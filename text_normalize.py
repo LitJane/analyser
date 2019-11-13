@@ -5,6 +5,8 @@
 
 import re
 
+from text_tools import unquote
+
 
 def r_group(x, name=None):
   if name is not None:
@@ -31,8 +33,8 @@ r_capitalized_ru = r'([А-Я][a-яА-Я–\-]{0,25})'
 r_capitalized = r_group(r'[A-ZА-Я][a-zA-Za-яА-Я–\-]{0,25}')
 # _r_name = r'[А-ЯA-Z][А-Яа-яA-Za-z\-–\[\]. ]{0,40}[а-яa-z.]'
 # _r_name_ru_having_quote = r'«([А-Я][А-Яа-я\-–\[\].\s«]{0,40}[А-Яа-я.,])»'
-_r_name_ru = r'[А-Я][А-Яа-я\-–\[\].\s«]{0,40}[А-Яа-я.,]'
-_r_name_lat = r'[A-Z][A-Za-z\-–\[\].\s]{0,40}[A-Za-z,]'
+_r_name_ru = r'[А-Я][№А-Яа-я\-–\[\].\s«]{0,40}[А-Яа-я.,]'
+_r_name_lat = r'[A-Z][№A-Za-z\-–\[\].\s]{0,40}[A-Za-z,]'
 _r_name = r_group(_r_name_ru) + '|' + r_group(_r_name_lat)
 r_name = r_group(_r_name, 'name')
 
@@ -51,7 +53,7 @@ def r_quoted(x):
   return r_quote_open + r'\s*' + x + r'\s*' + r_quote_close
 
 
-r_quoted_name = r_group(r_quoted(r_name))
+r_quoted_name = r_group(r_quoted(r_name), 'r_quoted_name')
 
 spaces_regex = [
   (re.compile(r'\t'), ' '),
@@ -167,6 +169,9 @@ def normalize_text(_t: str, replacements_regex):
 
 _legal_entity_types_of_subsidiaries = ['АО', 'ООО', 'ТОО', 'ИООО', 'ЗАО', 'НИС а.о.']
 
+r_quoted_name_contents = r_quote_open + r'\s*' + r_group(_r_name, 'r_quoted_name_contents') + r'\s*' + r_quote_close
+r_quoted_name_contents_c = re.compile(r_quoted_name_contents)
+
 
 def normalize_company_name(name: str) -> (str, str):
   legal_entity_type = ''
@@ -183,11 +188,17 @@ def normalize_company_name(name: str) -> (str, str):
   normal_name = normal_name.replace('\t', ' ').replace('\n', ' ')
   normal_name = normal_name.strip()
   normal_name = re.sub(r'\s+', ' ', normal_name)
-  normal_name = re.sub(r'[\s ]*[-–v][\s ]*', '-', normal_name)
-  normal_name = re.sub(r'["\']', '', normal_name)
+  normal_name = re.sub(r'[\s ]*[-–][\s ]*', '-', normal_name)
+
+  # x = r_quoted_name_contents_c.search(normal_name)
+  # if x is not None and x['r_quoted_name_contents'] is not None:
+  #   normal_name = x['r_quoted_name_contents']
+
+  # normal_name = re.sub(r'["\']', '', normal_name)
+
+  normal_name = unquote(normal_name)
+
   if normal_name.find('«') >= 0 and normal_name.find('»') < 0:  # TODO: hack
     normal_name += '»'
 
-  if normal_name[0] == '«' and normal_name[-1] == '»':
-    normal_name = normal_name[1:-1]
   return legal_entity_type, normal_name

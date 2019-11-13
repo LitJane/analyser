@@ -4,108 +4,76 @@
 import os
 import sys
 import traceback
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from pymongo import MongoClient
-from sklearn.ensemble import RandomForestClassifier
+from joblib import dump
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 
-from doc_structure import get_tokenized_line_number
+from headers_detector import line_features
+from hyperparams import models_path
+from integration.db import get_mongodb_connection
 from integration.word_document_parser import WordDocParser, join_paragraphs
-from text_tools import Tokens
+from legal_docs import PARAGRAPH_DELIMITER
 
-models_pth = os.path.join(Path(__file__).parents[1], 'vocab')
-print(models_pth)
-
-files_dir = '/Users/artem/Downloads/Telegram Desktop/X0/'
-
-popular_headers = pd.DataFrame.from_csv(os.path.join(models_pth, 'headers_by_popularity.csv'))[2:50]
-popular_headers = list(popular_headers['text'])
-
-from joblib import dump
-
-
-def _count_strange_symbols(txt, strange_symbols):
-  res = 0
-  for c in strange_symbols:
-    res += txt.count(c)
-  return res
+files_dirs = [
+  # '/Users/artem/Downloads/Telegram Desktop/X0/',
+              '/Users/artem/work/nemo/goil/IN/',
+              '/Users/artem/Google Drive/GazpromOil/Protocols', '/Users/artem/Google Drive/GazpromOil/Contracts',
+              '/Users/artem/Google Drive/GazpromOil/Charters']
+# MAX_DOCxS = 50 #0.0442
+# MAX_DOCS = 150 #0.0418
+MAX_DOCS = 500 #  0.0153 degrees.
+from random import shuffle
 
 
-def line_features(tokens: Tokens):
-  features = {}
-  txt = ' '.join(tokens)
-
-  numbers, span, k, s = get_tokenized_line_number(tokens, 0)
-  if not numbers:
-    numbers = []
-    number_minor = 0
-  else:
-    number_minor = numbers[-1]
-
-  header_id = ' '.join(tokens[span[1]:])
-  header_id = header_id.lower()
-  # print (numbers, s, k)
-
-  all_upper = header_id.upper() == header_id
-
-  features['popular'] = header_id in popular_headers
-
-  features['new_lines'] = txt.count('\n')
-  features['has_contract'] = txt.lower().find('договор')
-  features['all_uppercase'] = all_upper
-  features['len_tokens'] = len(tokens)
-  features['len_chars'] = len(txt)
-  features['number_level'] = len(numbers)
-  features['number_minor'] = number_minor
-  features['number_roman'] = s
-  features['dots'] = txt.count('.')
-  features['commas'] = txt.count(',')
-  features['brackets'] = txt.count(')')
-  features['dashes'] = txt.count('-')
-  features['strange_symbols'] = _count_strange_symbols(txt, '[_$@+]_?^&')
-
-  return features
-
-
-def doc_line_features(contract):
+def doc_line_features(contract) -> []:
   tmap = contract.tokens_map
   features = []
+  ln = 0
+  _prev_features = None
   for p in contract.paragraphs:
 
     header_tokens = tmap[p.header.slice]
-    header_features = line_features(header_tokens)
-    header_features['actual'] = 1
+    header_features = line_features(tmap, p.header.span, ln, _prev_features)
+
+    header_features['actual'] = 1.0
     print('☢️', header_tokens)
     features.append(header_features)
-
+    _prev_features = header_features.copy()
+    ln += 1
+    # --
     bodymap = tmap.slice(p.body.slice)
-    body_lines_ranges = bodymap.split_spans('\n', add_delimiter=True)
+    body_lines_ranges = bodymap.split_spans(PARAGRAPH_DELIMITER, add_delimiter=True)
     # line_number:int=0
     for line_span in body_lines_ranges:
-      line_tokens = bodymap.tokens_by_range(line_span)
-      # print('📃', line_tokens )
-      body_features = line_features(line_tokens)
+      # line_tokens = bodymap.tokens_by_range(line_span)
+
+      body_features = line_features(bodymap, line_span, ln, _prev_features)
       body_features['actual'] = 0
       features.append(body_features)
-      # print('📃-', body_features )
+      _prev_features = body_features.copy()
+      ln += 1
 
   return features
 
 
 def read_all_contracts():
-  client = MongoClient('mongodb://localhost:27017/')
-  db = client['gpn']
+  db = get_mongodb_connection()
   collection = db['legaldocs']
 
   wp = WordDocParser()
-  filenames = wp.list_filenames(files_dir)
+  filenames=[]
+  for dir in files_dirs:
+    filenames += wp.list_filenames(dir)
+
+  shuffle(filenames)
+  print(filenames)
 
   cnt = 0
   failures = 0
-
+  _version = wp.version
   for fn in filenames:
 
     shortfn = fn.split('/')[-1]
@@ -115,7 +83,7 @@ def read_all_contracts():
     cnt += 1
     print(cnt, fn)
 
-    res = collection.find_one({"_id": _doc_id, 'version': wp.version})
+    res = collection.find_one({"_id": _doc_id, 'version': _version})
     if res is None:
       try:
         # parse and save to DB
@@ -124,7 +92,7 @@ def read_all_contracts():
         res['short_filename'] = shortfn
         res['path'] = pth
         res['_id'] = _doc_id
-        res['version'] = wp.version
+        res['version'] = _version
 
         collection.delete_one({'_id': _doc_id})
         collection.insert_one(res)
@@ -138,7 +106,7 @@ def read_all_contracts():
 
     else:
       yield res
-      print(cnt, res["documentDate"], res["documentType"], res["documentNumber"])
+      # print(cnt, res["documentDate"], res["documentType"], res["documentNumber"])
 
 
 """
@@ -153,14 +121,16 @@ if __name__ == '__main__':
 
   features_dicts = []
   count = 0
-  for c in read_all_contracts():
 
+  for c in read_all_contracts():
+    # doctype = c['documentType']
     contract = join_paragraphs(c, c['_id'])
+
     _doc_features = doc_line_features(contract)
     features_dicts += _doc_features
 
     count += 1
-    if count > 125: break
+    if count > MAX_DOCS: break
 
   featuresX_data = pd.DataFrame.from_records(features_dicts)
 
@@ -181,7 +151,7 @@ if __name__ == '__main__':
   print('Testing Features Shape:', test_features.shape)
   print('Testing Labels Shape:', test_labels.shape)
 
-  rf = RandomForestClassifier(n_estimators=500, random_state=42)
+  rf = RandomForestRegressor(n_estimators=150, random_state=42, min_samples_split=8)
   # Train the model
   rf.fit(train_features, train_labels)
 
@@ -192,4 +162,4 @@ if __name__ == '__main__':
   # # Print out the mean absolute error (mae)
   print('Mean Absolute Error:', round(np.mean(errors), 4), 'degrees.')
 
-  dump(rf, os.path.join(models_pth, 'rf_headers_detector_model.joblib'))
+  dump(rf, os.path.join(models_path, 'rf_headers_detector_model.joblib'))

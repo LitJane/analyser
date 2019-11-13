@@ -45,7 +45,7 @@ class LegalDocumentTestCase(unittest.TestCase):
 
     # print(ld.embeddings)
     print(ld.tokens)
-    print_prof_data()
+
 
   def test_parse(self):
     d = LegalDocument("a")
@@ -54,11 +54,11 @@ class LegalDocumentTestCase(unittest.TestCase):
     self.assertEqual(1, len(d.tokens))
 
   def test_analyze_contract_0(self):
-    from renderer import SilentRenderer
+
     point1 = [1, 6, 4]
     emb = FakeEmbedder(point1)
 
-    ctx = ContractAnlysingContext(emb, SilentRenderer())
+    ctx = ContractAnlysingContext(emb )
     ctx.analyze_contract("1. ЮРИДИЧЕСКИЙ содержание 4.")
 
     ctx._logstep("analyze_contract")

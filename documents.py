@@ -1,23 +1,22 @@
+import os
+import pickle
 import sys
 import traceback
-
-from text_tools import untokenize, replace_tokens, tokenize_text
-
-TEXT_PADDING_SYMBOL = ' '
-
 import warnings
-import os, pickle
-from text_tools import Tokens, my_punctuation
 
 import nltk
 
+from hyperparams import models_path
+from text_tools import Tokens, my_punctuation, untokenize, replace_tokens, tokenize_text
+
+TEXT_PADDING_SYMBOL = ' '
 nltk.download('punkt')
 
 
 class TextMap:
 
   def __init__(self, text: str, map=None):
-    self._full_text = text
+    self._full_text = str(text)
     self._offset_chars = 0
     if map is None:
       self.map = TOKENIZER_DEFAULT.tokens_map(text)
@@ -71,13 +70,7 @@ class TextMap:
       b = a + 1
     return a, b
 
-  def token_indices_by_char_range(self, span: [int]) -> slice:
-    warnings.warn("use token_indices_by_char_range_2", DeprecationWarning)
-    a = self.token_index_by_char(span[0])
-    b = self.token_index_by_char(span[1])
-    if a == b and b >= 0:
-      b = a + 1
-    return slice(a, b)
+  token_indices_by_char_range = token_indices_by_char_range_2
 
   def slice(self, span: slice) -> 'TextMap':
     sliced = TextMap(self._full_text, self.map[span])
@@ -86,10 +79,7 @@ class TextMap:
       sliced._full_text = sliced._full_text[0:  sliced.map[-1][-1]]
     else:
       sliced._offset_chars = 0
-    # first_char_index = sliced.map[0][0]
-    # for _s in sliced.map:
-    #   _s[0] -= first_char_index
-    #   _s[1] -= first_char_index
+
     return sliced
 
   def split(self, delimiter: str) -> [Tokens]:
@@ -113,23 +103,58 @@ class TextMap:
         last = i + 1
     yield [last, self.get_len()]
 
-  def sentence_at_index(self, i: int) -> (int, int):
-    sent_spans = self.split_spans('\n', add_delimiter=True)
+  def sentence_at_index(self, i: int, return_delimiters=True) -> (int, int):
+    sent_spans = self.split_spans('\n', add_delimiter=return_delimiters)
+    d_add = 1
+    if return_delimiters:
+      d_add = 0
+
     for s in sent_spans:
-      if i >= s[0] and i < s[1]:
+      if i >= s[0] and i < s[1] + d_add:
         return s
     return [0, self.get_len()]
 
+  def char_range(self, span: [int]) -> (int, int):
+    a = span[0]
+    b = span[1]
+
+    if a is None:
+      a = 0
+
+    if b is None:
+      b = len(self.map)
+
+    if a >= len(self.map):
+      return 0, 0
+
+    start = self.map[a][0]
+
+    _last = min(len(self.map), b)
+    stop = self.map[_last - 1][1]
+
+    return start, stop
+
+  def remap_spans(self, spans, target_map: 'TextMap'):
+    assert self._full_text == target_map._full_text
+    ret = []
+    for span in spans:
+      char_range = self.char_range(span)
+      words_range = target_map.token_indices_by_char_range(char_range)
+      ret.append(words_range)
+    return ret
+
+  def remap_slices(self, spans, target_map: 'TextMap'):
+    assert self._full_text == target_map._full_text
+    ret = []
+    for span in spans:
+      char_range = self.char_range([span.start, span.stop])
+      words_range = target_map.token_indices_by_char_range(char_range)
+      ret.append(words_range)
+    return ret
+
   def text_range(self, span) -> str:
-    if span[0] >= len(self.map):
-      return ''
-
     try:
-      start = self.map[span[0]][0]
-      _last = min(len(self.map), span[1])
-      stop = self.map[_last - 1][1]
-
-      # assume map is ordered
+      start, stop = self.char_range(span)
       return self._full_text[start: stop]
     except:
       err = f'cannot deal with {span}'
@@ -180,8 +205,7 @@ class CaseNormalizer:
   def __init__(self):
     self.__dict__ = self.__shared_state
     if 'replacements_map' not in self.__dict__:
-      __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-      p = os.path.join(__location__, 'vocab', 'word_cases_stats.pickle')
+      p = os.path.join(models_path, 'word_cases_stats.pickle')
       print('loading word cases stats model', p)
 
       with open(p, 'rb') as handle:
@@ -241,19 +265,21 @@ class GTokenizer:
 
 def span_tokenize(text):
   start_from = 0
-  for token in nltk.word_tokenize(text):
-    if token == "''":
-      token = '"'
+  text = text.replace('`', '!')
+  text = text.replace('"', '!')
+  tokens = list(nltk.word_tokenize(text))
+  __debug = []
 
-    if token == "``":
-      token = '"'
+  for search_token in tokens:
 
-    ix_new = text.find(token, start_from)
+    ix_new = text.find(search_token, start_from)
     if ix_new < 0:
-      print(f'ACHTUNG! [{token}] not found with text.find, next text is: {text[start_from:start_from + 30]}')
+      msg = f'ACHTUNG! [{search_token}] not found with text.find, next text is: {text[start_from:start_from + 30]}'
+      warnings.warn(msg)
     else:
       start_from = ix_new
-      end = start_from + len(token)
+      end = start_from + len(search_token)
+      __debug.append((search_token, start_from, end))
       yield [start_from, end]
       start_from = end
 
@@ -293,3 +319,19 @@ class DefaultGTokenizer(GTokenizer):
 
 # TODO: use it!
 TOKENIZER_DEFAULT = DefaultGTokenizer()
+
+import numpy as np
+
+
+def sentences_attention_to_words(attention_v, sentence_map: TextMap, words_map: TextMap):
+  q_sent_indices = np.nonzero(attention_v)[0]
+  w_spans_attention = np.zeros(len(words_map))
+  char_ranges = [(sentence_map.map[i], attention_v[i]) for i in q_sent_indices]
+
+  w_spans = []
+  for char_range, a in char_ranges:
+    words_range = words_map.token_indices_by_char_range(char_range)
+    w_spans.append(words_range)
+    w_spans_attention[words_range[0]:words_range[1]] += a
+
+  return w_spans, w_spans_attention

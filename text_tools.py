@@ -58,6 +58,18 @@ def remove_empty_lines(original_text):
 # DISTANCES
 # ----------------------------------------------------------------
 
+
+def dist_cosine_to_point(text_emb, pt):
+  t_distances = np.zeros(len(text_emb))
+  for i in range(len(text_emb)):
+
+    d = distance.cosine(text_emb[i], pt)
+    if d > 1: d = 1
+    t_distances[i] = d
+
+  return t_distances
+
+
 def dist_hausdorff(u, v):
   return max(distance.directed_hausdorff(v, u, 4)[0], distance.directed_hausdorff(u, v, 4)[0]) / 40
 
@@ -327,3 +339,71 @@ def string_to_ip(txt) -> list or None:
     except:
       pass
   return ret
+
+
+def unquote(s):
+  if not s:
+    return s
+  if len(s) < 2:
+    return s
+
+  if s[0] == '«' and s[-1] == '»':
+    return s[1:-1]
+
+  if s[0] == '"' and s[-1] == '"':
+    return s[1:-1]
+
+  if s[0] == '\'' and s[-1] == '\'':
+    return s[1:-1]
+
+  return s
+
+
+def find_best_sentence_end(txt) -> int:
+  delimiters_prio = ['\n', '.!?', ';', ',', "-—", ')', ':', ' ']
+
+  for delimiters in delimiters_prio:
+
+    for i in reversed(range(len(txt))):
+      c = txt[i:i + 1]
+      if delimiters.find(c) >= 0:
+        return i + 1
+
+  return len(txt)
+
+
+def split_into_sentences(txt, max_len_chars=150):
+  spans = []
+  begin = 0
+  while begin < len(txt):
+    segment = txt[begin:begin + max_len_chars]
+    end = find_best_sentence_end(segment)
+    span = begin, begin + end
+    begin = span[1]
+    spans.append(span)
+
+  return spans
+
+
+def is_long_enough(val: str, minlen=2) -> bool:
+  if not val:
+    return False
+  if val.strip() == '':
+    return False
+  if len(val.strip()) < minlen:
+    return False
+  return True
+
+
+def span_len(span: [int]) -> int:
+  return abs(span[1] - span[0])
+
+
+if __name__ == '__main__':
+  x = '12345 aaaa.1234 ttt. dfdfd. 0123456789'
+  be = find_best_sentence_end(x)
+  spans = split_into_sentences(x, max_len_chars=12)
+  for span in spans:
+    print('S >>>', x[span[0]:span[1]])
+
+  # print('E >>>', x[be:])

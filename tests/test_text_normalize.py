@@ -17,11 +17,6 @@ class CaseNormalizerTestCase(unittest.TestCase):
     print(cn.normalize_text('стороны Заключили (ХОРОШИЙ)договор, (уррраа!!) ПРЕДМЕТ ДОГОВОРА'))
     print(cn.normalize_word('ДОГОВОР'))
 
-
-
-
-
-
   def test_normalize_doc_tokenization(self):
     doc_text = """n\n\nАкционерное общество «Газпром - Вибраниум и Криптонит» (АО «ГВК»), именуемое в \
         дальнейшем «Благотворитель», в лице заместителя генерального директора по персоналу и \
@@ -36,8 +31,6 @@ class CaseNormalizerTestCase(unittest.TestCase):
 
     for i in range(len(doc.tokens)):
       self.assertEqual(doc.tokens[i].lower(), doc.tokens_cc[i].lower())
-
-
 
   def test_normalize_basics(self):
     cn = CaseNormalizer()
@@ -56,9 +49,17 @@ class CaseNormalizerTestCase(unittest.TestCase):
 class TestTextNormalization(unittest.TestCase):
 
   def test_normalize_company_name(self):
+    a, b = normalize_company_name('Многофункциональный комплекс «Лахта центр»')
+    self.assertEqual('', a)
+    self.assertEqual('Многофункциональный комплекс «Лахта центр»', b)
+
     a, b = normalize_company_name('ООО «Газпромнефть Марин Бункер»')
     self.assertEqual('ООО', a)
     self.assertEqual('Газпромнефть Марин Бункер', b)
+
+    a, b = normalize_company_name('ООО «Газпромнефть «Марин Бункер»')
+    self.assertEqual('ООО', a)
+    self.assertEqual('Газпромнефть «Марин Бункер»', b)
 
     a, b = normalize_company_name('НИС а.о. Нови Сад')
     self.assertEqual('НИС а.о.', a)
@@ -76,6 +77,9 @@ class TestTextNormalization(unittest.TestCase):
     self.assertEqual('АО', a)
     self.assertEqual('Газпромнефть-Аэро', b)
 
+    a, b = normalize_company_name("АО «Газпромнефть–Сахалин»")
+    self.assertEqual('АО', a)
+    self.assertEqual('Газпромнефть-Сахалин', b)
 
   def _testNorm(self, a, b):
     _norm = normalize_text(a, replacements_regex)
@@ -83,7 +87,7 @@ class TestTextNormalization(unittest.TestCase):
     # if not _norm == b:
     #   self.fail('\n' + _norm + ' <> \n' + b)
 
-    self.assertEqual( b,_norm)
+    self.assertEqual(b, _norm)
     # test idempotence
     # self.assertEqual(_norm2, b)
 
@@ -137,7 +141,6 @@ class TestTextNormalization(unittest.TestCase):
     doc.parse()
     self.assertEqual('"Газпром"', doc.text)
 
-
   def test_dot_in_numbers(self):
     self._testNorm('Сумма договора не должна превышать 500 000 (пятьсот тысяч) рублей.',
                    'Сумма договора не должна превышать 500000 (пятьсот тысяч) рублей.')
@@ -148,12 +151,13 @@ class TestTextNormalization(unittest.TestCase):
     self._testNorm('Сумма договора не должна превышать 50 000,00 (пятьсот тысяч) рублей.',
                    'Сумма договора не должна превышать 50000,00 (пятьсот тысяч) рублей.')
 
-    self._testNorm('Стоимость оборудования 80 000,00 (восемьдесят тысяч рублей рублей 00 копеек) рублей, НДС не облагается.',
-                   'Стоимость оборудования 80000,00 (восемьдесят тысяч рублей рублей 00 копеек) рублей, НДС не облагается.')
+    self._testNorm(
+      'Стоимость оборудования 80 000,00 (восемьдесят тысяч рублей рублей 00 копеек) рублей, НДС не облагается.',
+      'Стоимость оборудования 80000,00 (восемьдесят тысяч рублей рублей 00 копеек) рублей, НДС не облагается.')
 
-
-    self._testNorm(' Общество с ограниченной ответственностью «Газпромнефть-Сахалин» (ООО «Газпромнефть-Сахалин»), именуемое в дальнейшем «Заказчик», в лице генерального директора Коробкова Александра Николаевича, действующего на основании Устава, с одной стороны, и',
-                   ' Общество с ограниченной ответственностью «Газпромнефть-Сахалин» (ООО «Газпромнефть-Сахалин»), именуемое в дальнейшем «Заказчик», в лице генерального директора Коробкова Александра Николаевича, действующего на основании Устава, с одной стороны, и')
+    self._testNorm(
+      ' Общество с ограниченной ответственностью «Газпромнефть-Сахалин» (ООО «Газпромнефть-Сахалин»), именуемое в дальнейшем «Заказчик», в лице генерального директора Коробкова Александра Николаевича, действующего на основании Устава, с одной стороны, и',
+      ' Общество с ограниченной ответственностью «Газпромнефть-Сахалин» (ООО «Газпромнефть-Сахалин»), именуемое в дальнейшем «Заказчик», в лице генерального директора Коробкова Александра Николаевича, действующего на основании Устава, с одной стороны, и')
 
     self._testNorm('3.000 (Три тысячи) рублей 00 коп.,', '3000 (Три тысячи) рублей 00 копеек,')
 

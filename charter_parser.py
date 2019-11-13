@@ -1,15 +1,19 @@
 # origin: charter_parser.py
+import re
 
 from charter_patterns import make_constraints_attention_vectors
 from legal_docs import LegalDocument, CharterDocument, \
-  extract_all_contraints_from_sr, _expand_slice
+  _expand_slice
 from ml_tools import *
+from ml_tools import FixedVector, ProbableValue
 from parsing import ParsingSimpleContext, head_types_dict, known_subjects
 from patterns import find_ner_end, improve_attention_vector, AV_PREFIX, PatternSearchResult, \
-  ConstraintsSearchResult, PatternSearchResults
+  ConstraintsSearchResult, PatternSearchResults, PatternMatch
 from sections_finder import SectionsFinder, FocusingSectionsFinder, HeadlineMeta
 from structures import *
-from transaction_values import extract_sum, ValueConstraint, extract_sum_and_sign_2, split_by_number_2
+from text_tools import untokenize, Tokens
+from transaction_values import extract_sum, number_re, ValueConstraint, VALUE_SIGN_MIN_TOKENS, detect_sign, \
+  currencly_map, complete_re
 from violations import ViolationsFinder
 
 WARN = '\033[1;31m'
@@ -83,8 +87,8 @@ class CharterConstraintsParser(ParsingSimpleContext):
     sentences = []
     for sentence_subdoc in sentenses_i:
       constraints: List[ProbableValue] = extract_all_contraints_from_sentence(sentence_subdoc,
-                                                                                sentence_subdoc.distances_per_pattern_dict[
-                                                                                  'deal_value_attention_vector'])
+                                                                              sentence_subdoc.distances_per_pattern_dict[
+                                                                                'deal_value_attention_vector'])
 
       sentence = {
         'subdoc': sentence_subdoc,
@@ -433,3 +437,123 @@ def put_if_better(destination: dict, key, x, is_better: staticmethod):
       destination[key] = x
   else:
     destination[key] = x
+
+
+def split_by_number_2(tokens: List[str], attention: FixedVector, threshold) -> (
+        List[List[str]], List[int], List[slice]):
+  indexes = []
+  last_token_is_number = False
+  for i in range(len(tokens)):
+
+    if attention[i] > threshold and len(number_re.findall(tokens[i])) > 0:
+      if not last_token_is_number:
+        indexes.append(i)
+      last_token_is_number = True
+    else:
+      last_token_is_number = False
+
+  text_fragments = []
+  ranges: List[slice] = []
+  if len(indexes) > 0:
+    for i in range(1, len(indexes)):
+      _slice = slice(indexes[i - 1], indexes[i])
+      text_fragments.append(tokens[_slice])
+      ranges.append(_slice)
+
+    text_fragments.append(tokens[indexes[-1]:])
+    ranges.append(slice(indexes[-1], len(tokens)))
+  return text_fragments, indexes, ranges
+
+
+def extract_sum_and_sign_2(subdoc, region: slice) -> ValueConstraint:
+  warnings.warn("deprecated", DeprecationWarning)
+  # TODO: rename
+
+  _slice = slice(region.start - VALUE_SIGN_MIN_TOKENS, region.stop)
+  subtokens = subdoc.tokens_cc[_slice]
+  _prefix_tokens = subtokens[0:VALUE_SIGN_MIN_TOKENS + 1]
+  _prefix = untokenize(_prefix_tokens)
+  _sign = detect_sign(_prefix)
+  # ======================================
+  _sum = extract_sum_from_tokens_2(subtokens)
+  # ======================================
+
+  currency = "UNDEF"
+  value = np.nan
+  if _sum is not None:
+    currency = _sum[1]
+    if _sum[1] in currencly_map:
+      currency = currencly_map[_sum[1]]
+    value = _sum[0]
+
+  vc = ValueConstraint(value, currency, _sign, TokensWithAttention([], []))
+
+  return vc
+
+
+def extract_all_contraints_from_sr(search_result: PatternSearchResult, attention_vector: List[float]) -> List[
+  ProbableValue]:
+  warnings.warn("use extract_all_contraints_from_sr_2", DeprecationWarning)
+
+  def __tokens_before_index(string, index):
+    warnings.warn("deprecated", DeprecationWarning)
+    return len(string[:index].split(' '))
+
+  sentence = ' '.join(search_result.tokens)
+  all_values = [slice(m.start(0), m.end(0)) for m in re.finditer(complete_re, sentence)]
+  constraints: List[ProbableValue] = []
+
+  for a in all_values:
+    # print(tokens_before_index(sentence, a.start), 'from', sentence[a])
+    token_index_s = __tokens_before_index(sentence, a.start) - 1
+    token_index_e = __tokens_before_index(sentence, a.stop)
+
+    region = slice(token_index_s, token_index_e)
+
+    vc: ValueConstraint = extract_sum_and_sign_3(search_result, region)
+    _e = _expand_slice(region, 10)
+    vc.context = TokensWithAttention(search_result.tokens[_e], attention_vector[_e])
+    confidence = attention_vector[region.start]
+    pv = ProbableValue(vc, confidence)
+
+    constraints.append(pv)
+
+  return constraints
+
+
+def extract_sum_and_sign_3(sr: PatternMatch, region: slice) -> ValueConstraint:
+  warnings.warn("use extract_sum_sign_currency", DeprecationWarning)
+
+  _slice = slice(region.start - VALUE_SIGN_MIN_TOKENS, region.stop)
+  subtokens = sr.tokens[_slice]
+  _prefix_tokens = subtokens[0:VALUE_SIGN_MIN_TOKENS + 1]
+  _prefix = untokenize(_prefix_tokens)
+  _sign = detect_sign(_prefix)
+  # ======================================
+  _sum = extract_sum_from_tokens_2(subtokens)
+  # ======================================
+
+  currency = "UNDEF"
+  value = np.nan
+  if _sum is not None:
+    currency = _sum[1]
+    if _sum[1] in currencly_map:
+      currency = currencly_map[_sum[1]]
+    value = _sum[0]
+
+  vc = ValueConstraint(value, currency, _sign, TokensWithAttention([], []))
+
+  return vc
+
+
+def extract_sum_from_tokens_2(sentence_tokens: Tokens):
+  warnings.warn("method relies on untokenize, not good", DeprecationWarning)
+  f, __ = extract_sum_from_tokens(sentence_tokens)
+  return f
+
+
+def extract_sum_from_tokens(sentence_tokens: Tokens):
+  warnings.warn("method relies on untokenize, not good", DeprecationWarning)
+  _sentence = untokenize(sentence_tokens).lower().strip()
+  f = extract_sum(_sentence)
+  return f, _sentence

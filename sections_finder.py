@@ -3,9 +3,10 @@ from typing import List
 
 import numpy as np
 
+from hyperparams import HyperParameters
 from legal_docs import LegalDocument
 from ml_tools import put_if_better, cut_above, relu, filter_values_by_key_prefix, \
-  smooth_safe, max_exclusive_pattern, sum_probabilities
+  smooth_safe, max_exclusive_pattern
 from parsing import ParsingSimpleContext
 from patterns import AbstractPatternFactory, improve_attention_vector
 
@@ -46,7 +47,7 @@ class FocusingSectionsFinder(SectionsFinder):
 
   def find_sections(self, contract: LegalDocument, factory: AbstractPatternFactory, headlines: List[str],
                     headline_patterns_prefix: str = 'headline.', additional_attention: List[float] = None,
-                    confidence_threshold=0.7) -> dict:
+                    confidence_threshold=HyperParameters.header_topic_min_confidence) -> dict:
 
     sections_filtered = {}
     for section_type in headlines:
@@ -57,19 +58,20 @@ class FocusingSectionsFinder(SectionsFinder):
       headers = [contract.subdoc_slice(p.header.as_slice()) for p in contract.paragraphs]
 
       _max_confidence = 0
-      _max_header_i = -1
+      _max_header_i = 0
       for header_index in range(len(headers)):
         header = headers[header_index]
-        vvs = header.calculate_distances_per_pattern(factory, pattern_prefix=pattern_prefix, merge=False)
-        vv = sum_probabilities(list(vvs.values()))  # bayes-aggregated vectors
-        _confidence = max(vv)
+        if header.text and header.text.strip():
+          vvs = header.calculate_distances_per_pattern(factory, pattern_prefix=pattern_prefix, merge=False)
+          vv = max_exclusive_pattern(list(vvs.values()))
+          _confidence = max(vv)
 
-        if _confidence > _max_confidence:
-          _max_confidence = _confidence
-          _max_header_i = header_index
+          if _confidence > _max_confidence:
+            _max_confidence = _confidence
+            _max_header_i = header_index
 
       if _max_confidence > confidence_threshold:
-        put_if_better(sections_filtered, _max_header_i, (_max_confidence, section_type), lambda a, b: a[1] > b[1])
+        put_if_better(sections_filtered, _max_header_i, (_max_confidence, section_type), lambda a, b: a[1] < b[1])
 
     sections = {}
     for header_i in sections_filtered:

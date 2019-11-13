@@ -51,4 +51,9 @@ tests/contracts-stats.csv
 
 tests/contracts-stats-1.csv
 
+nltk_data_download/tokenizers/punkt/PY3/polish.pickle
+
+libs/document-parser**/
+
 libs/document-parser-**/
+

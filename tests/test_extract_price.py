@@ -12,9 +12,10 @@ import numpy as np
 from contract_parser import ContractDocument, find_value_sign_currency
 from documents import TextMap
 from legal_docs import find_value_sign
-from ml_tools import SemanticTag, conditional_p_sum
+from ml_tools import conditional_p_sum
 from text_normalize import *
-from transaction_values import extract_sum, split_by_number_2
+from transaction_values import extract_sum
+from charter_parser import split_by_number_2
 
 data = [
   (0, 41752.62, 'RUB',
@@ -43,7 +44,8 @@ data = [
 
   (0, 1000000.0, 'EURO', 'стоимость покупки: 1 000 000 евро '),
 
-  (0, 86500.0, 'RUB', 'Стоимость Услуг составляет 86 500,00 рублей (Восемьдесят шесть тысяч пятьсот рублей) 00 копеек, налогом на добавленную стоимость (НДС) не облагается согласно пп. 14 п. 2 ст. 149 Налогового кодекса Российской Федерации. '),
+  (0, 86500.0, 'RUB',
+   'Стоимость Услуг составляет 86 500,00 рублей (Восемьдесят шесть тысяч пятьсот рублей) 00 копеек, налогом на добавленную стоимость (НДС) не облагается согласно пп. 14 п. 2 ст. 149 Налогового кодекса Российской Федерации. '),
 
   (0, 67624292.0, 'RUB', 'составляет 67 624 292 (шестьдесят семь миллионов шестьсот двадцать четыре тысячи '
                          'двести девяносто два) рубля '),
@@ -68,6 +70,8 @@ data = [
   (0, 1999.44, 'RUB', '1 999 (тысяча девятьсот) руб. 44 (сорок четыре) коп. и что-то 34'),
   (1, 25000000.0, 'USD', 'в размере более 25 млн . долларов сша'),
   (0, 25000000.0, 'USD', 'эквивалентной 25 миллионам долларов сша'),
+  (0, 1110635.40, 'RUB',
+   'Стоимость Услуг составляет 1 110 635,40 (Один миллион сто десять тысяч шестьсот тридцать пять) рублей 40 копеек, в т.ч. НДС (18%): 169 418,96 (Сто шестьдесят девять тысяч четыреста восемнадцать тысяч) рублей 96 копеек. Стоимость Услуг включает в себя стоимость учебных, справочных, методических и иных материалов, передаваемых Работникам.'),
   # (0, 80000,'RUB', 'Стоимость оборудования 80 000,00 (восемьдесят тысяч рублей рублей 00 копеек) рублей,'),#TODO
   (0, 80000, 'RUB', 'Стоимость оборудования 80000,00 (восемьдесят тысяч рублей рублей 00 копеек) рублей,'),  # TODO
 
@@ -140,7 +144,6 @@ class PriceExtractTestCase(unittest.TestCase):
     r = find_value_sign_currency(doc)
     # =========================================
 
-
     # for sum, sign, currency in r:
 
     print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
@@ -172,13 +175,11 @@ class PriceExtractTestCase(unittest.TestCase):
       doc.parse()
       r: List = find_value_sign_currency(doc)
       if r:
-
         print(doc.tokens_map_norm.text_range(r[0].value.span))
-        self.assertEqual(price,r[0]. value.value, text)
+        self.assertEqual(price, r[0].value.value, text)
         self.assertEqual(currency_exp, r[0].currency.value, text)
         print(r[0].value.value)
         print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
-
 
   def test_extract(self):
 
@@ -234,8 +235,8 @@ class PriceExtractTestCase(unittest.TestCase):
         self.assertTrue(restored[0].isdigit())
 
   def test_conditional_p_sum(self):
-    v= [0.9,0.9]
-    s = conditional_p_sum(v )
+    v = [0.9, 0.9]
+    s = conditional_p_sum(v)
     for a in v:
       self.assertGreater(s, a)
       self.assertGreater(1, a)

@@ -5,8 +5,7 @@
 
 import unittest
 
-from doc_structure import remove_similar_indexes_considering_weights,  get_tokenized_line_number
-from legal_docs import LegalDocument
+from doc_structure import remove_similar_indexes_considering_weights, get_tokenized_line_number
 
 
 class DocumentStructureTestCase(unittest.TestCase):
@@ -46,7 +45,7 @@ class DocumentStructureTestCase(unittest.TestCase):
     self.assertEqual(r, [1, 5])
 
   def test_get_tokenized_line_number(self):
-    n, span, level, roman = get_tokenized_line_number('2. correct'.split(' '),0)
+    n, span, level, roman = get_tokenized_line_number('2. correct'.split(' '), 0)
     self.assertEqual([2], n)
     self.assertEqual(1, level)
     self.assertEqual(False, roman)
@@ -55,6 +54,7 @@ class DocumentStructureTestCase(unittest.TestCase):
     self.assertEqual([2], n)
     self.assertEqual(0, level)
     self.assertEqual(True, roman)
+
 
 if __name__ == '__main__':
   unittest.main()

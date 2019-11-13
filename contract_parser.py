@@ -5,7 +5,7 @@ from ml_tools import *
 
 from parsing import ParsingConfig, ParsingContext
 from patterns import AV_SOFT, AV_PREFIX
-from renderer import AbstractRenderer
+
 from sections_finder import FocusingSectionsFinder
 from structures import ContractSubject
 
@@ -61,9 +61,9 @@ def filter_nans(vcs: List[ProbableValue]) -> List[ProbableValue]:
 
 class ContractAnlysingContext(ParsingContext):
 
-  def __init__(self, embedder, renderer: AbstractRenderer = None, pattern_factory=None):
+  def __init__(self, embedder, renderer=None, pattern_factory=None):
     ParsingContext.__init__(self, embedder)
-    self.renderer: AbstractRenderer = renderer
+
     if not pattern_factory:
       self.pattern_factory = ContractPatternFactory(embedder)
     else:
@@ -187,7 +187,6 @@ class ContractAnlysingContext(ParsingContext):
     return x
 
   def find_contract_subject_region(self, doc) -> SemanticTag:
-
     if 'subj' in doc.sections:
       subj_section = doc.sections['subj']
       subject_subdoc = subj_section.body
@@ -212,13 +211,15 @@ class ContractAnlysingContext(ParsingContext):
     max_confidence = 0
     max_subject_kind = None
     max_paragraph_span = None
+
     for subject_kind in contract_subjects:  # like ContractSubject.RealEstate ..
       subject_attention_vector: FixedVector = self.make_subject_attention_vector_3(section, subject_kind,
                                                                                    subject_headline_attention)
 
       paragraph_span, confidence, paragraph_attention_vector = _find_most_relevant_paragraph(section,
                                                                                              subject_attention_vector,
-                                                                                             min_len=20)
+                                                                                             min_len=20,
+                                                                                             return_delimiters=False)
 
       if self.verbosity_level > 2:
         print(f'--------------------confidence {subject_kind}=', confidence)
@@ -239,11 +240,12 @@ class ContractAnlysingContext(ParsingContext):
     assert contract.sections is not None, 'find sections first'
 
     search_sections_order = [
-      ['price.', 1], ['subj', 0.75], ['pricecond', 0.75], [None, 0.5]  # todo: check 'price', not 'price.'
+      ['cvalue', 1], ['pricecond', 0.75], ['subj', 0.75], [None, 0.5]  # todo: check 'price', not 'price.'
     ]
 
     for section, confidence_k in search_sections_order:
       if section in contract.sections or section is None:
+
         if section in contract.sections:
           value_section = contract.sections[section].body
           _section_name = contract.sections[section].subdoc.text.strip()
@@ -255,16 +257,17 @@ class ContractAnlysingContext(ParsingContext):
           self._logstep(f'searching for transaction values in section ["{section}"] "{_section_name}"')
 
         values_list: List[ContractValue] = find_value_sign_currency(value_section, self.pattern_factory)
+
         if not values_list:
           # search in next section
-          self.warning(f'В разделе "{_section_name}" стоимость сделки не найдена!')
+          self.warning(f'В разделе "{_section_name}" ["{section}"] стоимость сделки не найдена!')
 
         else:
           # decrease confidence:
           for g in values_list:
             for _r in g.as_list():
               _r.confidence *= confidence_k
-              _r.offset(value_section.start)
+
 
           # ------
           # reduce number of found values
@@ -279,7 +282,7 @@ class ContractAnlysingContext(ParsingContext):
 
 
       else:
-        self.warning('Раздел про стоимость сделки не найден!')
+        self.warning(f'Раздел [{section}]  не обнаружен')
 
 
 def find_value_sign_currency(value_section_subdoc: LegalDocument, factory: ContractPatternFactory = None) -> List[
@@ -295,15 +298,26 @@ def find_value_sign_currency(value_section_subdoc: LegalDocument, factory: Contr
     # HATI-HATI: this case is for Unit Testing only
     attention_vector_tuned = None
 
-  spans = [m for m in value_section_subdoc.tokens_map.finditer(transaction_values_re)]
-  values_list = [extract_sum_sign_currency(value_section_subdoc, span) for span in spans]
+  return find_value_sign_currency_attention(value_section_subdoc, attention_vector_tuned)
 
-  # Estimating confidence by looking at attention vector
-  if attention_vector_tuned is not None:
-    for value_sign_currency in values_list:
-      for t in value_sign_currency.as_list():
-        t.confidence *= (HyperParameters.confidence_epsilon + estimate_confidence_by_mean_top_non_zeros(
-          attention_vector_tuned[t.slice]))
+
+def find_value_sign_currency_attention(value_section_subdoc: LegalDocument, attention_vector_tuned=None) -> List[
+  ContractValue]:
+  spans = [m for m in value_section_subdoc.tokens_map.finditer(transaction_values_re)]
+  values_list = []
+
+  for span in spans:
+    value_sign_currency = extract_sum_sign_currency(value_section_subdoc, span)
+    if value_sign_currency is not None:
+
+      # Estimating confidence by looking at attention vector
+      if attention_vector_tuned is not None:
+        for t in value_sign_currency.as_list():
+          t.confidence *= (HyperParameters.confidence_epsilon + estimate_confidence_by_mean_top_non_zeros(
+            attention_vector_tuned[t.slice]))
+          t.offset(value_section_subdoc.start)
+
+      values_list.append(value_sign_currency)
 
   return values_list
 
@@ -316,17 +330,20 @@ def max_value(vals: List[ContractValue]) -> ContractValue:
   return max(vals, key=lambda a: a.value.value)
 
 
-def _find_most_relevant_paragraph(section: LegalDocument, subject_attention_vector: FixedVector, min_len: int):
+def _find_most_relevant_paragraph(section: LegalDocument, subject_attention_vector: FixedVector, min_len: int,
+                                  return_delimiters=True):
   # paragraph_attention_vector = smooth(attention_vector, 6)
-  _padding = 23
-  _blur = 10
+
+  _blur = HyperParameters.subject_paragraph_attention_blur
+  _padding = _blur * 2 + 1
 
   paragraph_attention_vector = smooth_safe(np.pad(subject_attention_vector, _padding, mode='constant'), _blur)[
                                _padding:-_padding]
+
   top_index = int(np.argmax(paragraph_attention_vector))
   span = section.tokens_map.sentence_at_index(top_index)
   if min_len is not None and span[1] - span[0] < min_len:
-    next_span = section.tokens_map.sentence_at_index(span[1] + 1)
+    next_span = section.tokens_map.sentence_at_index(span[1] + 1, return_delimiters)
     span = (span[0], next_span[1])
 
   # confidence = paragraph_attention_vector[top_index]

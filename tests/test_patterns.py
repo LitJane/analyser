@@ -1,6 +1,5 @@
 import unittest
 
-from legal_docs import LegalDocument
 from patterns import *
 
 
@@ -41,10 +40,6 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
 
     print("ranges")
     print(ranges)
-
-
-
-
 
   def test_eval_distances_soft_pattern2(self):
     point1 = [1, 3]
@@ -166,7 +161,7 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     point3 = [1, 6]
 
     fp2 = FuzzyPattern(None)
-    fp2.set_embeddings(np.array([point2]), (0,1))
+    fp2.set_embeddings(np.array([point2]), (0, 1))
     # fp2 = FuzzyPattern(np.array([[point2]]))
 
     cp = CoumpoundFuzzyPattern()
@@ -184,17 +179,18 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     from ml_tools import estimate_confidence
     confidence, sum_, nonzeros_count, _max = estimate_confidence([])
     self.assertEqual(0, confidence)
-    self.assertTrue( sum_ is np.nan)
+    self.assertTrue(sum_ is np.nan)
     self.assertEqual(0, nonzeros_count)
-    self.assertTrue( _max is np.nan)
+    self.assertTrue(_max is np.nan)
 
   def test_etimate_confidence2(self):
     from ml_tools import estimate_confidence
     confidence, sum_, nonzeros_count, _max = estimate_confidence([1])
     self.assertEqual(1, confidence)
-    self.assertEqual( sum_ , 1)
+    self.assertEqual(sum_, 1)
     self.assertEqual(1, nonzeros_count)
-    self.assertEqual( _max ,1)
+    self.assertEqual(_max, 1)
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -62,7 +62,6 @@ def get_tokenized_line_number(tokens: Tokens, last_level):
   return None, (0, 0), last_level, False
 
 
-# XXXL
 def remove_similar_indexes_considering_weights(indexes: List[int], weights: FixedVector) -> List[int]:
   hif = []
 

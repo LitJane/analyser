@@ -1,8 +1,8 @@
-from embedding_tools import ElmoEmbedder
 from legal_docs import rectifyed_sum_by_pattern_prefix
 from ml_tools import max_exclusive_pattern_by_prefix, momentum, cut_above, relu
 from patterns import AbstractPatternFactoryLowCase
 from structures import ContractSubject
+from tf_support.embedder_elmo import ElmoEmbedder
 
 
 class ContractPatternFactory(AbstractPatternFactoryLowCase):
@@ -12,7 +12,7 @@ class ContractPatternFactory(AbstractPatternFactoryLowCase):
     # self.headlines = ['subj', 'contract', 'def', 'price.', 'pricecond', 'terms', 'dates', 'break', 'rights', 'obl',
     #                   'resp', 'forcemajor', 'confidence', 'special', 'appl', 'addresses', 'conficts']
 
-    self.headlines = ['subj', 'contract', 'price.', 'pricecond', 'dates',
+    self.headlines = ['subj', 'contract', 'cvalue', 'pricecond', 'dates',
                       'resp', 'forcemajor', 'confidence', 'appl', 'addresses', 'conficts']
 
     self._build_head_patterns()
@@ -37,11 +37,11 @@ class ContractPatternFactory(AbstractPatternFactoryLowCase):
     cp('headline.subj.2', (p_r_f_x, 'ПРЕДМЕТ', 'ДОГОВОРА'))
     cp('headline.subj.3', ('заключили настоящий договор о нижеследующем', 'Общие положения', ''))
 
-    cp('headline.price.1', (p_r_f_x, 'цена', 'договора'))
-    cp('headline.price.2', (p_r_f_x, 'СТОИМОСТЬ', 'РАБОТ'))
-    cp('headline.price.3', (p_r_f_x, ' Расчеты', 'по договору'))
-    cp('headline.price.4', (p_r_f_x, 'Оплата', 'услуг'))
-    cp('headline.price.5',
+    cp('headline.cvalue.1', (p_r_f_x, 'цена', 'договора'))
+    cp('headline.cvalue.2', (p_r_f_x, 'СТОИМОСТЬ', 'РАБОТ'))
+    cp('headline.cvalue.3', (p_r_f_x, ' Расчеты', 'по договору'))
+    cp('headline.cvalue.4', (p_r_f_x, 'Оплата', 'услуг'))
+    cp('headline.cvalue.5',
        ('порядок и сроки', 'оплаты', 'согласовываются Сторонами в Дополнительных соглашениях к настоящему'))
 
     cp('headline.pricecond.1', ('УСЛОВИЯ ', 'ПЛАТЕЖЕЙ', ''))

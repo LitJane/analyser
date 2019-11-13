@@ -10,9 +10,9 @@ from text_normalize import normalize_text, replacements_regex
 
 class TableOfContentsRemovalTest(unittest.TestCase):
 
-    # ЕЮ Устав.docx
-    def test_remove_1(self):
-        t = '''
+  # ЕЮ Устав.docx
+  def test_remove_1(self):
+    t = '''
 УТВЕРЖДЕНО
 
 
@@ -93,15 +93,15 @@ ___________________________________________________________________
 
         '''
 
-        normal_text = normalize_text(t, replacements_regex)
-        print(normal_text)
-        print('='*20)
+    normal_text = normalize_text(t, replacements_regex)
+    print(normal_text)
+    print('=' * 20)
 
-        self.assertTrue(len(normal_text)<len(t)*0.9)
+    self.assertTrue(len(normal_text) < len(t) * 0.9)
 
-    # МНГ Устав.docx
-    def test_remove_2(self):
-        t = '''
+  # МНГ Устав.docx
+  def test_remove_2(self):
+    t = '''
 У  С  Т  А В
 
 Акционерного общества
@@ -185,15 +185,15 @@ ___________________________________________________________________
 	Правовое положение Общества, права и обязанности его акционеров определяются Гражданским кодексом Российской Федерации, Федеральным законом «Об акционерных обществах», другими правовыми актами Российской Федерации, настоящим Уставом, а также корпоративным договором в отношении Общества.
         '''
 
-        normal_text = normalize_text(t, replacements_regex)
-        print(normal_text)
-        print('=' * 20)
+    normal_text = normalize_text(t, replacements_regex)
+    print(normal_text)
+    print('=' * 20)
 
-        self.assertTrue(len(normal_text) < len(t) * 0.9)
+    self.assertTrue(len(normal_text) < len(t) * 0.9)
 
-    # 6.1.1(a) Project Tri-Neft - Sunrise Charter.docx
-    def test_remove_3(self):
-        t = '''
+  # 6.1.1(a) Project Tri-Neft - Sunrise Charter.docx
+  def test_remove_3(self):
+    t = '''
 УСТАВ
 
 CHARTER
@@ -359,15 +359,15 @@ TABLE OF CONTENTS
 Информация об Обществе была внесена в Единый государственный реестр юридических лиц под Основным государственным регистрационным номером 1057002610378 Налоговой инспекцией Федеральной налоговой службы по г. Томску 14 сентября 2005 года.
         '''
 
-        normal_text = normalize_text(t, replacements_regex)
-        print(normal_text)
-        print('=' * 20)
+    normal_text = normalize_text(t, replacements_regex)
+    print(normal_text)
+    print('=' * 20)
 
-        self.assertTrue(len(normal_text) < len(t) * 0.9)
+    self.assertTrue(len(normal_text) < len(t) * 0.9)
 
-    # Договор_ООО Зодчий_25 млн.$.docx
-    def test_remove_4(self):
-        t = '''
+  # Договор_ООО Зодчий_25 млн.$.docx
+  def test_remove_4(self):
+    t = '''
 г. Тюмень
 
 2019г.
@@ -429,9 +429,8 @@ TABLE OF CONTENTS
 при наклонн
         '''
 
-        normal_text = normalize_text(t, replacements_regex)
-        print(normal_text)
-        print('=' * 20)
+    normal_text = normalize_text(t, replacements_regex)
+    print(normal_text)
+    print('=' * 20)
 
-        self.assertTrue(len(normal_text) < len(t) * 0.9)
-
+    self.assertTrue(len(normal_text) < len(t) * 0.9)

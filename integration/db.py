@@ -12,6 +12,7 @@ def __check_var(vname):
   else:
     return True
 
+# mongod --config /usr/local/etc/mongod.conf
 
 def get_mongodb_connection():
   if __check_var('GPN_DB_HOST') and __check_var('GPN_DB_PORT') and __check_var('GPN_DB_NAME'):

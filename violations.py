@@ -1,9 +1,9 @@
 from typing import List
 
+from colab_support.renderer import as_warning, as_offset, as_error_html, as_msg, as_quote, as_currency
 from ml_tools import ProbableValue, np, TokensWithAttention
 from parsing import head_types_dict
 from patterns import ConstraintsSearchResult
-from renderer import as_warning, as_offset, as_error_html, as_msg, as_quote, as_currency
 from text_tools import untokenize
 from transaction_values import ValueConstraint
 
