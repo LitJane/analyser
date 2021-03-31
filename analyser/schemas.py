@@ -304,6 +304,18 @@ document_schemas = {
 
     },
 
+    "subject": {
+      "allOf": [
+        {"$ref": "#/definitions/tag"},
+        {
+          "properties": {
+            tag_value_field_name: {
+              "enum": ContractSubject._member_names_
+            }
+
+          }}],
+    },
+
     "competence": {
       "allOf": [
         {"$ref": "#/definitions/tag"},
@@ -389,6 +401,10 @@ document_schemas = {
 
     "contract": {
       "properties": {
+
+        'subject': {
+           "$ref": "#/definitions/subject"
+        },
 
         "date": {
           "$ref": "#/definitions/date_tag"
