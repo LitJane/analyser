@@ -219,12 +219,14 @@ document_schemas = {
         },
 
         "solution": {
+          "description": "Решение, принятое относительно вопроса повестки дня",
           "$ref": "#/definitions/boolean_tag"
         },
 
-        "warnings": {
-          "type": "string"
-        },
+        # "warnings": {
+        #   "description": "Всевозможные сложности анализа",
+        #   "type": "string"
+        # },
 
         "orgs": {
           "type": "array",
