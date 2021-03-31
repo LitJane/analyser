@@ -215,6 +215,50 @@ class TestSchema(unittest.TestCase):
 
         validate(instance=tree, schema=document_schemas)
 
+    def test_value_correct(self):
+        tree = {
+            "contract": {
+                "price": {
+                    "value":{
+                        "value":2000,
+                        "span": [14, 17],
+                    },
+                    "sign": {
+                        "value":-1,
+                        "span": [14, 17],
+                    },
+                    "currency": {
+                        "value":"RUB",
+                        "span": [14, 17],
+                    },
+                    "span": [14, 17]
+                },
+            }
+        }
+
+        validate(instance=tree, schema=document_schemas)
+
+    def test_value_missing_fields(self):
+        tree = {
+            "contract": {
+                "price": {
+
+                    "sign": {
+                        "value":-1,
+                        "span": [14, 17],
+                    },
+                    "currency": {
+                        "value":"RUB",
+                        "span": [14, 17],
+                    },
+                    "span": [14, 17]
+                },
+            }
+        }
+        with self.assertRaises(ValidationError) as context:
+            validate(instance=tree, schema=document_schemas)
+        self.assertIsNotNone(context.exception)
+
     def test_org_correct(self):
         tree = {
             "contract": {"orgs": [{

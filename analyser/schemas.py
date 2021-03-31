@@ -398,12 +398,16 @@ document_schemas = {
           "$ref": "#/definitions/number_tag"
         },
 
+        "price": {
+          "$ref": "#/definitions/currency_value"
+        },
+
         "orgs": {
           "type": "array",
           "maxItems": 10,
           "uniqueItems": True,
           "items": {
-            "$ref": "#/definitions/org",
+            "$ref": "#/definitions/contract_agent",
           }
         },
 
