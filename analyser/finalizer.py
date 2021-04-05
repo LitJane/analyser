@@ -523,8 +523,11 @@ def exclude_same_charters(charters):
 def finalize():
     audits = get_audits()
     for audit in audits:
+        if audit.get('subsidiary') is None:
+            logger.info(f'.....audit {audit["_id"]} finalizing skipped')
+            #todo: insert pre-check logic here
         if audit["subsidiary"]["name"] == "Все ДО":
-            print(f'.....audit {audit["_id"]} finalizing skipped')
+            logger.info(f'.....audit {audit["_id"]} finalizing skipped')
             continue
         logger.info(f'.....finalizing audit {audit["_id"]}')
         violations = []
