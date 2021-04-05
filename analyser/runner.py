@@ -228,7 +228,10 @@ def need_analysis(document: DbJsonDoc) -> bool:
 
 def audit_phase_1(audit, kind=None):
   logger.info(f'.....processing audit {audit["_id"]}')
-  ctx = AuditContext(audit["subsidiary"]["name"])
+  if audit.get('subsidiary') is None:
+    ctx = AuditContext()
+  else:
+    ctx = AuditContext(audit["subsidiary"]["name"])
 
   document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=kind, id_only=True)
   _charter_ids = audit.get("charters", [])
@@ -248,7 +251,10 @@ def audit_phase_1(audit, kind=None):
 
 
 def audit_phase_2(audit, kind=None):
-  ctx = AuditContext(audit["subsidiary"]["name"])
+  if audit.get('subsidiary') is None:
+    ctx = AuditContext()
+  else:
+    ctx = AuditContext(audit["subsidiary"]["name"])
 
   print(f'.....processing audit {audit["_id"]}')
 
