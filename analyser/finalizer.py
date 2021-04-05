@@ -524,8 +524,9 @@ def finalize():
     audits = get_audits()
     for audit in audits:
         if audit.get('subsidiary') is None:
-            logger.info(f'.....audit {audit["_id"]} finalizing skipped')
+            logger.info(f'.....pre-check {audit["_id"]} finalizing skipped')
             #todo: insert pre-check logic here
+            continue
         if audit["subsidiary"]["name"] == "Все ДО":
             logger.info(f'.....audit {audit["_id"]} finalizing skipped')
             continue
