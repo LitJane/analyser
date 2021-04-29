@@ -12,7 +12,7 @@ pymongo==3.11.2
 python-dateutil==2.8.1
 requests==2.25.1
 schedule==0.6.0
-scikit-learn==0.23.2
+scikit-learn==0.24.2
 seaborn==0.11.1
 pyjarowinkler==1.8
 textdistance==4.2.0
