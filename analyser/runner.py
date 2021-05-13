@@ -97,6 +97,8 @@ class BaseProcessor:
   def is_valid(self, audit, db_document: DbJsonDoc):
     # date must be ok
     # TODO: rename: -> is_eligible
+    if audit.get('pre-check'):
+      return True
     _date = db_document.get_date_value()
     if _date is not None:
       date_is_ok = audit["auditStart"] <= _date <= audit["auditEnd"]
