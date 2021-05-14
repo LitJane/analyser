@@ -15,7 +15,7 @@ schedule==0.6.0
 scikit-learn==0.23.2
 seaborn==0.11.1
 pyjarowinkler==1.8
-textdistance==4.2.0
+textdistance==4.2.1
 strict-rfc3339==0.7
 jsonpickle==1.4.2
 jsonschema==3.2.0
