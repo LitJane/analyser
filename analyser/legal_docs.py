@@ -501,6 +501,7 @@ def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> Contrac
     groupspan[1] = max(sign.span[1], value_tag.span[1], currency.span[1], group.span[1])
     group.span = groupspan
 
+    # TODO: return ContractPrice
     return ContractValue(sign, value_tag, currency, group)
   else:
     return None

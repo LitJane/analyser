@@ -13,6 +13,7 @@ from analyser.documents import TextMap
 from analyser.legal_docs import find_value_sign
 from analyser.ml_tools import conditional_p_sum
 from analyser.parsing import find_value_sign_currency
+from analyser.schemas import ContractPrice
 from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.transaction_values import ValueSpansFinder
 
@@ -228,7 +229,7 @@ class PriceExtractTestCase(unittest.TestCase):
     doc.parse()
     print(doc.normal_text)
     # =========================================
-    r = find_value_sign_currency(doc)
+    r:[ContractPrice] = find_value_sign_currency(doc)
     # =========================================
 
     # for sum, sign, currency in r:
@@ -237,11 +238,11 @@ class PriceExtractTestCase(unittest.TestCase):
 
     self.assertEqual('USD', r[0].currency.value)
     self.assertEqual(1, r[0].sign.value)
-    self.assertEqual(2000000, r[0].value.value)
+    self.assertEqual(2000000, r[0].amount.value)
 
     self.assertEqual('превышающую', doc.tokens_map_norm.text_range(r[0].sign.span))
     self.assertEqual('2000000',
-                     doc.tokens_map_norm.text_range(r[0].value.span))  # TODO:  keep 2000000
+                     doc.tokens_map_norm.text_range(r[0].amount.span))  # TODO:  keep 2000000
     self.assertEqual('долларов', doc.tokens_map_norm.text_range(r[0].currency.span))  # TODO: keep
 
   def test_find_all_value_sign_currency_d(self):
@@ -251,8 +252,8 @@ class PriceExtractTestCase(unittest.TestCase):
     doc.parse()
     r: List = find_value_sign_currency(doc)
 
-    print(doc.tokens_map_norm.text_range(r[0].value.span))
-    self.assertEqual(price, r[0].value.value, text)
+    print(doc.tokens_map_norm.text_range(r[0].amount.span))
+    self.assertEqual(price, r[0].amount.value, text)
     self.assertEqual(currency_exp, r[0].currency.value)
     print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
 
@@ -262,10 +263,10 @@ class PriceExtractTestCase(unittest.TestCase):
       doc.parse()
       r: List = find_value_sign_currency(doc)
       if r:
-        print(doc.tokens_map_norm.text_range(r[0].value.span))
-        self.assertEqual(price, r[0].value.value, text)
+        print(doc.tokens_map_norm.text_range(r[0].amount.span))
+        self.assertEqual(price, r[0].amount.value, text)
         self.assertEqual(currency_exp, r[0].currency.value, text)
-        print(r[0].value.value)
+        print(r[0].amount.value)
         print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
 
   def test_number_re(self):

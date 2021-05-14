@@ -10,6 +10,7 @@ from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.legal_docs import LegalDocument, ContractValue, extract_sum_sign_currency
 from analyser.ml_tools import estimate_confidence_by_mean_top_non_zeros, FixedVector, smooth_safe, relu
+from analyser.schemas import ContractPrice
 from analyser.transaction_values import complete_re as transaction_values_re
 from gpn.gpn import subsidiaries
 from tf_support.embedder_elmo import ElmoEmbedder
@@ -146,7 +147,7 @@ head_types = ['head.directors', 'head.all', 'head.gen', 'head.pravlenie']
 
 
 def find_value_sign_currency(value_section_subdoc: LegalDocument,
-                             factory: ContractPatternFactory = None) -> List[ContractValue]:
+                             factory: ContractPatternFactory = None) -> List[ContractPrice]:
   if factory is not None:
     value_section_subdoc.calculate_distances_per_pattern(factory)
     vectors = factory.make_contract_value_attention_vectors(value_section_subdoc)
@@ -164,9 +165,9 @@ def find_value_sign_currency(value_section_subdoc: LegalDocument,
 def find_value_sign_currency_attention(value_section_subdoc: LegalDocument,
                                        attention_vector_tuned: FixedVector or None,
                                        parent_tag=None,
-                                       absolute_spans=False) -> List[ContractValue]:
+                                       absolute_spans=False) -> List[ContractPrice]:
   spans = [m for m in value_section_subdoc.tokens_map.finditer(transaction_values_re)]
-  values_list = []
+  values_list:[ContractValue] = []
 
   for span in spans:
     value_sign_currency: ContractValue = extract_sum_sign_currency(value_section_subdoc, span)
@@ -189,7 +190,7 @@ def find_value_sign_currency_attention(value_section_subdoc: LegalDocument,
     for value in values_list:
       value += value_section_subdoc.start
 
-  return values_list
+  return [f.as_ContractPrice() for f in values_list]
 
 
 def _find_most_relevant_paragraph(section: LegalDocument,

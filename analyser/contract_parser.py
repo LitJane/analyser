@@ -14,7 +14,7 @@ from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
 from analyser.parsing import ParsingContext, AuditContext, find_value_sign_currency_attention
 from analyser.patterns import AV_SOFT, AV_PREFIX
-from analyser.schemas import ContractSchema, OrgItem
+from analyser.schemas import ContractSchema, OrgItem, ContractPrice
 from analyser.text_tools import find_top_spans
 from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, \
   nn_predict
@@ -181,7 +181,7 @@ class ContractParser(ParsingContext):
 
     contract.attributes_tree.orgs = [ca.as_OrgItem() for ca in cas]
     if len(contract.contract_values) > 0:
-      contract.attributes_tree.price = contract.contract_values[0].as_ContractPrice()
+      contract.attributes_tree.price = contract.contract_values[0]
     # TODO: convert price!!
 
     self.validate(contract, ctx)
@@ -191,7 +191,7 @@ class ContractParser(ParsingContext):
 ContractAnlysingContext = ContractParser  ##just alias, for ipnb compatibility. TODO: remove
 
 
-def max_confident(vals: [ContractValue]) -> ContractValue:
+def max_confident(vals: [ContractPrice]) -> ContractPrice:
   if len(vals) == 0:
     return None
   return max(vals, key=lambda a: a.integral_sorting_confidence())
@@ -279,19 +279,19 @@ def _unwrap_org_tags(all_: [ContractAgent]) -> [SemanticTag]:
   return tags
 
 
-def nn_find_contract_value(contract: ContractDocument, semantic_map: DataFrame) -> [ContractValue]:
+def nn_find_contract_value(contract: ContractDocument, semantic_map: DataFrame) -> [ContractPrice]:
   _keys = ['sign_value_currency/value', 'sign_value_currency/currency', 'sign_value_currency/sign']
   attention_vector = semantic_map[_keys].values.sum(axis=-1)
 
-  values_list: [ContractValue] = find_value_sign_currency_attention(contract, attention_vector)
+  values_list: [ContractPrice] = find_value_sign_currency_attention(contract, attention_vector)
   if len(values_list) == 0:
     return []
   # ------
   # reduce number of found values
   # take only max value and most confident ones (we hope, it is the same finding)
 
-  max_confident_cv: ContractValue = max_confident(values_list)
-  if max_confident_cv.value.confidence < 0.1:
+  max_confident_cv: ContractPrice = max_confident(values_list)
+  if max_confident_cv.amount.confidence < 0.1:
     return []
 
   return [max_confident_cv]

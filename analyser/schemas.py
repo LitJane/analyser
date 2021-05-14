@@ -7,7 +7,7 @@
 import warnings
 from enum import Enum
 
-from analyser.ml_tools import SemanticTagBase
+from analyser.ml_tools import SemanticTagBase, conditional_p_sum
 from analyser.structures import OrgStructuralLevel, ContractSubject, currencly_map
 
 tag_value_field_name = "value"
@@ -31,13 +31,28 @@ class ContractPrice(SemanticTagBase):
   def __init__(self):
     super().__init__()
 
-    self.amount: SemanticTagBase  # netto or brutto #deprecated
-    self.currency: SemanticTagBase
-    self.sign: SemanticTagBase
-    self.vat: SemanticTagBase  # number
-    self.vat_unit: SemanticTagBase  # percentage
-    self.value_brutto: SemanticTagBase  # netto + VAT
-    self.value_netto: SemanticTagBase  # value before VAT
+    self.amount: SemanticTagBase= None  # netto or brutto #deprecated
+    self.currency: SemanticTagBase= None
+    self.sign: SemanticTagBase= None
+    self.vat: SemanticTagBase = None # number
+    self.vat_unit: SemanticTagBase= None  # percentage
+    self.value_brutto: SemanticTagBase = None # netto + VAT
+    self.value_netto: SemanticTagBase = None # value before VAT
+
+  def list_children(self):
+    return [self.amount, self.currency, self.sign, self.value_netto, self.value_brutto, self.vat,  self.vat_unit ]
+
+  def integral_sorting_confidence(self) -> float:
+    confs = [c.confidence for c in self.list_children() if c is not None]
+    return conditional_p_sum(confs)
+
+
+  def __mul__(self, confidence_k):
+
+    for _r in self.list_children():
+      if _r is not None:
+        _r.confidence *= confidence_k
+    return self
 
 
 class AgendaItemContract(HasOrgs, SemanticTagBase):
@@ -56,8 +71,13 @@ class AgendaItem(SemanticTagBase):
     self.solution: SemanticTagBase or None = None
 
     # TODO: this must be an array of contracts,
-    self.contract: AgendaItemContract = AgendaItemContract()
+    self.contracts: [AgendaItemContract] = []
 
+  def get_contract_at(self, idx)->AgendaItemContract:
+    if len(self.contracts) <= idx:
+      for k in range(len(self.contracts), idx+1):
+        self.contracts.append(AgendaItemContract())
+    return self.contracts[idx]
 
 class OrgItem():
 
@@ -101,12 +121,12 @@ class Competence(SemanticTagBase):
   child of CharterStructuralLevel
   """
 
-  def __init__(self, tag: SemanticTagBase = None, value:ContractSubject=None):
+  def __init__(self, tag: SemanticTagBase = None, value: ContractSubject = None):
     super().__init__(tag)
     self.constraints: [ContractPrice] = []
     if value is not None:
       if isinstance(value, ContractSubject):
-        self.value=value
+        self.value = value
       else:
         raise ValueError(value)
 
@@ -249,7 +269,10 @@ document_schemas = {
         {"$ref": "#/definitions/tag"},
         {
           "properties": {
-            "contract": {"$ref": "#/definitions/agenda_contract"}
+            "contracts": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/agenda_contract"}
+            }
           },
           "required": ["span"],
           # "additionalProperties": False
@@ -404,7 +427,7 @@ document_schemas = {
       "properties": {
 
         'subject': {
-           "$ref": "#/definitions/subject"
+          "$ref": "#/definitions/subject"
         },
 
         "date": {
@@ -512,9 +535,10 @@ class Schema2LegacyListConverter:
     if isinstance(tag, ContractPrice):
       suffix = 'min'
       if hasattr(tag, 'sign'):
-        amnt = tag.sign.value
-        if amnt < 0:
-          suffix = "max"
+        if tag.sign is not None:
+          amnt = tag.sign.value
+          if amnt < 0:
+            suffix = "max"
 
       return f"constraint-{suffix}"
 
