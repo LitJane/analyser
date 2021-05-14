@@ -17,5 +17,5 @@ seaborn==0.11.1
 pyjarowinkler==1.8
 textdistance==4.2.1
 strict-rfc3339==0.7
-jsonpickle==1.4.2
+jsonpickle==2.0.0
 jsonschema==3.2.0
