@@ -34,7 +34,8 @@ class TestProtocolParser(unittest.TestCase):
     # print (doc)
 
     pp = Runner.get_instance().protocol_parser
-    pp.find_org_date_number(legal_doc, AuditContext())
+    # pp.find_org_date_number(legal_doc, AuditContext())
+    legal_doc:ProtocolDocument = pp.find_attributes(legal_doc, AuditContext())
 
     orgtags = legal_doc.org_tags
     for t in orgtags:
@@ -124,7 +125,7 @@ class TestProtocolParser(unittest.TestCase):
     # for f in x:
     print(doc.text[x.span()[0]:x.span()[1]])
 
-  def test_find_protocol_votes_2(self):
+  def test_find_protocol_votes_re(self):
     t = '''
 Предварительно утвердить годовой отчет Общества за 2017 год.
 Итоги голосования:

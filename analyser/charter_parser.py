@@ -81,14 +81,7 @@ class CharterDocument(LegalDocumentExt):
     j['attributes_tree'] = {"charter": _attributes_tree_dict}
     return j
 
-  @overrides
-  def tags_to_json_attributes(self) -> dict:
 
-    converter = Schema2LegacyListConverter()
-    dest = {}
-    converter.schema2list(dest, self.attributes_tree)
-
-    return dest
 
 
 def _make_org_level_patterns() -> pd.DataFrame:

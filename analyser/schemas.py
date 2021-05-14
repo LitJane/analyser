@@ -55,6 +55,7 @@ class AgendaItem(SemanticTagBase):
     super().__init__(tag)
     self.solution: SemanticTagBase or None = None
 
+    # TODO: this must be an array of contracts,
     self.contract: AgendaItemContract = AgendaItemContract()
 
 

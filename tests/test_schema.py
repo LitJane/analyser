@@ -22,7 +22,8 @@ from integration.db import get_mongodb_connection
 
 class TestSchema(unittest.TestCase):
 
-    @unittest.skip
+    # @unittest.skip
+    @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
     def test_insert_schema_to_db_json(self):
         db = get_mongodb_connection()
         collection_schemas = db['schemas']

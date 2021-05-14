@@ -79,11 +79,11 @@ class TestJsonExport(unittest.TestCase):
       print(key)
       self.assertIn(key, json_struct.__dict__.keys())
 
-    for key in restored.attributes:
-      self.assertIn(key, json_struct.attributes.keys())
-
-    for key in json_struct.attributes:
-      self.assertIn(key, restored.attributes.keys())
+    # for key in restored.attributes:
+    #   self.assertIn(key, json_struct.attributes.keys())
+    #
+    # for key in json_struct.attributes:
+    #   self.assertIn(key, restored.attributes.keys())
 
     # self.assertDictEqual(json_struct.attributes, restored.attributes)
 
