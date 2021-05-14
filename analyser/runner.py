@@ -1,5 +1,4 @@
 import traceback
-import warnings
 
 import pymongo
 
@@ -117,15 +116,6 @@ class BaseProcessor:
     o2: str = db_doc.get_attribute_value("org-2-name")
 
     return subsidiary in (o1, o2)
-
-  def is_same_org(self, legal_doc: LegalDocument, db_doc, subsidiary: str):
-    warnings.warn("use _same_org", DeprecationWarning)
-    if db_doc.get("user") is not None and db_doc["user"].get("attributes") is not None and db_doc["user"][
-      "attributes"].get("org-1-name") is not None:
-      if subsidiary == db_doc["user"]["attributes"]["org-1-name"]["value"]:
-        return True
-    else:
-      return legal_doc.is_same_org(subsidiary)
 
 
 class ProtocolProcessor(BaseProcessor):
