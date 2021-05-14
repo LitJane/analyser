@@ -21,6 +21,21 @@ def remove_old_links(audit_id, contract_id):
     audit_collection.update_one({"_id": audit_id}, {"$pull": {"links": {"type": "analysis", "$or": [{"toId": contract_id}, {"fromId": contract_id}]}}})
 
 
+def get_linked_docs(audit_id, contract_id):
+    db = get_mongodb_connection()
+    audit_collection = db['audits']
+    links = audit_collection.find({"_id": audit_id, "$or": [{"links.toId": contract_id}, {"links.fromId": contract_id}]})
+    result = []
+    document_collecion = db['documents']
+    for link in links:
+        if link['fromId'] == contract_id:
+            result.append(document_collecion.find_one({'_id': link['toId']}))
+        else:
+            result.append(document_collecion.find_one({'_id': link['fromId']}))
+
+    return result
+
+
 def add_link(audit_id, doc_id1, doc_id2):
     db = get_mongodb_connection()
     audit_collection = db['audits']
@@ -173,7 +188,7 @@ def get_charter_diapasons(charter):
             if len(constraints) == 0:
                 min_constraint = 0
             for constraint in constraints:
-                if int(constraint.get("sign", 0)) > 0: #sorry, there might be no 'sign'
+                if int(constraint.get("sign", 0)) > 0:
                     if subject_map[value["parent"]]["min"] == 0:
                         subject_map[value["parent"]]["min"] = constraint["value"]
                         subject_map[value["parent"]]["original_min"] = constraint["original_value"]
@@ -228,13 +243,31 @@ def find_protocol(contract, protocols, org_level, audit):
         return result[0]
 
 
-def check_contract(contract, charters, protocols, audit):
+def find_supplementary_agreements(contract, sup_agreements, audit):
+    contract_attrs = get_attrs(contract)
+    result = []
+    if contract_attrs.get('number') is not None:
+        contract_number = contract_attrs['number']['value']
+    else:
+        return result
+    for sup_agreement in sup_agreements:
+        sup_agreement_attrs = get_attrs(sup_agreement)
+        if sup_agreement_attrs.get('number') is not None and sup_agreement_attrs['number']['value'] == contract_number:
+            result.append(sup_agreement)
+            add_link(audit['_id'], contract['_id'], sup_agreement['_id'])
+    return result
+
+
+def check_contract(contract, charters, protocols, audit, supplementary_agreements):
     violations = []
     contract_attrs = get_attrs(contract)
     contract_number = ""
     remove_old_links(audit["_id"], contract["_id"])
+    # user_linked_docs = get_linked_docs(audit["_id"], contract["_id"])
     if contract_attrs.get("number") is not None:
         contract_number = contract_attrs["number"]["value"]
+        # linked_sup_agreements = list(filter(lambda doc: doc['parse']['documentType'] == 'SUPPLEMENTARY_AGREEMENT', user_linked_docs))
+        find_supplementary_agreements(contract, supplementary_agreements, audit)
     eligible_charter = None
     for charter in charters:
         charter_attrs = get_attrs(charter)
@@ -246,7 +279,6 @@ def check_contract(contract, charters, protocols, audit):
         except Exception as e:
             msg = f'audit {audit["_id"]} charter {charter["_id"]} contract{contract["_id"]}'
             print('ERROR: ', e, msg )
-
 
     if eligible_charter is None:
         json_charters = []
@@ -262,7 +294,7 @@ def check_contract(contract, charters, protocols, audit):
                             "charters": json_charters
                             }
         if 'date' in contract_attrs:
-          violation_reason["contract"]["date"] = contract_attrs["date"]["value"]
+            violation_reason["contract"]["date"] = contract_attrs["date"]["value"]
 
         violations.append(create_violation(
           document_id={
@@ -287,15 +319,41 @@ def check_contract(contract, charters, protocols, audit):
         contract_value = None
         if contract_attrs.get("sign_value_currency/value") is not None and contract_attrs.get("sign_value_currency/currency") is not None:
             contract_value = convert_to_rub({"value": contract_attrs["sign_value_currency/value"]["value"], "currency": contract_attrs["sign_value_currency/currency"]["value"]})
-        if contract_value is not None and audit.get('bookValues') is not None:
-            bookValue = get_book_value(audit, str(contract_attrs["date"]["value"].year - 1))
-            if bookValue is not None:
-                if bookValue * 0.25 < contract_value["value"] <= bookValue * 0.5:
-                    competences = {'BoardOfDirectors': {"min": bookValue * 0.25, "original_min": 25, "original_currency_min": "%", "max": bookValue * 0.5, "original_max": 50, "original_currency_max": "%", "competence_attr_name": 'BoardOfDirectors/BigDeal'}}
-                    change_contract_primary_subject(contract, 'BigDeal')
-                elif contract_value["value"] > bookValue * 0.5:
-                    competences = {'ShareholdersGeneralMeeting': {"min": bookValue * 0.5, "original_min": 50, "original_currency_min": "%", "max": np.inf, "competence_attr_name": 'ShareholdersGeneralMeeting/BigDeal'}}
-                    change_contract_primary_subject(contract, 'BigDeal')
+
+            if contract_value is not None and audit.get('bookValues') is not None:
+                book_value = get_book_value(audit, str(contract_attrs["date"]["value"].year - 1))
+                if book_value is not None:
+                    if eligible_charter_attrs.get('org-1-type') is not None and 'акционерное общество' in eligible_charter_attrs['org-1-type']['value'].lower():
+                        if book_value * 0.25 < contract_value["value"] <= book_value * 0.5:
+                            competences = {'BoardOfDirectors': {"min": book_value * 0.25, "original_min": 25, "original_currency_min": "%", "max": book_value * 0.5, "original_max": 50, "original_currency_max": "%", "competence_attr_name": 'BoardOfDirectors/BigDeal'}}
+                            change_contract_primary_subject(contract, 'BigDeal')
+                        elif contract_value["value"] > book_value * 0.5:
+                            competences = {'ShareholdersGeneralMeeting': {"min": book_value * 0.5, "original_min": 50, "original_currency_min": "%", "max": np.inf, "competence_attr_name": 'ShareholdersGeneralMeeting/BigDeal'}}
+                            change_contract_primary_subject(contract, 'BigDeal')
+                    else:
+                        if charter_subject_map.get('BigDeal') is not None:
+                            if charter_subject_map['BigDeal'].get('BoardOfDirectors') is not None:
+                                big_deal_subject_charter_competence = charter_subject_map['BigDeal'].get('BoardOfDirectors')
+                                if big_deal_subject_charter_competence.get('min') is not None \
+                                        and big_deal_subject_charter_competence.get('original_currency_min') is not None:
+                                    limit = big_deal_subject_charter_competence['min']
+                                    if big_deal_subject_charter_competence['original_currency_min'] == 'Percent':
+                                        limit = big_deal_subject_charter_competence['min'] * book_value / 100
+                                        big_deal_subject_charter_competence['original_currency_min'] = '%'
+                                    if contract_value['value'] > limit:
+                                        change_contract_primary_subject(contract, 'BigDeal')
+                                        competences = {'BoardOfDirectors': big_deal_subject_charter_competence}
+                            if charter_subject_map['BigDeal'].get('AllMembers') is not None:
+                                big_deal_subject_charter_competence = charter_subject_map['BigDeal'].get('AllMembers')
+                                if big_deal_subject_charter_competence.get('min') is not None \
+                                        and big_deal_subject_charter_competence.get('original_currency_min') is not None:
+                                    limit = big_deal_subject_charter_competence['min']
+                                    if big_deal_subject_charter_competence['original_currency_min'] == 'Percent':
+                                        limit = big_deal_subject_charter_competence['min'] * book_value / 100
+                                        big_deal_subject_charter_competence['original_currency_min'] = '%'
+                                    if contract_value['value'] > limit:
+                                        change_contract_primary_subject(contract, 'BigDeal')
+                                        competences = {'AllMembers': big_deal_subject_charter_competence}
 
         if competences is not None and contract_value is not None:
             eligible_protocol = None
@@ -465,8 +523,12 @@ def exclude_same_charters(charters):
 def finalize():
     audits = get_audits()
     for audit in audits:
+        if audit.get('subsidiary') is None:
+            logger.info(f'.....pre-check {audit["_id"]} finalizing skipped')
+            #todo: insert pre-check logic here
+            continue
         if audit["subsidiary"]["name"] == "Все ДО":
-            print(f'.....audit {audit["_id"]} finalizing skipped')
+            logger.info(f'.....audit {audit["_id"]} finalizing skipped')
             continue
         logger.info(f'.....finalizing audit {audit["_id"]}')
         violations = []
@@ -478,12 +540,16 @@ def finalize():
                 if (charter.get("isActive") is None or charter["isActive"]) and charter["state"] == 15:
                     charters.append(charter)
             cleaned_charters = exclude_same_charters(charters)
-            charters = sorted(cleaned_charters, key=lambda k: get_attrs(k)["date"]["value"])
+            charters = sorted(cleaned_charters, key=lambda k: get_attrs(k)["date"]["value"], reverse=True)
         protocols = get_docs_by_audit_id(audit["_id"], 15, "PROTOCOL", without_large_fields=True)
+        supplementary_agreements = get_docs_by_audit_id(audit["_id"], 15, "SUPPLEMENTARY_AGREEMENT", without_large_fields=True)
 
         for contract_id in contract_ids:
-            contract = get_doc_by_id(contract_id["_id"])
-            violations.extend(check_contract(contract, charters, protocols, audit))
+            try:
+                contract = get_doc_by_id(contract_id["_id"])
+                violations.extend(check_contract(contract, charters, protocols, audit, supplementary_agreements))
+            except Exception as err:
+                logger.exception(f'cant finalize contract {contract_id["_id"]}')
 
         save_violations(audit, violations)
         print(f'.....audit {audit["_id"]} is waiting for approval')
