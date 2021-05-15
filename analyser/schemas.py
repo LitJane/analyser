@@ -31,21 +31,20 @@ class ContractPrice(SemanticTagBase):
   def __init__(self):
     super().__init__()
 
-    self.amount: SemanticTagBase= None  # netto or brutto #deprecated
-    self.currency: SemanticTagBase= None
-    self.sign: SemanticTagBase= None
-    self.vat: SemanticTagBase = None # number
-    self.vat_unit: SemanticTagBase= None  # percentage
-    self.value_brutto: SemanticTagBase = None # netto + VAT
-    self.value_netto: SemanticTagBase = None # value before VAT
+    self.amount: SemanticTagBase = None  # netto or brutto #deprecated
+    self.currency: SemanticTagBase = None
+    self.sign: SemanticTagBase = None
+    self.vat: SemanticTagBase = None  # number
+    self.vat_unit: SemanticTagBase = None  # percentage
+    self.amount_brutto: SemanticTagBase = None  # netto + VAT
+    self.amount_netto: SemanticTagBase = None  # value before VAT
 
   def list_children(self):
-    return [self.amount, self.currency, self.sign, self.value_netto, self.value_brutto, self.vat,  self.vat_unit ]
+    return [self.amount, self.currency, self.sign, self.value_netto, self.value_brutto, self.vat, self.vat_unit]
 
   def integral_sorting_confidence(self) -> float:
     confs = [c.confidence for c in self.list_children() if c is not None]
     return conditional_p_sum(confs)
-
 
   def __mul__(self, confidence_k):
 
@@ -73,11 +72,12 @@ class AgendaItem(SemanticTagBase):
     # TODO: this must be an array of contracts,
     self.contracts: [AgendaItemContract] = []
 
-  def get_contract_at(self, idx)->AgendaItemContract:
+  def get_contract_at(self, idx) -> AgendaItemContract:
     if len(self.contracts) <= idx:
-      for k in range(len(self.contracts), idx+1):
+      for k in range(len(self.contracts), idx + 1):
         self.contracts.append(AgendaItemContract())
     return self.contracts[idx]
+
 
 class OrgItem():
 
@@ -153,7 +153,7 @@ document_schemas = {
   "definitions": {
 
     "tag": {
-      "description": "a piece of text, denoting an attributes",
+      "description": "a piece of text, denoting an attribute",
       "type": "object",
 
       "properties": {
@@ -169,7 +169,8 @@ document_schemas = {
           "type": "string"
         }
       },
-      "required": ["span", tag_value_field_name]
+      # "required": ["span", tag_value_field_name]
+      "required": ["span"]
     },
 
     "string_tag": {
@@ -181,6 +182,7 @@ document_schemas = {
               "type": "string"
             }
           },
+          "required": ["span", tag_value_field_name]
 
         }]
     },
@@ -194,6 +196,7 @@ document_schemas = {
               "type": "boolean"
             }
           },
+          "required": ["span", tag_value_field_name]
 
         }]
 
@@ -207,7 +210,8 @@ document_schemas = {
             tag_value_field_name: {
               "type": "number"
             }
-          }
+          },
+          "required": ["span", tag_value_field_name]
         }],
     },
 
@@ -221,6 +225,8 @@ document_schemas = {
               "format": "date-time"
             }
           },
+
+          "required": ["span", tag_value_field_name]
 
         }],
 
@@ -239,11 +245,6 @@ document_schemas = {
           "$ref": "#/definitions/date_tag"
         },
 
-        "solution": {
-          "description": "Решение, принятое относительно вопроса повестки дня",
-          "$ref": "#/definitions/boolean_tag"
-        },
-
         # "warnings": {
         #   "description": "Всевозможные сложности анализа",
         #   "type": "string"
@@ -256,7 +257,7 @@ document_schemas = {
           }
         },
 
-        "value": {
+        "price": {
           "$ref": "#/definitions/currency_value"
         },
 
@@ -264,6 +265,7 @@ document_schemas = {
       "additionalProperties": False
 
     },
+
     "agenda": {
       "allOf": [
         {"$ref": "#/definitions/tag"},
@@ -272,6 +274,11 @@ document_schemas = {
             "contracts": {
               "type": "array",
               "items": {"$ref": "#/definitions/agenda_contract"}
+            },
+
+            "solution": {
+              "description": "Решение, принятое относительно вопроса повестки дня",
+              "$ref": "#/definitions/boolean_tag"
             }
           },
           "required": ["span"],
@@ -304,12 +311,13 @@ document_schemas = {
     },
 
     "currency_value": {
+      "description": "see ContractPrice class",
 
       "allOf": [
         {"$ref": "#/definitions/tag"},
         {
           "properties": {
-            "value": {
+            "amount": {
               "$ref": "#/definitions/number_tag",
             },
 
@@ -319,10 +327,30 @@ document_schemas = {
 
             "sign": {
               "$ref": "#/definitions/sign",
+            },
+
+            "vat": {
+              "description": "НДС",
+              "$ref": "#/definitions/number_tag",
+            },
+
+            "vat_unit": {
+              "description": "числовое значение или процент",
+              "$ref": "#/definitions/currency"
+            },
+
+            "amount_brutto": {
+              "description": "= amount_netto + VAT",
+              "$ref": "#/definitions/number_tag",
+            },
+
+            "amount_netto": {
+              "description": "amount_brutto minus VAT",
+              "$ref": "#/definitions/number_tag",
             }
 
           },
-          "required": ["sign", "value", "currency"],
+          "required": ["amount", "currency"],
         }
       ],
 

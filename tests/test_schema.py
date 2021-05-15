@@ -220,13 +220,17 @@ class TestSchema(unittest.TestCase):
         tree = {
             "contract": {
                 "price": {
-                    "value": {
+                    "amount": {
                         "value": 2000,
                         "span": [14, 17],
                     },
                     "sign": {
                         "value": -1,
                         "span": [14, 17],
+                    },
+                    "vat": {
+                        "value": 20,
+                        "span": [17, 20],
                     },
                     "currency": {
                         "value": "RUB",
