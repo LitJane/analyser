@@ -40,7 +40,7 @@ class ContractPrice(SemanticTagBase):
     self.amount_netto: SemanticTagBase = None  # value before VAT
 
   def list_children(self):
-    return [self.amount, self.currency, self.sign, self.value_netto, self.value_brutto, self.vat, self.vat_unit]
+    return [self.amount, self.currency, self.sign, self.amount_netto, self.amount_brutto, self.vat, self.vat_unit]
 
   def integral_sorting_confidence(self) -> float:
     confs = [c.confidence for c in self.list_children() if c is not None]
