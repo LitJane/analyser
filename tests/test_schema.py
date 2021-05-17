@@ -28,7 +28,7 @@ class TestSchema(unittest.TestCase):
         db = get_mongodb_connection()
         collection_schemas = db['schemas']
 
-        json_str = json.dumps(document_schemas, indent=4)
+        json_str = json.dumps(document_schemas, indent=4, ensure_ascii=False)
         print(json_str)
         print(type(json_str))
         key = f"documents_schema_{analyser.__version__}"

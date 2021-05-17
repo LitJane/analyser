@@ -5,13 +5,7 @@ from enum import Enum, unique, EnumMeta
 
 import numpy as np
 from keras.utils import to_categorical
-currencly_map = {
-  'руб': 'RUB',
-  'дол': 'USD',
-  'евр': 'EURO',
-  'тэн': 'KZT',
-  'тен': 'KZT',
-}
+
 legal_entity_types = {
   'Акционерное общество': 'АО',
   'Публичное акционерное общество': 'ПАО',
@@ -67,7 +61,8 @@ class DocumentState(Enum):
 
   Done = 15
 
-ORG_LEVELS_names:[str] = [
+
+ORG_LEVELS_names: [str] = [
   'общее собрание участников',
   'единственный участник',
   'общее собрание акционеров',
@@ -76,11 +71,35 @@ ORG_LEVELS_names:[str] = [
   'генеральный директор',
   'правление общества']
 
+
+@unique
+class Currencies(Enum):
+  RUB = 0
+  USD = 1
+  EURO = 2
+  KZT = 3
+  BYN = 4
+  TJR = 5
+  RSD = 6
+  KGS = 7
+  UAH = 8
+  Percent = 100
+
+
+currencly_map = {
+  'руб': Currencies.RUB.name,
+  'дол': Currencies.USD.name,
+  'евр': Currencies.EURO.name,
+  'тэн': Currencies.KZT.name,
+  'тен': Currencies.KZT.name,
+}
+
+
 @unique
 class OrgStructuralLevel(Enum, metaclass=DisplayStringEnumMeta):
   # TODO: define per org_types
 
-  AllMembers = 4, ['Общее собрание участников' , 'Единственный участник']
+  AllMembers = 4, ['Общее собрание участников', 'Единственный участник']
   ShareholdersGeneralMeeting = 3, ['Общее собрание акционеров', 'Единственный акционер']
   BoardOfDirectors = 2, ['Совет директоров']
   CEO = 1, ['Генеральный директор']
@@ -88,13 +107,13 @@ class OrgStructuralLevel(Enum, metaclass=DisplayStringEnumMeta):
 
   @staticmethod
   def get_all_display_names(nm: str) -> [str]:
-    ret=[]
+    ret = []
     for x in OrgStructuralLevel:
       if isinstance(x.display_string, list):
         for ds in x.display_string:
           ret.append(ds)
       else:
-        ret.append( x.display_string)
+        ret.append(x.display_string)
 
     return ret
 
@@ -105,16 +124,13 @@ class OrgStructuralLevel(Enum, metaclass=DisplayStringEnumMeta):
         for ds in x.display_string:
           if ds.lower() == nm.lower():
             return x.name
-      elif x.display_string.lower()  == nm.lower():
+      elif x.display_string.lower() == nm.lower():
         return x.name
     return None
 
   @staticmethod
   def as_db_json():
     return [{"_id": x.name, "number": x.value, "alias": x.display_string} for x in OrgStructuralLevel]
-
-
-
 
 
 @unique
@@ -135,6 +151,22 @@ class ContractTags(Enum, metaclass=DisplayStringEnumMeta):
 #   Charity = 1, 'Благотворительность'
 #   RealEstate = 4, 'Сделки с недвижимым имуществом'
 #   Loans = 7, 'Займы, кредиты и др. обязательста'
+
+
+@unique
+class InsiderInfoType(Enum):
+  Bankruptcy = 0
+  SharesOfParticipation = 1
+  SEB = 2
+  Changes = 3
+  Licenses = 4
+  OSA = 5
+  Accounting = 6
+  Plans = 7
+  SD = 8
+  Deals = 9
+  Courts = 10
+  IssuedSecurities = 11
 
 
 @unique
