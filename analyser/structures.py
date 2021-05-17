@@ -92,6 +92,17 @@ currencly_map = {
   'евр': Currencies.EURO.name,
   'тэн': Currencies.KZT.name,
   'тен': Currencies.KZT.name,
+
+  'сомони': Currencies.TJR.name,
+  'Таджикский сомони': Currencies.TJR.name,
+
+  'гривна': Currencies.UAH.name,
+  'Украинская гривна': Currencies.UAH.name,
+  'гривен': Currencies.UAH.name,
+
+  'динар': Currencies.RSD.name,
+  'Сербский динар': Currencies.RSD.name,
+
 }
 
 
