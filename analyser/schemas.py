@@ -224,7 +224,7 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": InsiderInfoType._member_names_
+              "enum": InsiderInfoType.list_names()
             }
           }
         }
@@ -308,7 +308,7 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": Currencies._member_names_
+              "enum": Currencies.list_names()
             }
           }
         }],
@@ -398,7 +398,7 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": ContractSubject._member_names_
+              "enum": ContractSubject.list_names()
             },
 
             "insideInformation": {
@@ -414,7 +414,7 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": ContractSubject._member_names_
+              "enum": ContractSubject.list_names()
             },
             "constraints": {
               "type": "array",
@@ -428,7 +428,7 @@ document_schemas = {
         {"$ref": "#/definitions/tag"},
         {"properties": {
           tag_value_field_name: {
-            "enum": OrgStructuralLevel._member_names_
+            "enum": OrgStructuralLevel.list_names()
           },
 
           "competences": {

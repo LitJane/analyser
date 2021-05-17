@@ -34,6 +34,10 @@ legal_entity_types = {
   'Автономная некоммерческая организация': 'АНО',
 }
 
+class EnumExt(Enum):
+  @classmethod
+  def list_names(cls):
+    return cls._member_names_
 
 class DisplayStringEnumMeta(EnumMeta):
   def __new__(mcs, name, bases, attrs):
@@ -73,7 +77,7 @@ ORG_LEVELS_names: [str] = [
 
 
 @unique
-class Currencies(Enum):
+class Currencies(EnumExt):
   RUB = 0
   USD = 1
   EURO = 2
@@ -107,7 +111,7 @@ currencly_map = {
 
 
 @unique
-class OrgStructuralLevel(Enum, metaclass=DisplayStringEnumMeta):
+class OrgStructuralLevel(EnumExt, metaclass=DisplayStringEnumMeta):
   # TODO: define per org_types
 
   AllMembers = 4, ['Общее собрание участников', 'Единственный участник']
@@ -164,8 +168,10 @@ class ContractTags(Enum, metaclass=DisplayStringEnumMeta):
 #   Loans = 7, 'Займы, кредиты и др. обязательста'
 
 
+
+
 @unique
-class InsiderInfoType(Enum):
+class InsiderInfoType(EnumExt):
   Bankruptcy = 0
   SharesOfParticipation = 1
   SEB = 2
@@ -181,7 +187,7 @@ class InsiderInfoType(Enum):
 
 
 @unique
-class ContractSubject(Enum, metaclass=DisplayStringEnumMeta):
+class ContractSubject(EnumExt, metaclass=DisplayStringEnumMeta):
   Other = 0, 'Другое'
 
   Charity = 1, 'Благотворительность'
