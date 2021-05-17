@@ -8,7 +8,7 @@ import warnings
 from enum import Enum
 
 from analyser.ml_tools import SemanticTagBase, conditional_p_sum
-from analyser.structures import OrgStructuralLevel, ContractSubject, currencly_map
+from analyser.structures import OrgStructuralLevel, ContractSubject, InsiderInfoType, Currencies
 
 tag_value_field_name = "value"
 
@@ -146,7 +146,7 @@ class CharterSchema(DocumentSchema):
 
 
 document_schemas = {
-  "$schema": "http://json-schema.org/draft-04/schema#",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Legal document attributes",
   "description": "Legal document attributes. Schema draft 4 is used for compatibility with Mongo DB",
 
@@ -202,7 +202,7 @@ document_schemas = {
 
     },
 
-    "number_tag": {
+    "numeric_tag": {
       "allOf": [
         {"$ref": "#/definitions/tag"},
         {
@@ -213,6 +213,22 @@ document_schemas = {
           },
           "required": ["span", tag_value_field_name]
         }],
+    },
+
+    "insideInformation": {
+      "description": "Инсайдерская информация",
+      "allOf": [
+        {
+          "$ref": "#/definitions/tag"
+        },
+        {
+          "properties": {
+            tag_value_field_name: {
+              "enum": InsiderInfoType.list_names()
+            }
+          }
+        }
+      ]
     },
 
     "date_tag": {
@@ -292,7 +308,7 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": list(currencly_map.values())
+              "enum": Currencies.list_names()
             }
           }
         }],
@@ -309,6 +325,26 @@ document_schemas = {
             }
           }}]
     },
+    "person": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/tag"
+        },
+        {
+          "properties": {
+            "lastName": {
+              "$ref": "#/definitions/string_tag"
+            }
+          },
+          "required": ["lastName"],
+          "errorMessage": {
+            "required": {
+              "lastName": "Не размечена фамилия"
+            }
+          }
+        }
+      ]
+    },
 
     "currency_value": {
       "description": "see ContractPrice class",
@@ -318,7 +354,7 @@ document_schemas = {
         {
           "properties": {
             "amount": {
-              "$ref": "#/definitions/number_tag",
+              "$ref": "#/definitions/numeric_tag",
             },
 
             "currency": {
@@ -331,7 +367,7 @@ document_schemas = {
 
             "vat": {
               "description": "НДС",
-              "$ref": "#/definitions/number_tag",
+              "$ref": "#/definitions/numeric_tag",
             },
 
             "vat_unit": {
@@ -341,12 +377,12 @@ document_schemas = {
 
             "amount_brutto": {
               "description": "= amount_netto + VAT",
-              "$ref": "#/definitions/number_tag",
+              "$ref": "#/definitions/numeric_tag",
             },
 
             "amount_netto": {
               "description": "amount_brutto minus VAT",
-              "$ref": "#/definitions/number_tag",
+              "$ref": "#/definitions/numeric_tag",
             }
 
           },
@@ -362,7 +398,11 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": ContractSubject._member_names_
+              "enum": ContractSubject.list_names()
+            },
+
+            "insideInformation": {
+              "$ref": "#/definitions/insideInformation"
             }
 
           }}],
@@ -374,7 +414,7 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": ContractSubject._member_names_
+              "enum": ContractSubject.list_names()
             },
             "constraints": {
               "type": "array",
@@ -388,7 +428,7 @@ document_schemas = {
         {"$ref": "#/definitions/tag"},
         {"properties": {
           tag_value_field_name: {
-            "enum": OrgStructuralLevel._member_names_
+            "enum": OrgStructuralLevel.list_names()
           },
 
           "competences": {
@@ -463,11 +503,22 @@ document_schemas = {
         },
 
         "number": {
-          "$ref": "#/definitions/number_tag"
+          "$ref": "#/definitions/string_tag"
         },
 
         "price": {
           "$ref": "#/definitions/currency_value"
+        },
+
+        "insideInformation": {
+          "$ref": "#/definitions/insideInformation"
+        },
+
+        "people": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/person"
+          }
         },
 
         "orgs": {
@@ -490,7 +541,7 @@ document_schemas = {
         },
 
         "number": {
-          "$ref": "#/definitions/number_tag"
+          "$ref": "#/definitions/string_tag"
         },
 
         "structural_level": {

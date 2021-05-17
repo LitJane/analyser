@@ -110,7 +110,7 @@ class ContractParser(ParsingContext):
     contract.number = nn_get_contract_number(_head.tokens_map, semantic_map)
     contract.date = nn_get_contract_date(_head.tokens_map, semantic_map)
 
-    ## Migrazzio
+    ## Migrazzio #TODO: employ attributes tree
     contract.attributes_tree.orgs = [ca.as_OrgItem() for ca in cas]
 
     return contract
@@ -191,13 +191,13 @@ class ContractParser(ParsingContext):
 ContractAnlysingContext = ContractParser  ##just alias, for ipnb compatibility. TODO: remove
 
 
-def max_confident(vals: [ContractPrice]) -> ContractPrice:
+def max_confident(vals: [ContractPrice]) -> ContractPrice or None:
   if len(vals) == 0:
     return None
   return max(vals, key=lambda a: a.integral_sorting_confidence())
 
 
-def max_value(vals: [ContractValue]) -> ContractValue:
+def max_value(vals: [ContractValue]) -> ContractValue or None:
   if len(vals) == 0:
     return None
   return max(vals, key=lambda a: a.value.value)
