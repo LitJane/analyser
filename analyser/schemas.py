@@ -54,13 +54,35 @@ class ContractPrice(SemanticTagBase):
     return self
 
 
+def merge_spans(tags: [SemanticTagBase]) -> (int, int):
+  arr = []
+  for attr in tags:
+    if attr is not None:
+      arr.append(attr.get_span()[0])
+      arr.append(attr.get_span()[1])
+  if len(arr) > 0:
+    return min(arr), max(arr)
+
+  return None
+
+
 class AgendaItemContract(HasOrgs, SemanticTagBase):
   number: SemanticTagBase = None
   date: SemanticTagBase = None
   price: ContractPrice = None
 
   def __init__(self):
+    self.span = None
     super().__init__()
+
+  def get_span(self) -> (int, int):
+    return merge_spans([self.number, self.date, self.price, *self.orgs])
+
+  def set_span(self, s):
+    pass
+
+
+  span = property(get_span, set_span)
 
 
 class AgendaItem(SemanticTagBase):
@@ -88,9 +110,12 @@ class OrgItem():
     self.alias: SemanticTagBase or None = None  # a.k.a role in the contract
     self.alt_name: SemanticTagBase or None = None
 
+  def get_span(self):
+    return merge_spans([self.type, self.name, self.alias, self.alt_name])
+
   def as_list(self) -> [SemanticTagBase]:
     warnings.warn("use OrgItem", DeprecationWarning)
-    return [getattr(self, key) for key in ["type", "name", "alias"] if getattr(self, key) is not None]
+    return [getattr(self, key) for key in ["type", "name", "alias", "alt_name"] if getattr(self, key) is not None]
 
 
 class ContractSchema(DocumentSchema, HasOrgs):

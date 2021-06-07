@@ -380,12 +380,13 @@ TAG_KEY_DELIMITER = '/'
 
 
 class SemanticTagBase:
-  value: str or Enum or int or float or datetime.date or None = None
-  span: (int, int)
+  # value: str or Enum or int or float or datetime.date or None = None
+  # span: (int, int)
 
   def __init__(self, tag=None):
     super().__init__()
     self.confidence: float = 0.0
+    self.value = None
     if tag is not None:
       self.value = tag.value
       self.set_span(tag.span)

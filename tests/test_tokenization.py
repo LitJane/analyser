@@ -56,8 +56,6 @@ class TokenisationTestCase(unittest.TestCase):
     self.assertLessEqual(max(lens), maxlen)
     self.assertEqual(doc.tokens_map._full_text, tm._full_text)
 
-
-
   def test_normalize_doc_slice_1(self):
     doc_text = """\n\n\nАкционерное 3`4`` общество «Газпром - 'Вибраниум' и Криптонит» (АО «ГВК»), "именуемое" в собранием `` акционеров собранием `` акционеров \'\' \
         дальнейшем «Благотворитель», 
