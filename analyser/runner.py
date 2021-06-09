@@ -112,10 +112,12 @@ class BaseProcessor:
     return org_is_ok and date_is_ok
 
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
-    o1: str = db_doc.get_attribute_value("org-1-name")
-    o2: str = db_doc.get_attribute_value("org-2-name")
-
-    return subsidiary in (o1, o2)
+    orgs = db_doc.get_attributes_tree().get('orgs')
+    if orgs is not None:
+      for org in orgs:
+        if org.get('name') == subsidiary:
+          return True
+    return False
 
 
 class ProtocolProcessor(BaseProcessor):
