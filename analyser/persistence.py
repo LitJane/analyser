@@ -129,9 +129,11 @@ class DbJsonDoc:
     a = {}
     if self.user is not None:
       a = self.user.get('attributes_tree', {})
+      return next(iter(a.values()))
     elif self.analysis is not None:
       a = self.analysis.get('attributes_tree', {})
-    return next(iter(a.values()))
+      return next(iter(a.values()))
+    return a
 
   def get_subject(self) -> dict:
     return self.get_attribute('subject')
