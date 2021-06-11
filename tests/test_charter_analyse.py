@@ -36,8 +36,7 @@ class TestCharterAnalyse(unittest.TestCase):
       # TODO: mind, this could be slow if embedding is required
       parser.find_org_date_number(charter, AuditContext())
 
-      for tag in charter.get_tags():
-        print(tag)
+
 
 
 unittest.main(argv=['-e utf-8'], verbosity=3, exit=False)
