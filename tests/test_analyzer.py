@@ -15,7 +15,7 @@ from analyser.persistence import DbJsonDoc
 from analyser.runner import BaseProcessor, document_processors, CONTRACT, PROTOCOL, CHARTER
 from integration.db import get_mongodb_connection
 
-
+@unittest.skip
 class AnalyzerTestCase(unittest.TestCase):
   @unittest.skip
   def test_analyse_acontract(self):

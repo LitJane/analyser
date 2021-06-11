@@ -1,12 +1,13 @@
 import os
 import warnings
 
-import keras
-import keras.backend as K
 import pandas as pd
-from keras import Model
-from keras.callbacks import ModelCheckpoint, CSVLogger, ReduceLROnPlateau
+
+import tensorflow.keras.backend as K
 from pandas import DataFrame
+from tensorflow import keras
+from tensorflow.keras import Model
+from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger, ReduceLROnPlateau
 
 from analyser.hyperparams import models_path
 from analyser.log import logger
