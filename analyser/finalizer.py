@@ -124,7 +124,8 @@ def get_audit_by_id(aid:ObjectId):
 
 def save_violations(audit, violations):
     db = get_mongodb_connection()
-    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"violations": violations}})
+    db['audits'].update_one({'_id': audit['_id']}, {'$pull': {'violations': {'userViolation': False}}})
+    db["audits"].update_one({'_id': audit["_id"]}, {"$push": {"violations": {'$each': violations}}})
     db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"status": "Done"}})
 
 
@@ -164,7 +165,7 @@ def get_charter_diapasons(charter):
                         subject_map = {}
                         subjects[subject_type] = subject_map
                     if subject_map.get(structural_level_name) is None:
-                        subject_map[structural_level_name] = {"min": 0, "max": np.inf, "competence_attr_name": structural_level_name + '/' + subject_type}
+                        subject_map[structural_level_name] = {"min": 0, "max": np.inf, "competence_attr_name": competence.get('span')}
                     constraints = competence.get('constraints')
                     if constraints is not None:
                         if len(constraints) == 0:
@@ -253,6 +254,16 @@ def get_org(doc_attrs):
         return None
 
 
+def get_charter_span(charter_atts, org_level, subject):
+    if charter_atts.get('structural_levels') is not None:
+        for structural_level in charter_atts['structural_levels']:
+            if org_level == structural_level['value'] and structural_level.get('competences') is not None:
+                for competence in structural_level['competences']:
+                    if competence.get('value') is not None and subject == competence['value']:
+                        return competence['span']
+    return None
+
+
 def check_contract(contract, charters, protocols, audit, supplementary_agreements):
     violations = []
     contract_attrs = get_attrs(contract)
@@ -317,10 +328,10 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                 org = get_org(eligible_charter_attrs)
                 if org is not None and org.get('type') is not None and 'акционерное общество' == org['type']['value'].lower():
                     if book_value * 0.25 < contract_value["value"] <= book_value * 0.5:
-                        competences = {'BoardOfDirectors': {"min": 25, "currency_min": "Percent", "max": 50, "currency_max": "Percent", "competence_attr_name": 'BoardOfDirectors/BigDeal'}}
+                        competences = {'BoardOfDirectors': {"min": 25, "currency_min": "Percent", "max": 50, "currency_max": "Percent", "competence_attr_name": get_charter_span(eligible_charter_attrs, 'BoardOfDirectors', 'BigDeal')}}
                         change_contract_primary_subject(contract, 'BigDeal')
                     elif contract_value["value"] > book_value * 0.5:
-                        competences = {'ShareholdersGeneralMeeting': {"min": 50, "currency_min": "Percent", "max": np.inf, "competence_attr_name": 'ShareholdersGeneralMeeting/BigDeal'}}
+                        competences = {'ShareholdersGeneralMeeting': {"min": 50, "currency_min": "Percent", "max": np.inf, "competence_attr_name": get_charter_span(eligible_charter_attrs, 'ShareholdersGeneralMeeting', 'BigDeal')}}
                         change_contract_primary_subject(contract, 'BigDeal')
                 else:
                     if charter_subject_map.get('BigDeal') is not None:
@@ -349,6 +360,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
             eligible_protocol = None
             need_protocol_check = False
             competence_constraint = None
+            org_level = None
 
             for competence, constraint in competences.items():
                 if constraint['currency_min'] == 'Percent' and book_value is not None:
@@ -365,18 +377,19 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                     competence_constraint = constraint
                     eligible_protocol = find_protocol(contract, protocols, competence, audit)
                     if eligible_protocol is not None:
+                        org_level = competence
                         break
 
-            attribute = None
+            competence_span = None
             text = None
             min_value = None
             max_value = None
             if competence_constraint is not None:
-                attribute = competence_constraint.get("competence_attr_name")
-                if attribute is not None and eligible_charter_attrs.get(attribute) is not None:
-                    text = extract_text(eligible_charter_attrs[attribute]["span"],
+                competence_span = competence_constraint.get("competence_attr_name")
+                if competence_span is not None:
+                    text = extract_text(competence_span,
                                         eligible_charter["analysis"]["tokenization_maps"]["words"],
-                                        eligible_charter["analysis"]["normal_text"]) + "(" + get_nearest_header(eligible_charter["analysis"]["headers"], eligible_charter_attrs[attribute]["span"][0])["value"] + ")"
+                                        eligible_charter["analysis"]["normal_text"]) + "(" + get_nearest_header(eligible_charter["analysis"]["headers"], competence_span[0])["value"] + ")"
                 if competence_constraint["min"] != 0:
                     min_value = {"value": competence_constraint["min"], "currency": competence_constraint["currency_min"]}
                 if competence_constraint["max"] != np.inf:
@@ -400,7 +413,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                         {"id": contract["_id"], "number": contract_number,
                          "type": contract["parse"]["documentType"]},
                         {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
-                        {"id": eligible_charter["_id"], "attribute": attribute, "text": text},
+                        {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                         "contract_date_less_than_protocol_date",
                         {"contract": {"number": contract_number,
                                       "date": contract_attrs["date"]["value"],
@@ -416,7 +429,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                 {"id": contract["_id"], "number": contract_number,
                                  "type": contract["parse"]["documentType"]},
                                 {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
-                                {"id": eligible_charter["_id"], "attribute": attribute, "text": text},
+                                {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                                 "contract_value_great_than_protocol_value",
                                 {"contract": {"number": contract_number,
                                               "date": contract_attrs["date"]["value"],
@@ -433,7 +446,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                 {"id": contract["_id"], "number": contract_number,
                                  "type": contract["parse"]["documentType"]},
                                 {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
-                                {"id": eligible_charter["_id"], "attribute": attribute, "text": text},
+                                {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                                 "contract_value_not_equal_protocol_value",
                                 {"contract": {"number": contract_number,
                                               "date": contract_attrs["date"]["value"],
@@ -451,7 +464,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                  "type": contract["parse"]["documentType"]},
                                 {"id": eligible_charter["_id"],
                                  "date": eligible_charter_attrs["date"]["value"]},
-                                {"id": eligible_charter["_id"], "attribute": attribute, "text": text},
+                                {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                                 "contract_value_less_than_protocol_value",
                                 {"contract": {"number": contract_number,
                                               "date": contract_attrs["date"]["value"],
@@ -472,9 +485,9 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                         {"id": contract["_id"], "number": contract_number,
                          "type": contract["parse"]["documentType"]},
                         {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
-                        {"id": eligible_charter["_id"], "attribute": attribute, "text": text},
+                        {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                         {"type": "protocol_not_found", "subject": contract_attrs["subject"]["value"],
-                         "org_structural_level": attribute.split('/')[0],
+                         "org_structural_level": org_level,
                          "min": min_value,
                          "max": max_value
                          },
