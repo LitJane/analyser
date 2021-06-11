@@ -1,26 +1,6 @@
 import keras.backend as K
 import tensorflow as tf
-from keras.engine import Layer
 
-
-class Mag(Layer):
-  """
-  computes magnitudes of channels vectors. Output shape is (b, x, e) --> (b, x, 1)
-  """
-
-  def __init__(self, **kwargs):
-    super(Mag, self).__init__(**kwargs)
-    self.supports_masking = False
-
-  def call(self, inputs, **kwargs):
-    _sum = K.sum(K.square(inputs), axis=-1)
-    return K.expand_dims(K.sqrt(_sum), -1)
-
-  def compute_output_shape(self, input_shape):
-    sh = list(input_shape)[:-1] + [1]
-    print('input_shape', input_shape)
-    print('sh', sh)
-    return tuple(sh)
 
 
 def sigmoid_focal_crossentropy(

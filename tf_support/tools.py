@@ -104,10 +104,11 @@ class KerasTrainingContext:
     if verbose > 1:
       model.summary()
 
-    ch_fn = os.path.join(self.model_checkpoint_path, f"{model_name}-{keras.__version__}.h5")
+    keras__version__ = '2.4.3' #keras.__version__
+    ch_fn = os.path.join(self.model_checkpoint_path, f"{model_name}-{keras__version__}.h5")
 
     if weights_file_override is not None:
-      ch_fn = os.path.join(self.model_checkpoint_path, f"{weights_file_override}-{keras.__version__}.h5")
+      ch_fn = os.path.join(self.model_checkpoint_path, f"{weights_file_override}-{keras__version__}.h5")
 
     if load_weights:
       try:

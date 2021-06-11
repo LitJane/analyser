@@ -4,7 +4,8 @@
 from enum import Enum, unique, EnumMeta
 
 import numpy as np
-from keras.utils import to_categorical
+# from keras.utils import to_categorical
+from keras.utils.np_utils import to_categorical
 
 legal_entity_types = {
   'Акционерное общество': 'АО',
