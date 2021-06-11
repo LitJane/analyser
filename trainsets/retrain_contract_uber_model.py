@@ -18,8 +18,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from bson import json_util
-from keras import Model
-from keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras import Model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from packaging import version
 from pandas import DataFrame
 from pymongo import ASCENDING
