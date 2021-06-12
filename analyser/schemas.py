@@ -53,6 +53,8 @@ class ContractPrice(SemanticTagBase):
     for t in self.list_children():
       if t is not None:
         t.offset(addon)
+
+    self.offset(addon)
     return self
 
   def __mul__(self, confidence_k) -> 'ContractPrice':

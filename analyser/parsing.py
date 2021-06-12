@@ -171,6 +171,7 @@ def find_value_sign_currency_attention(value_section_subdoc: LegalDocument,
 
   for span in spans:
     value_sign_currency: ContractValue = extract_sum_sign_currency(value_section_subdoc, span)
+    #TODO: replace with ContractPrice type
     if value_sign_currency is not None:
 
       # Estimating confidence by looking at attention vector

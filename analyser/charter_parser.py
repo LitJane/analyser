@@ -13,7 +13,7 @@ from analyser.embedding_tools import AbstractEmbedder
 from analyser.hyperparams import HyperParameters, models_path
 from analyser.legal_docs import LegalDocumentExt, remap_attention_vector, embedd_sentences, LegalDocument, \
   ParserWarnings
-from analyser.ml_tools import SemanticTag, calc_distances_per_pattern, merge_colliding_spans, TAG_KEY_DELIMITER, Spans, \
+from analyser.ml_tools import SemanticTag, calc_distances_per_pattern, merge_colliding_spans, Spans, \
   FixedVector, span_to_slice, estimate_confidence_by_mean_top_non_zeros, calc_distances_per_pattern_dict, \
   max_exclusive_pattern_by_prefix, relu, attribute_patternmatch_to_index, SemanticTagBase
 from analyser.parsing import ParsingContext, AuditContext, find_value_sign_currency_attention, \
@@ -267,32 +267,8 @@ class CharterParser(ParsingContext):
     for competence in structural_level.competences:  # contract subjects
 
       for value in values:
-        # v_group = value.parent
         if competence.contains(value.get_span()):
-          # v_group.set_parent_tag(competence_tag)
           competence.constraints.append(value)
-
-  def _rename_margin_values_tags(self, values: [ContractPrice]):
-    warnings.warn("deprecated", DeprecationWarning)
-    # TODO: remove this
-    for value in values:
-      if value.sign.value < 0:
-        sfx = '-max'
-      elif value.sign.value > 0:
-        sfx = '-min'
-      else:
-        sfx = ''
-
-      value.parent.kind = f"constraint{sfx}"
-
-    known_keys = []
-    k = 0  # constraints numbering
-    for value in values:
-      k += 1
-      if value.parent.get_key() in known_keys:
-        value.parent.kind = f"{value.parent.kind}{TAG_KEY_DELIMITER}{k}"
-
-      known_keys.append(value.parent.get_key())
 
   def attribute_spans_to_subjects(self,
                                   unique_sentence_spans: Spans,
