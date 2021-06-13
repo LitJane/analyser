@@ -1,5 +1,4 @@
 import traceback
-import warnings
 
 import pymongo
 
@@ -97,6 +96,8 @@ class BaseProcessor:
   def is_valid(self, audit, db_document: DbJsonDoc):
     # date must be ok
     # TODO: rename: -> is_eligible
+    if audit.get('pre-check'):
+      return True
     _date = db_document.get_date_value()
     if _date is not None:
       date_is_ok = audit["auditStart"] <= _date <= audit["auditEnd"]
@@ -115,15 +116,6 @@ class BaseProcessor:
     o2: str = db_doc.get_attribute_value("org-2-name")
 
     return subsidiary in (o1, o2)
-
-  def is_same_org(self, legal_doc: LegalDocument, db_doc, subsidiary: str):
-    warnings.warn("use _same_org", DeprecationWarning)
-    if db_doc.get("user") is not None and db_doc["user"].get("attributes") is not None and db_doc["user"][
-      "attributes"].get("org-1-name") is not None:
-      if subsidiary == db_doc["user"]["attributes"]["org-1-name"]["value"]:
-        return True
-    else:
-      return legal_doc.is_same_org(subsidiary)
 
 
 class ProtocolProcessor(BaseProcessor):
@@ -228,7 +220,10 @@ def need_analysis(document: DbJsonDoc) -> bool:
 
 def audit_phase_1(audit, kind=None):
   logger.info(f'.....processing audit {audit["_id"]}')
-  ctx = AuditContext(audit["subsidiary"]["name"])
+  if audit.get('subsidiary') is None:
+    ctx = AuditContext()
+  else:
+    ctx = AuditContext(audit["subsidiary"]["name"])
 
   document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=kind, id_only=True)
   _charter_ids = audit.get("charters", [])
@@ -248,7 +243,10 @@ def audit_phase_1(audit, kind=None):
 
 
 def audit_phase_2(audit, kind=None):
-  ctx = AuditContext(audit["subsidiary"]["name"])
+  if audit.get('subsidiary') is None:
+    ctx = AuditContext()
+  else:
+    ctx = AuditContext(audit["subsidiary"]["name"])
 
   print(f'.....processing audit {audit["_id"]}')
 

@@ -380,13 +380,13 @@ TAG_KEY_DELIMITER = '/'
 
 
 class SemanticTagBase:
-  value: str or Enum or int or float or datetime.date or None = None
-  span: (int, int)
-
+  # value: str or Enum or int or float or datetime.date or None = None
+  # span: (int, int)
 
   def __init__(self, tag=None):
     super().__init__()
     self.confidence: float = 0.0
+    self.value = None
     if tag is not None:
       self.value = tag.value
       self.set_span(tag.span)
@@ -422,6 +422,11 @@ class SemanticTagBase:
 
   def contains(self, child: [int]) -> bool:
     return self.span[0] <= child[0] and child[1] <= self.span[1]
+
+  def as_slice(self):
+    return slice(self.span[0], self.span[1])
+
+  slice = property(as_slice)
 
 
 class SemanticTag(SemanticTagBase):
@@ -493,9 +498,6 @@ class SemanticTag(SemanticTagBase):
       key = TAG_KEY_DELIMITER.join([self._parent_tag.get_key(), key])
     return key
 
-  def as_slice(self):
-    return slice(self.span[0], self.span[1])
-
   def isNotEmpty(self) -> bool:
     return self.span is not None and self.span[0] != self.span[1]
 
@@ -516,8 +518,6 @@ class SemanticTag(SemanticTagBase):
 
   def __str__(self):
     return f'SemanticTag: {self.get_key()} {self.span} {self.value} {self.confidence}'
-
-  slice = property(as_slice)
 
 
 def clean_semantic_tag_copy(t: SemanticTag) -> SemanticTagBase or None:

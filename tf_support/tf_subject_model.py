@@ -1,8 +1,11 @@
 # see  /notebooks/TF_subjects.ipynb
 import warnings
 
-from keras.layers import Conv1D, LSTM, Dense, Bidirectional, Input, Dropout
-from keras.layers import MaxPooling1D
+import numpy as np
+import pandas as pd
+from tensorflow.keras.layers import Conv1D, LSTM, Dense, Bidirectional, Input, Dropout
+from tensorflow.keras.layers import MaxPooling1D
+from tensorflow.keras.models import Model
 
 from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
@@ -14,12 +17,9 @@ from trainsets.trainset_tools import SubjectTrainsetManager
 
 VALIDATION_SET_PROPORTION = 0.25
 
-from keras.models import Model
+
 
 EMB = 1024  # embedding dimentionality
-
-import numpy as np
-import pandas as pd
 
 
 def decode_subj_prediction(result: FixedVector) -> (ContractSubject, float, int):

@@ -1,6 +1,8 @@
-from keras import Model
-from keras.layers import Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, MaxPooling1D
-from keras.layers import concatenate
+
+
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, MaxPooling1D
+from tensorflow.keras.layers import concatenate
 
 from analyser.headers_detector import TOKEN_FEATURES
 from tf_support.addons import sigmoid_focal_crossentropy

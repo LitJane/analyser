@@ -1,27 +1,6 @@
-import keras.backend as K
+import tensorflow.keras.backend as K
 import tensorflow as tf
-from keras import activations
-from keras.engine import Layer
 
-
-class Mag(Layer):
-  """
-  computes magnitudes of channels vectors. Output shape is (b, x, e) --> (b, x, 1)
-  """
-
-  def __init__(self, **kwargs):
-    super(Mag, self).__init__(**kwargs)
-    self.supports_masking = False
-
-  def call(self, inputs, **kwargs):
-    _sum = K.sum(K.square(inputs), axis=-1)
-    return K.expand_dims(K.sqrt(_sum), -1)
-
-  def compute_output_shape(self, input_shape):
-    sh = list(input_shape)[:-1] + [1]
-    print('input_shape', input_shape)
-    print('sh', sh)
-    return tuple(sh)
 
 
 def sigmoid_focal_crossentropy(
@@ -70,19 +49,3 @@ def sigmoid_focal_crossentropy(
 
   # compute the final loss and return
   return tf.reduce_sum(alpha_factor * modulating_factor * ce, axis=-1)
-
-
-def crf_nll(y_true, y_pred):
-  """
-  https://github.com/keras-team/keras-contrib/blob/3fc5ef709e061416f4bc8a92ca3750c824b5d2b0/keras_contrib/losses/crf_losses.py#L6
-  """
-
-  crf, idx = y_pred._keras_history[:2]
-  if crf._outbound_nodes:
-    raise TypeError('When learn_model="join", CRF must be the last layer.')
-  if crf.sparse_target:
-    y_true = K.one_hot(K.cast(y_true[:, :, 0], 'int32'), crf.units)
-  X = crf._inbound_nodes[idx].input_tensors[0]
-  mask = crf._inbound_nodes[idx].input_masks[0]
-  nloglik = crf.get_negative_log_likelihood(y_true, X, mask)
-  return activations.relu(nloglik)

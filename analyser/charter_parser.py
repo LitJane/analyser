@@ -1,24 +1,25 @@
 # origin: charter_parser.py
+import os
 import warnings
 
 import pandas as pd
 from overrides import overrides
 from pandas import DataFrame
-import os
+
 from analyser.attributes import to_json
-from analyser.contract_agents import find_org_names, ContractAgent, find_org_names_raw, _rename_org_tags
+from analyser.contract_agents import find_org_names, ContractAgent, find_org_names_raw
 from analyser.doc_dates import find_document_date
 from analyser.embedding_tools import AbstractEmbedder
 from analyser.hyperparams import HyperParameters, models_path
 from analyser.legal_docs import LegalDocumentExt, remap_attention_vector, embedd_sentences, LegalDocument, \
-  ContractValue, ParserWarnings
-from analyser.ml_tools import SemanticTag, calc_distances_per_pattern, merge_colliding_spans, TAG_KEY_DELIMITER, Spans, \
+  ParserWarnings
+from analyser.ml_tools import SemanticTag, calc_distances_per_pattern, merge_colliding_spans, Spans, \
   FixedVector, span_to_slice, estimate_confidence_by_mean_top_non_zeros, calc_distances_per_pattern_dict, \
   max_exclusive_pattern_by_prefix, relu, attribute_patternmatch_to_index, SemanticTagBase
 from analyser.parsing import ParsingContext, AuditContext, find_value_sign_currency_attention, \
   _find_most_relevant_paragraph
 from analyser.patterns import build_sentence_patterns, PATTERN_DELIMITER
-from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, Schema2LegacyListConverter
+from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, ContractPrice
 from analyser.structures import OrgStructuralLevel, ContractSubject
 
 WARN = '\033[1;31m'
@@ -60,20 +61,6 @@ class CharterDocument(LegalDocumentExt):
   date = property(get_date, set_date)
   number = property(get_number, set_number)
 
-  def get_tags(self) -> [SemanticTag]:
-    warnings.warn("please switch to attributes_tree struktur", DeprecationWarning)
-    raise NotImplementedError('get_tags deleted forever')
-
-  def get_org_tags(self) -> [SemanticTag]:
-    warnings.warn("please switch to attributes_tree struktur", DeprecationWarning)
-    org = self.attributes_tree.org
-    if org is not None:
-      return _rename_org_tags([org], prefix="", start_from=1)
-
-    return []
-
-  org_tags = property(get_org_tags)
-
   @overrides
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
@@ -81,23 +68,11 @@ class CharterDocument(LegalDocumentExt):
     j['attributes_tree'] = {"charter": _attributes_tree_dict}
     return j
 
-  @overrides
-  def tags_to_json_attributes(self) -> dict:
-
-    converter = Schema2LegacyListConverter()
-    dest = {}
-    converter.schema2list(dest, self.attributes_tree)
-
-    return dest
-
 
 def _make_org_level_patterns() -> pd.DataFrame:
-
   p = os.path.join(models_path, 'charter_org_level_patterns.json')
-  comp_str_pat =  pd.read_json(p, orient='index')
+  comp_str_pat = pd.read_json(p, orient='index')
   return comp_str_pat.astype('str')
-
-
 
 
 class CharterParser(ParsingContext):
@@ -265,8 +240,8 @@ class CharterParser(ParsingContext):
     subject_spans: Spans = collect_subjects_spans2(subdoc, _subject_attentions_map)
 
     # finding Values(amounts)
-    values: [ContractValue] = find_value_sign_currency_attention(subdoc, None, absolute_spans=False)
-    self._rename_margin_values_tags(values)
+    values: [ContractPrice] = find_value_sign_currency_attention(subdoc, None, absolute_spans=False)
+    # self._rename_margin_values_tags(values)
     valued_sentence_spans: Spans = collect_sentences_having_constraint_values(subdoc, values, merge_spans=True)
 
     _united_spans: Spans = []
@@ -282,40 +257,18 @@ class CharterParser(ParsingContext):
                                      structural_level  # OrgStructuralLevel.BoardOfDirectors
                                      )
 
+    # --------------------
     # offsetting tags to absolute values
     for value in values: value += subdoc.start
+    # --------------------
     for competence_tag in structural_level.competences: competence_tag += subdoc.start
 
     # nesting values (assigning parents)
     for competence in structural_level.competences:  # contract subjects
 
       for value in values:
-        v_group = value.parent
-        if competence.contains(v_group.span):
-          # v_group.set_parent_tag(competence_tag)
-          competence.constraints.append(value.as_ContractPrice())
-
-  def _rename_margin_values_tags(self, values):
-    warnings.warn("deprecated", DeprecationWarning)
-    # TODO: remove this
-    for value in values:
-      if value.sign.value < 0:
-        sfx = '-max'
-      elif value.sign.value > 0:
-        sfx = '-min'
-      else:
-        sfx = ''
-
-      value.parent.kind = f"constraint{sfx}"
-
-    known_keys = []
-    k = 0  # constraints numbering
-    for value in values:
-      k += 1
-      if value.parent.get_key() in known_keys:
-        value.parent.kind = f"{value.parent.kind}{TAG_KEY_DELIMITER}{k}"
-
-      known_keys.append(value.parent.get_key())
+        if competence.contains(value.get_span()):
+          competence.constraints.append(value)
 
   def attribute_spans_to_subjects(self,
                                   unique_sentence_spans: Spans,
@@ -353,15 +306,16 @@ class CharterParser(ParsingContext):
         all_subjects.remove(best_subject)  # taken: avoid duplicates
 
 
-def collect_sentences_having_constraint_values(subdoc: LegalDocumentExt, contract_values: [ContractValue],
+def collect_sentences_having_constraint_values(subdoc: LegalDocumentExt, contract_values: [ContractPrice],
                                                merge_spans=True) -> Spans:
   # collect sentences having constraint values
   unique_sentence_spans: Spans = []
   for contract_value in contract_values:
-    contract_value_sentence_span = subdoc.sentence_at_index(contract_value.parent.span[0], return_delimiters=False)
+    parent_span = contract_value.get_span()
+    contract_value_sentence_span = subdoc.sentence_at_index(parent_span[0], return_delimiters=False)
     if contract_value_sentence_span not in unique_sentence_spans:
       unique_sentence_spans.append(contract_value_sentence_span)
-    contract_value_sentence_span = subdoc.sentence_at_index(contract_value.parent.span[1], return_delimiters=False)
+    contract_value_sentence_span = subdoc.sentence_at_index(parent_span[1], return_delimiters=False)
     if contract_value_sentence_span not in unique_sentence_spans:
       unique_sentence_spans.append(contract_value_sentence_span)
   # --

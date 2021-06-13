@@ -41,6 +41,17 @@ class NumpyFloatHandler(jsonpickle.handlers.BaseHandler):
     return round(obj, 6)
 
 
+class AgendaItemContractHandler(jsonpickle.handlers.BaseHandler):
+  def flatten(self, obj: AgendaItemContract, data):
+    pickler = self.context
+    data['span'] = pickler.flatten(obj.span)
+    data['orgs'] = pickler.flatten(obj.orgs)
+    data['date'] = pickler.flatten(obj.date)
+    data['price'] = pickler.flatten(obj.price)
+    data['number'] = pickler.flatten(obj.number)
+    return data  # [obj.span, pickler.flatten(obj.orgs), obj.date, obj.price, obj.number]
+
+
 class EnumHandler(jsonpickle.handlers.BaseHandler):
   def flatten(self, e: Enum, data):
     return e.name
@@ -53,6 +64,8 @@ jsonpickle.handlers.registry.register(Enum, EnumHandler, base=True)
 jsonpickle.handlers.registry.register(np.float, NumpyFloatHandler)
 jsonpickle.handlers.registry.register(np.float32, NumpyFloatHandler)
 jsonpickle.handlers.registry.register(np.float64, NumpyFloatHandler)
+
+jsonpickle.handlers.registry.register(AgendaItemContract, AgendaItemContractHandler)
 
 
 def del_none(d):
@@ -490,7 +503,7 @@ def should_i_migrate(ids) -> bool:
 
   if '-forcemigration' in sys.argv:
     return True
-  
+
   print("use -forcemigration cmd line arg if your answer is always yes")
   print("use -skipmigration cmd line arg if your answer is always no")
   print('\a')
