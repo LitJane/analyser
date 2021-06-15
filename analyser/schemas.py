@@ -46,7 +46,18 @@ class ContractPrice(SemanticTagBase):
     confs = [c.confidence for c in self.list_children() if c is not None]
     return conditional_p_sum(confs)
 
-  def __mul__(self, confidence_k):
+  def get_span(self) -> (int, int):
+    return merge_spans(self.list_children())
+
+  def __add__(self, addon: int) -> 'ContractPrice':
+    for t in self.list_children():
+      if t is not None:
+        t.offset(addon)
+
+    self.offset(addon)
+    return self
+
+  def __mul__(self, confidence_k) -> 'ContractPrice':
 
     for _r in self.list_children():
       if _r is not None:
@@ -80,7 +91,6 @@ class AgendaItemContract(HasOrgs, SemanticTagBase):
 
   def set_span(self, s):
     pass
-
 
   span = property(get_span, set_span)
 
