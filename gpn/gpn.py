@@ -673,8 +673,7 @@ data = {
   ]
 }
 
-subsidiaries = data['Subsidiary']
-
+subsidiaries = []
 
 def all_do_names():
   for s in subsidiaries:
@@ -702,6 +701,12 @@ def estimate_subsidiary_name_match_min_jaro_similarity():
   return top_similarity
 
 
-HyperParameters.subsidiary_name_match_min_jaro_similarity = estimate_subsidiary_name_match_min_jaro_similarity()
-print('HyperParameters.subsidiary_name_match_min_jaro_similarity',
-      HyperParameters.subsidiary_name_match_min_jaro_similarity)
+def update_subsidiaries_cache(new_subsidiaries):
+  global subsidiaries
+  subsidiaries = new_subsidiaries
+  HyperParameters.subsidiary_name_match_min_jaro_similarity = estimate_subsidiary_name_match_min_jaro_similarity()
+  print('HyperParameters.subsidiary_name_match_min_jaro_similarity',
+        HyperParameters.subsidiary_name_match_min_jaro_similarity)
+
+
+update_subsidiaries_cache(data['Subsidiary'])

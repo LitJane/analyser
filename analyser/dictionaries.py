@@ -1,3 +1,6 @@
+import json
+import os
+
 from pymongo import DESCENDING, ASCENDING
 
 import analyser
@@ -8,7 +11,6 @@ from analyser.structures import OrgStructuralLevel, ContractSubject, contract_su
 from gpn.gpn import subsidiaries
 from integration.db import get_mongodb_connection
 
-import json
 
 def contract_subject_as_db_json():
     for cs in ContractSubject:
@@ -44,9 +46,10 @@ def update_db_dictionaries():
 
     insert_schemas_to_db(db)
 
-    coll = db["subsidiaries"]
-    coll.delete_many({})
-    coll.insert_many(subsidiaries)
+    if os.environ.get("GPN_CSGK_WSDL") is None:
+        coll = db["subsidiaries"]
+        coll.delete_many({})
+        coll.insert_many(subsidiaries)
 
     coll = db["orgStructuralLevel"]
     coll.delete_many({})
