@@ -538,7 +538,7 @@ def finalize():
             logger.info(f'.....pre-check {audit["_id"]} finalizing skipped')
             #todo: insert pre-check logic here
             continue
-        if audit["subsidiary"]["name"] == "Все ДО":
+        if "Все ДО" in audit["subsidiary"]["name"]:
             logger.info(f'.....audit {audit["_id"]} finalizing skipped')
             continue
         logger.info(f'.....finalizing audit {audit["_id"]}')
