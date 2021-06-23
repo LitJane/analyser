@@ -411,7 +411,9 @@ class SemanticTagBase:
     raise NotImplementedError()
 
   def __len__(self) -> int:
-    return self.span[1] - self.span[0]
+    if self.span:
+      return self.span[1] - self.span[0]
+    return 0
 
   def __add__(self, addon: int):
     return self.offset(addon)

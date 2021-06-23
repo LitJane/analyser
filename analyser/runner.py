@@ -1,6 +1,8 @@
+import json
 import traceback
 
 import pymongo
+from bson import json_util
 
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
@@ -10,6 +12,7 @@ from analyser.log import logger
 from analyser.parsing import AuditContext
 from analyser.persistence import DbJsonDoc
 from analyser.protocol_parser import ProtocolParser
+from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
 from integration.db import get_mongodb_connection
 
@@ -189,6 +192,20 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
   return res
 
 
+from jsonschema import validate, ValidationError, FormatChecker
+
+
+def validate_json_schema(db_document):
+  try:
+
+    json_str = json.dumps(db_document.analysis['attributes_tree'], ensure_ascii=False,
+                          default=json_util.default)
+    validate(instance=json_str, schema=document_schemas, format_checker=FormatChecker())
+  except ValidationError as e:
+    logger.error(e)
+    db_document.state = DocumentState.Error.value
+
+
 def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_number: int = 0):
   # TODO: does not save attributes
   analyse_json_obj: dict = doc.to_json_obj()
@@ -196,6 +213,8 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
   documents_collection = db['documents']
   db_document.analysis = analyse_json_obj
   db_document.state = state
+  validate_json_schema(db_document)
+
   db_document.retry_number = retry_number
   documents_collection.update({'_id': doc.get_id()}, db_document.as_dict(), True)
 

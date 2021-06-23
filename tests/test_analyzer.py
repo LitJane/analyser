@@ -15,12 +15,12 @@ from analyser.persistence import DbJsonDoc
 from analyser.runner import BaseProcessor, document_processors, CONTRACT, PROTOCOL, CHARTER
 from integration.db import get_mongodb_connection
 
-@unittest.skip
+# @unittest.skip
 class AnalyzerTestCase(unittest.TestCase):
   @unittest.skip
   def test_analyse_acontract(self):
-
-    doc = get_doc_by_id(ObjectId('5fdb213f542ce403c92b4530'))
+    # {_id:ObjectId('5de8a3fd1b3453848224a9d5')}
+    doc = get_doc_by_id(ObjectId('5de8a3fd1b3453848224a9d5'))
     # _db_client = MongoClient(f'mongodb://192.168.10.36:27017/')
     # _db_client.server_info()
 
@@ -33,9 +33,9 @@ class AnalyzerTestCase(unittest.TestCase):
     audit = get_audit_by_id(doc['auditId'])
     jdoc = DbJsonDoc(doc)
     logger.info(f'......pre-processing {jdoc._id}')
-    _audit_subsidiary: str = audit["subsidiary"]["name"]
+    # _audit_subsidiary: str = audit["subsidiary"]["name"]
 
-    ctx = AuditContext(_audit_subsidiary)
+    ctx = AuditContext(None )
     processor: BaseProcessor = document_processors[CONTRACT]
     processor.preprocess(jdoc, context=ctx)
     processor.process(jdoc, audit, ctx)
