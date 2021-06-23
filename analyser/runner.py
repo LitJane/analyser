@@ -195,6 +195,7 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
   db = get_mongodb_connection()
   documents_collection = db['documents']
   db_document.analysis = analyse_json_obj
+  # db_document.analysis['version'] = analyser.__version__
   db_document.state = state
   db_document.retry_number = retry_number
   documents_collection.update({'_id': doc.get_id()}, db_document.as_dict(), True)
