@@ -17,7 +17,7 @@ from integration.db import get_mongodb_connection
 
 # @unittest.skip
 class AnalyzerTestCase(unittest.TestCase):
-  # @unittest.skip
+  @unittest.skip
   def test_analyse_acontract(self):
     # {_id:ObjectId('5de8a3fd1b3453848224a9d5')}
     doc = get_doc_by_id(ObjectId('5de8a3fd1b3453848224a9d5'))

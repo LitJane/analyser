@@ -195,6 +195,7 @@ def find_org_names_raw_by_re(doc: LegalDocument, regex, confidence_base: float, 
         pass
 
   # normalize org_name names by find_closest_org_name
+  all_ = [normalize_contract_agent(ca) for ca in all_]
 
   return all_
 
