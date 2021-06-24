@@ -57,7 +57,7 @@ class BaseProcessor:
       db_document.retry_number = 0
 
     if db_document.retry_number > 2:
-      logger.error(
+      logger.info(
         f'{db_document.documentType} {db_document.get_id()} exceeds maximum retries for analysis and is skipped')
       return None
 
@@ -173,7 +173,7 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
       query["$and"][2]["$or"].append({"state": state})
 
   if kind is not None:
-    query["$and"].append({'parse.documentType': kind})
+    query["$and"].append({'documentType': kind})
 
   if id_only:
     cursor = documents_collection.find(query, projection={'_id': True})

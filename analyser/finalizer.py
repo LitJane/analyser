@@ -411,7 +411,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                 if eligible_protocol_attrs["date"]["value"] > contract_attrs["date"]["value"]:
                     violations.append(create_violation(
                         {"id": contract["_id"], "number": contract_number,
-                         "type": contract["parse"]["documentType"]},
+                         "type": contract["documentType"]},
                         {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
                         {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                         "contract_date_less_than_protocol_date",
@@ -427,7 +427,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                         if sign < 0 and min_constraint <= protocol_value["value"] < contract_value["value"]:
                             violations.append(create_violation(
                                 {"id": contract["_id"], "number": contract_number,
-                                 "type": contract["parse"]["documentType"]},
+                                 "type": contract["documentType"]},
                                 {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
                                 {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                                 "contract_value_great_than_protocol_value",
@@ -444,7 +444,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                         if sign == 0 and min_constraint <= protocol_value["value"] != contract_value["value"]:
                             violations.append(create_violation(
                                 {"id": contract["_id"], "number": contract_number,
-                                 "type": contract["parse"]["documentType"]},
+                                 "type": contract["documentType"]},
                                 {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
                                 {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                                 "contract_value_not_equal_protocol_value",
@@ -461,7 +461,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                         if sign > 0 and min_constraint <= protocol_value["value"] > contract_value["value"]:
                             violations.append(create_violation(
                                 {"id": contract["_id"], "number": contract_number,
-                                 "type": contract["parse"]["documentType"]},
+                                 "type": contract["documentType"]},
                                 {"id": eligible_charter["_id"],
                                  "date": eligible_charter_attrs["date"]["value"]},
                                 {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
@@ -483,7 +483,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                 if need_protocol_check:
                     violations.append(create_violation(
                         {"id": contract["_id"], "number": contract_number,
-                         "type": contract["parse"]["documentType"]},
+                         "type": contract["documentType"]},
                         {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
                         {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                         {"type": "protocol_not_found", "subject": contract_attrs["subject"]["value"],
