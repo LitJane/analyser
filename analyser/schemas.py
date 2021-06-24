@@ -127,6 +127,12 @@ class OrgItem():
     warnings.warn("use OrgItem", DeprecationWarning)
     return [getattr(self, key) for key in ["type", "name", "alias", "alt_name"] if getattr(self, key) is not None]
 
+  def is_valid(self):
+    for child in self.as_list():
+      if child is not None:
+        return True
+    return False
+
 
 class ContractSchema(DocumentSchema, HasOrgs):
   price: ContractPrice = None
