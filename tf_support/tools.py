@@ -2,7 +2,6 @@ import os
 import warnings
 
 import pandas as pd
-
 import tensorflow.keras.backend as K
 from pandas import DataFrame
 from tensorflow import keras
@@ -105,7 +104,7 @@ class KerasTrainingContext:
     if verbose > 1:
       model.summary()
 
-    keras__version__ = '2.4.3' #keras.__version__
+    keras__version__ = keras.__version__
     ch_fn = os.path.join(self.model_checkpoint_path, f"{model_name}-{keras__version__}.h5")
 
     if weights_file_override is not None:
