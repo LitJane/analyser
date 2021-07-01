@@ -1,11 +1,18 @@
+import json
+import re
+from types import SimpleNamespace
+
 import numpy as np
 import pymongo
 import textdistance
 from bson import ObjectId
 
 from analyser.log import logger
-from integration.currencies import convert_to_charter_currency
+from integration.currencies import convert_to_currency
 from integration.db import get_mongodb_connection
+
+
+full_name_pattern = re.compile(r'(?P<last_name>[а-я,А-Я,a-z,A-Z]+) +(?P<first_name>[а-я,А-Я,a-z,A-Z]+)(\.? +)?(?P<middle_name>[а-я,А-Я,a-z,A-Z]+)?')
 
 
 def get_audits():
@@ -84,13 +91,14 @@ def get_docs_by_audit_id(id: str, state, kind=None, id_only=False, without_large
 
     query = {
         'auditId': id,
-        'documentType': kind,
         "state": state,
         # "$or": [
         #     {"$and": [{"analysis.attributes.date": {"$ne": None}}, {"user": None}]},
         #     {"user.attributes.date": {"$ne": None}}
         # ]
     }
+    if kind is not None:
+        query['documentType'] = kind
     if id_only:
         res = documents_collection.find(query, projection={'_id': True})
     else:
@@ -140,7 +148,7 @@ def get_max_value(doc_attrs):
         if key.endswith("/value"):
             if doc_attrs.get(key[:-5] + "sign") is not None:
                 sign = doc_attrs[key[:-5] + "sign"]["value"]
-            current_value = convert_to_charter_currency({"value": value["value"], "currency": doc_attrs[key[:-5] + "currency"]["value"]})
+            current_value = convert_to_currency({"value": value["value"], "currency": doc_attrs[key[:-5] + "currency"]["value"]})
             if max_value is None or max_value["value"] < current_value["value"]:
                 max_value = current_value
     return max_value, sign
@@ -322,7 +330,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
         if audit.get('bookValues') is not None:
             book_value = get_book_value(audit, str(contract_attrs["date"]["value"].year - 1))
         if contract_attrs.get('price') is not None:
-            contract_value = convert_to_charter_currency({"value": contract_attrs['price']['amount']["value"], "currency": contract_attrs['price']['currency']["value"]}, charter_currency)
+            contract_value = convert_to_currency({"value": contract_attrs['price']['amount']["value"], "currency": contract_attrs['price']['currency']["value"]}, charter_currency)
 
             if contract_value is not None and book_value is not None:
                 org = get_org(eligible_charter_attrs)
@@ -500,6 +508,159 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
     return violations
 
 
+def get_amount_netto(price):
+    if price is None:
+        return None
+    result = {}
+    # price_obj = json.loads(json.dumps(price), object_hook=lambda item: SimpleNamespace(**item))
+    if price.get('currency') is not None:
+        result['currency'] = price['currency']['value']
+    if price.get('amount_netto') is not None:
+        result['value'] = price['amount_netto']['value']
+        return result
+    elif price.get('amount_brutto') is not None and price.get('vat') is not None and price.get('vat_unit') is not None:
+        if price['vat_unit']['value'] == 'Percent':
+            result['value'] = price['amount_brutto']['value'] * (100 - price['vat']['value']) / 100.0
+        elif price['vat_unit']['value'] != price['currency']['value']:
+            vat = convert_to_currency({'value': price['vat']['value'], 'currency': price['vat_unit']['value']}, price['currency']['value'])
+            result['value'] = price['amount_brutto']['value'] - vat
+        else:
+            result['value'] = price['amount_brutto']['value'] - price['vat']['value']
+    elif price.get('amount') is not None:
+        result['value'] = price['amount']['value']
+    return result
+
+
+def check_inside(document):
+    doc_attrs = get_attrs(document)
+    if doc_attrs.get('insideInformation') is not None:
+        text = extract_text(doc_attrs['insideInformation']['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
+        return {'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': doc_attrs['insideInformation']['value']}
+    return None
+
+
+def prepare_affiliates(legal_entity_types):
+    result = []
+    coll = get_mongodb_connection().get_collection('affiliatesList')
+    affiliates = coll.find({})
+    for affiliate in affiliates:
+        exclude = False
+        for legal_entity_type in legal_entity_types:
+            if legal_entity_type['_id'] in affiliate['name']:
+                exclude = True
+                break
+        if not exclude:
+            affiliate['last_name'] = affiliate['name'].split(' ')[0]
+            result.append(affiliate)
+    return result
+
+
+def prepare_beneficiary_chain(audit, legal_entity_types):
+    result = []
+    if audit['beneficiary_chain'] is None:
+        return result
+    for beneficiary in audit['beneficiary_chain']['benefeciaries']:
+        exclude = False
+        for legal_entity_type in legal_entity_types:
+            if legal_entity_type['id'] in beneficiary['namePerson']:
+                exclude = True
+                break
+        if not exclude:
+            beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
+            result.append(beneficiary)
+
+    return result
+
+
+def is_same_person(name1 , name2):
+    match1 = re.search(full_name_pattern, name1)
+    match2 = re.search(full_name_pattern, name2)
+    if match1 is not None and match2 is not None:
+        first_name1 = match1.group('first_name')
+        middle_name1 = match1.group('middle_name')
+        first_name2 = match2.group('first_name')
+        middle_name2 = match2.group('middle_name')
+        if textdistance.jaro_winkler.normalized_distance(first_name1, first_name2) < 0.1:
+            if middle_name1 is not None and middle_name2 is not None:
+                if textdistance.jaro_winkler.normalized_distance(middle_name1, middle_name2) < 0.1:
+                    return True
+            else:
+                return True
+    return False
+
+
+def get_reason(affiliate, contract_date):
+    for reason in affiliate['reasons']:
+        if reason.get('date') is not None:
+            if reason['date'] < contract_date:
+                return reason
+        else:
+            return reason
+    return None
+
+
+def check_interest(contract, audit, affiliates, beneficiaries):
+    result = []
+    contract_attrs = get_attrs(contract)
+
+    contract_date = None
+    if contract_attrs.get('date') is not None:
+        contract_date = contract_attrs['date'].get('value')
+    amount_netto = get_amount_netto(contract_attrs.get('price'))
+    if amount_netto['currency'] != 'RUB':
+        amount_netto = convert_to_currency(amount_netto, 'RUB')
+    if amount_netto['value'] >= 1000000000:#need interest check
+        if contract_attrs.get('people') is not None:
+            for i, person in enumerate(contract_attrs['people']):
+                person_last_name = person.get('lastName')
+                notes = []
+                name = None
+                reason = None
+                if i == 0:
+                    if person.get('value') is not None and person_last_name is not None:
+                        for beneficiary in beneficiaries:
+                            if textdistance.jaro_winkler.normalized_distance(person_last_name['value'], beneficiary['last_name']) < 0.1:
+                                if is_same_person(person.get('value'), beneficiary['namePerson']) and name is None:
+                                    name = beneficiary['namePerson']
+                                else:
+                                    notes.append(beneficiary['namePerson'])
+                        if name is not None or len(notes) > 0:
+                            result.append({'type': 'InterestControl', 'text': name, 'reason': 'Бенефициар', 'notes': notes})
+                else:
+                    for affiliate in affiliates:
+                        if textdistance.jaro_winkler.normalized_distance(person_last_name['value'], affiliate['last_name']) < 0.1:
+                            if is_same_person(person.get('value'), affiliate['namePerson']) and name is None:
+                                r = get_reason(affiliate, contract_date)
+                                if r is not None:
+                                    name = affiliate['namePerson']
+                                    reason = reason['text']
+                            else:
+                                notes.append(affiliate['namePerson'])
+                        if name is not None or len(notes) > 0:
+                            result.append({'type': 'InterestControl', 'text': name, 'reason': reason, 'notes': notes})
+    return result
+
+
+def check_contract_project(document, audit, affiliates, beneficiaries):
+    violations = []
+    document_attrs = get_attrs(document)
+    if document.get('documentType') == 'CONTRACT' and 'InterestControl' in audit['checkTypes']:
+        interest_violations = check_interest(document, audit, affiliates, beneficiaries)
+        violations.extend(interest_violations)
+
+    if 'InsiderControl' in audit['checkTypes']:
+        violation = check_inside(document)
+        if violation is not None:
+            violations.append(violation)
+    if len(violations) > 0:
+        orgs = []
+        if document_attrs.get('orgs') is not None and len(document_attrs['orgs']) > 1:
+            orgs = document_attrs['orgs'][1:]
+        return {'document_id': document['_id'], 'document_filename': document['filename'], 'orgs': orgs, 'violations': violations, 'userViolation': False, 'id': ObjectId()}
+    else:
+        return None
+
+
 def exclude_same_charters(charters):
     result = []
     date_map = {}
@@ -534,9 +695,28 @@ def exclude_same_charters(charters):
 def finalize():
     audits = get_audits()
     for audit in audits:
-        if audit.get('subsidiary') is None:
-            logger.info(f'.....pre-check {audit["_id"]} finalizing skipped')
-            #todo: insert pre-check logic here
+        if audit.get('pre-check'):
+            logger.info(f'.....finalizing pre-audit {audit["_id"]}')
+            prepared_affiliates = None
+            prepared_beneficiaries = None
+            if 'InterestControl' in audit['checkTypes']:
+                legal_entity_types = get_mongodb_connection()['legalEntityTypes'].find({})
+                if prepared_affiliates is None:
+                    prepared_affiliates = prepare_affiliates(legal_entity_types)
+                prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
+            document_ids = get_docs_by_audit_id(audit["_id"], 15, id_only=True)
+            violations = []
+            for document_id in document_ids:
+                try:
+                    document = get_doc_by_id(document_id["_id"])
+                    violation = check_contract_project(document, audit, prepared_affiliates, prepared_beneficiaries)
+                    if violation is not None:
+                        violations.append(violation)
+                except Exception as err:
+                    logger.exception(f'cant finalize document {document_id["_id"]}')
+
+            save_violations(audit, violations)
+            logger.info(f'.....pre-audit {audit["_id"]} is waiting for approval')
             continue
         if "Все ДО" in audit["subsidiary"]["name"]:
             logger.info(f'.....audit {audit["_id"]} finalizing skipped')
@@ -555,17 +735,17 @@ def finalize():
         protocols = get_docs_by_audit_id(audit["_id"], 15, "PROTOCOL", without_large_fields=True)
         supplementary_agreements = get_docs_by_audit_id(audit["_id"], 15, "SUPPLEMENTARY_AGREEMENT", without_large_fields=True)
 
-        for contract_id in contract_ids:
+        for document_id in contract_ids:
             try:
-                contract = get_doc_by_id(contract_id["_id"])
+                contract = get_doc_by_id(document_id["_id"])
                 if get_attrs(contract).get('date') is None:
                     continue
                 violations.extend(check_contract(contract, charters, protocols, audit, supplementary_agreements))
             except Exception as err:
-                logger.exception(f'cant finalize contract {contract_id["_id"]}')
+                logger.exception(f'cant finalize contract {document_id["_id"]}')
 
         save_violations(audit, violations)
-        print(f'.....audit {audit["_id"]} is waiting for approval')
+        logger.info(f'.....audit {audit["_id"]} is waiting for approval')
 
 
 if __name__ == '__main__':
