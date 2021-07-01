@@ -629,15 +629,16 @@ def check_interest(contract, audit, affiliates, beneficiaries):
                 else:
                     for affiliate in affiliates:
                         if textdistance.jaro_winkler.normalized_distance(person_last_name['value'], affiliate['last_name']) < 0.1:
-                            if is_same_person(person.get('value'), affiliate['namePerson']) and name is None:
-                                r = get_reason(affiliate, contract_date)
+                            r = get_reason(affiliate, contract_date)
+                            if is_same_person(person.get('value'), affiliate['name']) and name is None:
                                 if r is not None:
-                                    name = affiliate['namePerson']
-                                    reason = reason['text']
+                                    name = affiliate['name']
+                                    reason = r['text']
                             else:
-                                notes.append(affiliate['namePerson'])
-                        if name is not None or len(notes) > 0:
-                            result.append({'type': 'InterestControl', 'text': name, 'reason': reason, 'notes': notes})
+                                if r is not None:
+                                    notes.append(affiliate['name'])
+                    if name is not None or len(notes) > 0:
+                        result.append({'type': 'InterestControl', 'text': name, 'reason': reason, 'notes': notes})
     return result
 
 
