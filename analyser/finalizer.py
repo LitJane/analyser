@@ -558,7 +558,7 @@ def prepare_affiliates(legal_entity_types):
 
 def prepare_beneficiary_chain(audit, legal_entity_types):
     result = []
-    if audit['beneficiary_chain'] is None:
+    if audit.get('beneficiary_chain') is None:
         return result
     for beneficiary in audit['beneficiary_chain']['benefeciaries']:
         exclude = False
