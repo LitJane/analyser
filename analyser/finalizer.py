@@ -8,6 +8,7 @@ import textdistance
 from bson import ObjectId
 
 from analyser.log import logger
+from analyser.structures import legal_entity_types
 from integration.currencies import convert_to_currency
 from integration.db import get_mongodb_connection
 
@@ -546,7 +547,7 @@ def prepare_affiliates(legal_entity_types):
     for affiliate in affiliates:
         exclude = False
         for legal_entity_type in legal_entity_types:
-            if legal_entity_type['_id'] in affiliate['name']:
+            if legal_entity_type in affiliate['name']:
                 exclude = True
                 break
         if not exclude:
@@ -562,7 +563,7 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
     for beneficiary in audit['beneficiary_chain']['benefeciaries']:
         exclude = False
         for legal_entity_type in legal_entity_types:
-            if legal_entity_type['id'] in beneficiary['namePerson']:
+            if legal_entity_type in beneficiary['namePerson']:
                 exclude = True
                 break
         if not exclude:
@@ -701,7 +702,6 @@ def finalize():
             prepared_affiliates = None
             prepared_beneficiaries = None
             if 'InterestControl' in audit['checkTypes']:
-                legal_entity_types = get_mongodb_connection()['legalEntityTypes'].find({})
                 if prepared_affiliates is None:
                     prepared_affiliates = prepare_affiliates(legal_entity_types)
                 prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
