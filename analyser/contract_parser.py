@@ -219,7 +219,7 @@ def check_org_intersections(contract_agents: [OrgItem]):
   :param contract_agents:
   :return:
   '''
-  if len(contract_agents) == 0:
+  if len(contract_agents) < 2:
     return
   if contract_agents[0].alias is None:
     return
