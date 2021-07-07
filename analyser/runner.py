@@ -60,7 +60,7 @@ class BaseProcessor:
       db_document.retry_number = 0
 
     if db_document.retry_number > 2:
-      logger.error(
+      logger.info(
         f'{db_document.documentType} {db_document.get_id()} exceeds maximum retries for analysis and is skipped')
       return None
 
@@ -115,10 +115,10 @@ class BaseProcessor:
     return org_is_ok and date_is_ok
 
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
-    o1: str = db_doc.get_attribute_value("org-1-name")
-    o2: str = db_doc.get_attribute_value("org-2-name")
-
-    return subsidiary in (o1, o2)
+    org = finalizer.get_org(db_doc.get_attributes_tree())
+    if org is not None and org.get('name') is not None and org['name'].get('value') == subsidiary:
+      return True
+    return False
 
 
 class ProtocolProcessor(BaseProcessor):
@@ -176,7 +176,7 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
       query["$and"][2]["$or"].append({"state": state})
 
   if kind is not None:
-    query["$and"].append({'parse.documentType': kind})
+    query["$and"].append({'documentType': kind})
 
   if id_only:
     cursor = documents_collection.find(query, projection={'_id': True})
