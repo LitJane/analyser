@@ -9,6 +9,7 @@ from bson import ObjectId
 
 from analyser.log import logger
 from analyser.structures import legal_entity_types
+from integration import mail
 from integration.currencies import convert_to_currency
 from integration.db import get_mongodb_connection
 
@@ -747,6 +748,7 @@ def finalize():
 
         save_violations(audit, violations)
         logger.info(f'.....audit {audit["_id"]} is waiting for approval')
+        mail.send_end_audit_email(audit)
 
 
 if __name__ == '__main__':
