@@ -4,6 +4,7 @@ from datetime import datetime
 from zeep import Client, helpers
 
 from analyser.log import logger
+from analyser.structures import legal_entity_types
 from gpn.gpn import update_subsidiaries_cache
 from integration.db import get_mongodb_connection
 
@@ -33,12 +34,20 @@ def get_csgk_client():
     return None
 
 
-def _get_legal_entity_type(short_name, legal_entities):
-    candidate = short_name.split(' ', 1)[0].strip()
+def _clean_short_subsidiary_name(short_name, short_legal_entities):
+    split = short_name.split(' ', 1)
+    if len(split) > 1:
+        for legal_entity in short_legal_entities:
+            if legal_entity == split[0].strip():
+                return legal_entity, split[1].strip().replace('"', '').replace("'", '')
+    return '', short_name
+
+
+def _clean_subsidiary_name(name, legal_entities):
     for legal_entity in legal_entities:
-        if legal_entity == candidate:
-            return legal_entity
-    return ''
+        if name.lower().startswith(legal_entity):
+            return name[len(legal_entity):].strip().replace('"', '').replace("'", '')
+    return name
 
 
 def get_subsidiary_list():
@@ -54,15 +63,17 @@ def get_subsidiary_list():
             ret_code = result.get('RetCode')
             ret_msg = result.get('RetMsg')
             if ret_code == 0:
-                legal_entity_aliases = []
-                legal_entity_aliases = list(filter(lambda x: len(x) > 0, legal_entity_aliases))
+                legal_entity_aliases = list(filter(lambda x: len(x) > 0, legal_entity_types.values()))
+                lower_legal_entities = list(map(lambda x: x.lower(), legal_entity_types.keys()))
                 for sub_result in result['ExecuteResult']['_value_1']['_value_1']:
                     csgk_sub = sub_result.get('CorpManagement._x0020_Integration_CompanySimple_List')
+                    clean_name = _clean_subsidiary_name(csgk_sub.get('ULName'), lower_legal_entities)
+                    legal_entity_type, clean_short_name = _clean_short_subsidiary_name(csgk_sub.get('ULShortName'), legal_entity_aliases)
                     subsidiary = {
                         'subsidiary_id': csgk_sub.get('IdCompany'),
-                        '_id': csgk_sub.get('ULName'),
-                        'legal_entity_type': _get_legal_entity_type(csgk_sub.get('ULShortName'), legal_entity_aliases),
-                        'aliases': [csgk_sub.get('ULShortName')],
+                        '_id': clean_name,
+                        'legal_entity_type': legal_entity_type,
+                        'aliases': [clean_short_name],
                         'short_name': csgk_sub.get('ULShortName'),
                         'INN': csgk_sub.get('INN'),
                         'KPP': csgk_sub.get('KPP'),

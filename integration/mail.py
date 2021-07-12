@@ -79,7 +79,7 @@ def send_end_audit_email(audit):
             message.attach(part1)
             message.attach(part2)
 
-            send_email(smtp_server, port, sender_email, sender_email.split('@'), password, audit['author']['mail'], message.as_string())
+            send_email(smtp_server, port, sender_email, sender_email.split('@')[0], password, audit['author']['mail'], message.as_string())
     except Exception as e:
         logger.exception(e)
 
