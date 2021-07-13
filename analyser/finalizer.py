@@ -143,17 +143,17 @@ def create_violation(document_id, founding_document_id, reference, violation_typ
     return {'id': ObjectId(), 'userViolation': False, "document": document_id, "founding_document": founding_document_id, "reference": reference, "violation_type": violation_type, "violation_reason": violation_reason}
 
 
-def get_max_value(doc_attrs):
-    max_value = None
+def get_best_value(doc_attrs, contract_value, charter_currency):
+    best_value = None
     sign = 0
     for key, value in doc_attrs.items():
         if key.endswith("/value"):
             if doc_attrs.get(key[:-5] + "sign") is not None:
                 sign = doc_attrs[key[:-5] + "sign"]["value"]
             current_value = convert_to_currency({"value": value["value"], "currency": doc_attrs[key[:-5] + "currency"]["value"]})
-            if max_value is None or max_value["value"] < current_value["value"]:
-                max_value = current_value
-    return max_value, sign
+            if best_value is None or best_value["value"] < current_value["value"]:
+                best_value = current_value
+    return best_value, sign
 
 
 def get_charter_diapasons(charter):
@@ -331,8 +331,9 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
         book_value = None
         if audit.get('bookValues') is not None:
             book_value = get_book_value(audit, str(contract_attrs["date"]["value"].year - 1))
-        if contract_attrs.get('price') is not None:
-            contract_value = convert_to_currency({"value": contract_attrs['price']['amount']["value"], "currency": contract_attrs['price']['currency']["value"]}, charter_currency)
+        contract_value = get_amount_netto(contract_attrs.get('price'))
+        if contract_value is not None:
+            contract_value = convert_to_currency(contract_value, charter_currency)
 
             if contract_value is not None and book_value is not None:
                 org = get_org(eligible_charter_attrs)
@@ -432,7 +433,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                          "protocol": {"org_structural_level": protocol_structural_level,
                                       "date": eligible_protocol_attrs["date"]["value"]}}))
                 else:
-                    protocol_value, sign = get_max_value(eligible_protocol_attrs)
+                    protocol_value, sign = get_best_value(eligible_protocol_attrs, contract_value, charter_currency)
                     if protocol_value is not None:
                         if sign < 0 and min_constraint <= protocol_value["value"] < contract_value["value"]:
                             violations.append(create_violation(
@@ -535,9 +536,14 @@ def get_amount_netto(price):
 
 def check_inside(document):
     doc_attrs = get_attrs(document)
+    inside_info = None
     if doc_attrs.get('insideInformation') is not None:
-        text = extract_text(doc_attrs['insideInformation']['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
-        return {'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': doc_attrs['insideInformation']['value']}
+        inside_info = doc_attrs['insideInformation']
+    elif doc_attrs.get('subject') is not None and doc_attrs['subject'].get('insideInformation') is not None:
+        inside_info = doc_attrs['subject']['insideInformation']
+    if inside_info is not None:
+        text = extract_text(inside_info['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
+        return {'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': inside_info['value']}
     return None
 
 
