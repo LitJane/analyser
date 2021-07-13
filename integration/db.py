@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 import warnings
 
 from pymongo import MongoClient
@@ -24,7 +25,14 @@ def get_mongodb_connection():
       host = _env_var('GPN_DB_HOST', 'localhost')
       port = _env_var('GPN_DB_PORT', 27017)
       print(f"DB HOST IS: {host}")
-      _db_client = MongoClient(f'mongodb://{host}:{port}/')
+      user = _env_var('GPN_DB_USER', None)
+      password = _env_var('GPN_DB_PASSWORD', None)
+      if user is not None and password is not None:
+        user = urllib.parse.quote_plus(user)
+        password = urllib.parse.quote_plus(password)
+        _db_client = MongoClient(f'mongodb://{user}:{password}@{host}:{port}/')
+      else:
+        _db_client = MongoClient(f'mongodb://{host}:{port}/')
       _db_client.server_info()
 
     except Exception as err:
