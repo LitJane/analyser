@@ -552,14 +552,21 @@ def prepare_affiliates(legal_entity_types):
     coll = get_mongodb_connection().get_collection('affiliatesList')
     affiliates = coll.find({})
     for affiliate in affiliates:
-        exclude = False
-        for legal_entity_type in legal_entity_types:
-            if legal_entity_type in affiliate['name']:
-                exclude = True
+        company = False
+        for key, value in legal_entity_types.items():
+            if affiliate['name'].lower().strip().startswith(key):
+                affiliate['clean_name'] = affiliate['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                affiliate['legal_entity_type'] = key
+                company = True
                 break
-        if not exclude:
+            if affiliate['name'].lower().strip().startswith(value + ' '):
+                affiliate['clean_name'] = affiliate['name'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                affiliate['legal_entity_type'] = key
+                company = True
+                break
+        if not company:
             affiliate['last_name'] = affiliate['name'].split(' ')[0]
-            result.append(affiliate)
+        result.append(affiliate)
     return result
 
 
@@ -568,19 +575,24 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
     if audit.get('beneficiary_chain') is None:
         return result
     for beneficiary in audit['beneficiary_chain']['benefeciaries']:
-        exclude = False
-        for legal_entity_type in legal_entity_types:
-            if legal_entity_type in beneficiary['namePerson']:
-                exclude = True
-                break
-        if not exclude:
+        company = False
+        for key, value in legal_entity_types.items():
+            if beneficiary['name'] is not None:
+                if beneficiary['name'].lower().strip().startswith(key):
+                    beneficiary['clean_name'] = beneficiary['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                    beneficiary['legal_entity_type'] = key
+                if beneficiary['name'].lower().strip().startswith(value + ' '):
+                    beneficiary['clean_name'] = beneficiary['name'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                    beneficiary['legal_entity_type'] = key
+            if beneficiary['namePerson'].lower().strip().startswith(key) or beneficiary['namePerson'].lower().strip().startswith(value + ' '):
+                company = True
+        if not company:
             beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
-            result.append(beneficiary)
-
+        result.append(beneficiary)
     return result
 
 
-def is_same_person(name1 , name2):
+def is_same_person(name1, name2):
     match1 = re.search(full_name_pattern, name1)
     match2 = re.search(full_name_pattern, name2)
     if match1 is not None and match2 is not None:
@@ -607,6 +619,34 @@ def get_reason(affiliate, contract_date):
     return None
 
 
+def contains_same_name(result, name):
+    for elem in result:
+        if elem['text'] == name:
+            return True
+    return False
+
+
+def get_persons_from_chain(beneficiaries, name):
+    result = []
+    found_names = [name]
+    while True:
+        new_names = []
+        for beneficiary in beneficiaries:
+            for found_name in found_names:
+                if beneficiary['name'] == found_name:
+                    if beneficiary.get('last_name') is not None:
+                        result.append(beneficiary)
+                    else:
+                        new_names.append(beneficiary['namePerson'])
+        found_names = new_names
+        if len(found_names) == 0:
+            if len(result) == 0:
+                return None
+            return result
+        if name in found_names:
+            return None
+
+
 def check_interest(contract, audit, affiliates, beneficiaries):
     result = []
     contract_attrs = get_attrs(contract)
@@ -623,11 +663,11 @@ def check_interest(contract, audit, affiliates, beneficiaries):
                 person_last_name = person.get('lastName')
                 notes = []
                 name = None
-                reason = None
+                reason_text = None
                 if i == 0:
                     if person.get('value') is not None and person_last_name is not None:
                         for beneficiary in beneficiaries:
-                            if textdistance.jaro_winkler.normalized_distance(person_last_name['value'], beneficiary['last_name']) < 0.1:
+                            if beneficiary.get('last_name') is not None and textdistance.jaro_winkler.normalized_distance(person_last_name['value'], beneficiary['last_name']) < 0.1:
                                 if is_same_person(person.get('value'), beneficiary['namePerson']) and name is None:
                                     name = beneficiary['namePerson']
                                 else:
@@ -636,17 +676,62 @@ def check_interest(contract, audit, affiliates, beneficiaries):
                             result.append({'type': 'InterestControl', 'text': name, 'reason': 'Бенефициар', 'notes': notes})
                 else:
                     for affiliate in affiliates:
-                        if textdistance.jaro_winkler.normalized_distance(person_last_name['value'], affiliate['last_name']) < 0.1:
-                            r = get_reason(affiliate, contract_date)
+                        if affiliate.get('last_name') is not None and textdistance.jaro_winkler.normalized_distance(person_last_name['value'], affiliate['last_name']) < 0.1:
+                            reason = get_reason(affiliate, contract_date)
                             if is_same_person(person.get('value'), affiliate['name']) and name is None:
-                                if r is not None:
+                                if reason is not None:
                                     name = affiliate['name']
-                                    reason = r['text']
+                                    reason_text = reason['text']
                             else:
-                                if r is not None:
+                                if reason is not None:
                                     notes.append(affiliate['name'])
                     if name is not None or len(notes) > 0:
-                        result.append({'type': 'InterestControl', 'text': name, 'reason': reason, 'notes': notes})
+                        result.append({'type': 'InterestControl', 'text': name, 'reason': reason_text, 'notes': notes})
+        for beneficiary in beneficiaries:
+            name = None
+            reason_text = None
+            notes = []
+            beneficiary_clean_name = beneficiary['name']
+            if beneficiary.get('clean_name') is not None:
+                beneficiary_clean_name = beneficiary['clean_name']
+            for affiliate in affiliates:
+                reason = get_reason(affiliate, contract_date)
+                if reason is not None:
+                    if affiliate.get('last_name') is not None and beneficiary.get('last_name') is not None:
+                        if textdistance.jaro_winkler.normalized_distance(beneficiary['last_name'], affiliate['last_name']) < 0.1:
+                            if is_same_person(beneficiary['namePerson'], affiliate['name']) and name is None:
+                                name = affiliate['name']
+                                reason_text = 'Бенефициар и ' + reason['text']
+                            else:
+                                notes.append(affiliate['name'])
+
+                    if affiliate.get('last_name') is None and beneficiary.get('last_name') is None:
+                        affilate_clean_name = affiliate['name']
+                        if affiliate.get('clean_name') is not None:
+                            affilate_clean_name = affiliate['clean_name']
+                        if beneficiary_clean_name == affilate_clean_name:
+                            names = get_persons_from_chain(beneficiaries, beneficiary['name'])
+                            if names is None and not contains_same_name(result, beneficiary['name']):
+                                result.append({'type': 'InterestControl', 'text': beneficiary['name'], 'reason': 'Бенефициар', 'notes': []})
+                            for name in names:
+                                notes = []
+                                same_name = None
+                                for internal_affiliate in affiliates:
+                                    reason = get_reason(internal_affiliate, contract_date)
+                                    if reason is not None:
+                                        if internal_affiliate.get('last_name') is not None:
+                                            if textdistance.jaro_winkler.normalized_distance(name['last_name'], internal_affiliate['last_name']) < 0.1:
+                                                if is_same_person(name['namePerson'], internal_affiliate['name']) and same_name is None:
+                                                    same_name = internal_affiliate['name']
+                                                    reason_text = 'Бенефициар и ' + reason['text']
+                                                else:
+                                                    notes.append(affiliate['name'])
+                                if (same_name is not None and not contains_same_name(result, same_name)) or len(notes) > 0:
+                                    result.append({'type': 'InterestControl', 'text': same_name, 'reason': reason_text, 'notes': notes})
+
+            if (name is not None and not contains_same_name(result, name)) or len(notes) > 0:
+                result.append({'type': 'InterestControl', 'text': name, 'reason': reason_text, 'notes': notes})
+
     return result
 
 
