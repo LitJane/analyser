@@ -66,7 +66,7 @@ def get_book_value(audit, target_year: str):
 
 def extract_text(span, words, text):
     first_idx = words[span[0]][0]
-    last_idx = words[span[1]][0] - 1
+    last_idx = words[span[1]][0]
     return text[first_idx:last_idx]
 
 
@@ -213,7 +213,7 @@ def clean_name(name):
     return name.replace(" ", "").replace("-", "").replace("_", "").lower()
 
 
-def find_protocol(contract, protocols, org_level, contract_value):
+def find_protocol(contract, protocols, org_level, contract_value, check_orgs=True):
     contract_attrs = get_attrs(contract)
     result = None
     best_value = -1
@@ -234,7 +234,7 @@ def find_protocol(contract, protocols, org_level, contract_value):
                                     clean_protocol_org = clean_name(agenda_org['name']["value"])
                                     for clean_contract_org in clean_contract_orgs:
                                         distance = textdistance.levenshtein.normalized_distance(clean_contract_org, clean_protocol_org)
-                                        if distance < 0.1:
+                                        if distance < 0.1 or not check_orgs:
                                             if contract_value is not None and agenda_contract.get('price') is not None:
                                                 protocol_value = convert_to_currency({'value': agenda_contract['price']['amount']['value'], 'currency': agenda_contract['price']['currency']['value']}, contract_value['currency'])
                                                 if contract_value['value'] <= best_value:
@@ -414,7 +414,9 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                     competence_constraint = constraint
                     linked_protocols = list(filter(lambda doc: doc['documentType'] == 'PROTOCOL', user_linked_docs))
                     if linked_protocols:
-                        eligible_protocol = linked_protocols[0]
+                        eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value)
+                        if eligible_protocol is None: #force find protocol_value and sign
+                            eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value, check_orgs=False)
                     else:
                         eligible_protocol, protocol_value, sign = find_protocol(contract, protocols, competence, contract_value)
                         add_link(audit["_id"], contract["_id"], eligible_protocol["_id"])
@@ -775,12 +777,12 @@ def check_interest(contract, additional_docs, affiliates, beneficiaries):
                                                         notes.append(affiliate['name'])
                                     if (same_name is not None and not contains_same_name(result, same_name)) or len(notes) > 0:
                                         if same_name is None:
-                                            same_name = beneficiary['name']
+                                            same_name = beneficiary['namePerson']
                                         result.append({'type': 'InterestControl', 'text': same_name, 'reason': reason_text, 'notes': notes})
 
                 if (name is not None and not contains_same_name(result, name)) or len(notes) > 0:
                     if name is None:
-                        name = beneficiary['name']
+                        name = beneficiary['namePerson']
                     result.append({'type': 'InterestControl', 'text': name, 'reason': reason_text, 'notes': notes})
 
     return result
