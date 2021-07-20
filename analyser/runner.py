@@ -116,7 +116,7 @@ class BaseProcessor:
 
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
     org = finalizer.get_org(db_doc.get_attributes_tree())
-    if org is not None and org.get('name') is not None and org['name'].get('value') == subsidiary:
+    if org is not None and org.get('name') is not None and org['name'].get('value').strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '') == subsidiary:
       return True
     return False
 
