@@ -31,16 +31,14 @@ def remove_old_links(audit_id, contract_id):
     audit_collection.update_one({"_id": audit_id}, {"$pull": {"links": {"type": "analysis", "$or": [{"toId": contract_id}, {"fromId": contract_id}]}}})
 
 
-def get_linked_docs(audit_id, contract_id):
+def get_linked_docs(audit, contract_id):
     db = get_mongodb_connection()
-    audit_collection = db['audits']
-    links = audit_collection.find({"_id": audit_id, "$or": [{"links.toId": contract_id}, {"links.fromId": contract_id}]})
     result = []
     document_collection = db['documents']
-    for link in links:
+    for link in audit['links']:
         if link['fromId'] == contract_id:
             result.append(document_collection.find_one({'_id': link['toId']}))
-        else:
+        elif link['toId'] == contract_id:
             result.append(document_collection.find_one({'_id': link['fromId']}))
 
     return result
@@ -164,46 +162,47 @@ def get_charter_diapasons(charter):
     charter_currency = 'RUB'
     if charter_attrs.get('structural_levels') is not None:
         for structural_level in charter_attrs['structural_levels']:
-            structural_level_name = structural_level['value']
-            if structural_level.get('competences') is not None:
-                for competence in structural_level['competences']:
-                    if competence.get('value') is None:
-                        continue
-                    subject_type = competence['value']
-                    subject_map = subjects.get(subject_type)
-                    if subject_map is None:
-                        subject_map = {}
-                        subjects[subject_type] = subject_map
-                    if subject_map.get(structural_level_name) is None:
-                        subject_map[structural_level_name] = {"min": 0, "max": np.inf, "competence_attr_name": competence.get('span')}
-                    constraints = competence.get('constraints')
-                    if constraints is not None:
-                        if len(constraints) == 0:
-                            min_constraint = 0
-                        for constraint in constraints:
-                            constraint_currency = constraint['currency']['value']
-                            constraint_amount = constraint['amount']['value']
-                            if constraint_currency != 'Percent':
-                                charter_currency = constraint_currency
-                            if constraint.get('sign') is not None and int(constraint['sign'].get("value", 0)) > 0:
-                                if subject_map[structural_level_name]["min"] == 0:
-                                    subject_map[structural_level_name]["min"] = constraint_amount
-                                    subject_map[structural_level_name]["currency_min"] = constraint_currency
-                                else:
-                                    old_value = subject_map[structural_level_name]["min"]
-                                    if constraint_amount < old_value:
+            if structural_level.get('value') is not None:
+                structural_level_name = structural_level['value']
+                if structural_level.get('competences') is not None:
+                    for competence in structural_level['competences']:
+                        if competence.get('value') is None:
+                            continue
+                        subject_type = competence['value']
+                        subject_map = subjects.get(subject_type)
+                        if subject_map is None:
+                            subject_map = {}
+                            subjects[subject_type] = subject_map
+                        if subject_map.get(structural_level_name) is None:
+                            subject_map[structural_level_name] = {"min": 0, "max": np.inf, "competence_attr_name": competence.get('span')}
+                        constraints = competence.get('constraints')
+                        if constraints is not None:
+                            if len(constraints) == 0:
+                                min_constraint = 0
+                            for constraint in constraints:
+                                constraint_currency = constraint['currency']['value']
+                                constraint_amount = constraint['amount']['value']
+                                if constraint_currency != 'Percent':
+                                    charter_currency = constraint_currency
+                                if constraint.get('sign') is not None and int(constraint['sign'].get("value", 0)) > 0:
+                                    if subject_map[structural_level_name]["min"] == 0:
                                         subject_map[structural_level_name]["min"] = constraint_amount
                                         subject_map[structural_level_name]["currency_min"] = constraint_currency
-                                min_constraint = min(min_constraint, constraint_amount)
-                            else:
-                                if subject_map[structural_level_name]["max"] == np.inf:
-                                    subject_map[structural_level_name]["max"] = constraint_amount
-                                    subject_map[structural_level_name]["currency_max"] = constraint_currency
+                                    else:
+                                        old_value = subject_map[structural_level_name]["min"]
+                                        if constraint_amount < old_value:
+                                            subject_map[structural_level_name]["min"] = constraint_amount
+                                            subject_map[structural_level_name]["currency_min"] = constraint_currency
+                                    min_constraint = min(min_constraint, constraint_amount)
                                 else:
-                                    old_value = subject_map[structural_level_name]["max"]
-                                    if constraint_amount > old_value:
+                                    if subject_map[structural_level_name]["max"] == np.inf:
                                         subject_map[structural_level_name]["max"] = constraint_amount
                                         subject_map[structural_level_name]["currency_max"] = constraint_currency
+                                    else:
+                                        old_value = subject_map[structural_level_name]["max"]
+                                        if constraint_amount > old_value:
+                                            subject_map[structural_level_name]["max"] = constraint_amount
+                                            subject_map[structural_level_name]["currency_max"] = constraint_currency
     if min_constraint == np.inf:
         min_constraint = 0
     return subjects, min_constraint, charter_currency
@@ -216,7 +215,7 @@ def clean_name(name):
 def find_protocol(contract, protocols, org_level, contract_value, check_orgs=True):
     contract_attrs = get_attrs(contract)
     result = None
-    best_value = -1
+    best_value = {'value': -1, 'currency': 'RUB'}
     best_sign = 0
     clean_contract_orgs=[]
     for contract_org in contract_attrs['orgs']:
@@ -237,24 +236,24 @@ def find_protocol(contract, protocols, org_level, contract_value, check_orgs=Tru
                                         if distance < 0.1 or not check_orgs:
                                             if contract_value is not None and agenda_contract.get('price') is not None:
                                                 protocol_value = convert_to_currency({'value': agenda_contract['price']['amount']['value'], 'currency': agenda_contract['price']['currency']['value']}, contract_value['currency'])
-                                                if contract_value['value'] <= best_value:
-                                                    if best_value >= protocol_value['value'] >= contract_value['value']:
+                                                if contract_value['value'] <= best_value['value']:
+                                                    if best_value['value'] >= protocol_value['value'] >= contract_value['value']:
                                                         result = protocol
-                                                        best_value = protocol_value['value']
+                                                        best_value = protocol_value
                                                         sign = 0
                                                         if agenda_contract['price'].get('sign') is not None:
                                                             sign = agenda_contract['price']['sign']['value']
                                                         best_sign = sign
                                                 else:
-                                                    if protocol_value['value'] > best_value:
+                                                    if protocol_value['value'] > best_value['value']:
                                                         result = protocol
-                                                        best_value = protocol_value['value']
+                                                        best_value = protocol_value
                                                         sign = 0
                                                         if agenda_contract['price'].get('sign') is not None:
                                                             sign = agenda_contract['price']['sign']['value']
                                                         best_sign = sign
                                             else:
-                                                if best_value == -1:
+                                                if best_value['value'] == -1:
                                                     result = protocol
 
         return result, best_value, best_sign
@@ -299,7 +298,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
     contract_attrs = get_attrs(contract)
     contract_number = ""
     remove_old_links(audit["_id"], contract["_id"])
-    user_linked_docs = get_linked_docs(audit["_id"], contract["_id"])
+    user_linked_docs = get_linked_docs(audit, contract["_id"])
     if contract_attrs.get("number") is not None:
         contract_number = contract_attrs["number"]["value"]
         # linked_sup_agreements = list(filter(lambda doc: doc['documentType'] == 'SUPPLEMENTARY_AGREEMENT', user_linked_docs))
@@ -400,11 +399,13 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
             sign = None
 
             for competence, constraint in competences.items():
-                if constraint['currency_min'] == 'Percent' and book_value is not None:
+                constraint_currency_min = constraint.get('currency_min')
+                constraint_currency_max = constraint.get('currency_max')
+                if constraint_currency_min is not None and constraint_currency_min == 'Percent' and book_value is not None:
                     abs_min = constraint['min'] * book_value / 100
                 else:
                     abs_min = constraint['min']
-                if constraint['currency_max'] == 'Percent' and book_value is not None:
+                if constraint_currency_max is not None and constraint_currency_max == 'Percent' and book_value is not None:
                     abs_max = constraint['max'] * book_value / 100
                 else:
                     abs_max = constraint['max']
@@ -419,7 +420,8 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                             eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value, check_orgs=False)
                     else:
                         eligible_protocol, protocol_value, sign = find_protocol(contract, protocols, competence, contract_value)
-                        add_link(audit["_id"], contract["_id"], eligible_protocol["_id"])
+                        if eligible_protocol is not None:
+                            add_link(audit["_id"], contract["_id"], eligible_protocol["_id"])
                     if eligible_protocol is not None:
                         org_level = competence
                         break
@@ -465,7 +467,6 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                          "protocol": {"org_structural_level": protocol_structural_level,
                                       "date": eligible_protocol_attrs["date"]["value"]}}))
                 else:
-                    # protocol_value, sign = get_best_value(eligible_protocol_attrs, contract_value, charter_currency)
                     if protocol_value is not None:
                         if sign < 0 and min_constraint <= protocol_value["value"] < contract_value["value"]:
                             violations.append(create_violation(
@@ -478,8 +479,8 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "date": contract_attrs["date"]["value"],
                                               "org_type": contract_org2_type,
                                               "org_name": contract_org2_name,
-                                              "value": contract_attrs["sign_value_currency/value"]["value"],
-                                              "currency": contract_attrs["sign_value_currency/currency"]["value"]},
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
                                 "protocol": {
                                      "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
                                      "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
@@ -495,8 +496,8 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "date": contract_attrs["date"]["value"],
                                               "org_type": contract_org2_type,
                                               "org_name": contract_org2_name,
-                                              "value": contract_attrs["sign_value_currency/value"]["value"],
-                                              "currency": contract_attrs["sign_value_currency/currency"]["value"]},
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
                                 "protocol": {
                                      "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
                                      "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
@@ -513,9 +514,8 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "date": contract_attrs["date"]["value"],
                                               "org_type": contract_org2_type,
                                               "org_name": contract_org2_name,
-                                              "value": contract_attrs["sign_value_currency/value"]["value"],
-                                              "currency": contract_attrs["sign_value_currency/currency"][
-                                                  "value"]},
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
                                 "protocol": {
                                      "org_structural_level": protocol_structural_level,
                                      "date": eligible_protocol_attrs["date"]["value"],
@@ -538,8 +538,9 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                       "date": contract_attrs["date"]["value"],
                                       "org_type": contract_org2_type,
                                       "org_name": contract_org2_name,
-                                      "value": contract_attrs["sign_value_currency/value"]["value"],
-                                      "currency": contract_attrs["sign_value_currency/currency"]["value"]}}))
+                                      "value": contract_value["original_value"],
+                                      "currency": contract_value["original_currency"]
+                                      }}))
     return violations
 
 
@@ -550,19 +551,31 @@ def get_amount_netto(price):
     # price_obj = json.loads(json.dumps(price), object_hook=lambda item: SimpleNamespace(**item))
     if price.get('currency') is not None:
         result['currency'] = price['currency']['value']
+    else:
+        return None
     if price.get('amount_netto') is not None:
         result['value'] = price['amount_netto']['value']
         return result
-    elif price.get('amount_brutto') is not None and price.get('vat') is not None and price.get('vat_unit') is not None:
-        if price['vat_unit']['value'] == 'Percent':
-            result['value'] = price['amount_brutto']['value'] * (100 - price['vat']['value']) / 100.0
-        elif price['vat_unit']['value'] != price['currency']['value']:
-            vat = convert_to_currency({'value': price['vat']['value'], 'currency': price['vat_unit']['value']}, price['currency']['value'])
-            result['value'] = price['amount_brutto']['value'] - vat
+    elif price.get('amount_brutto') is not None:
+        vat_unit = price['currency']['value']
+        if price.get('vat_unit') is not None:
+            vat_unit = price['vat_unit']['value']
+        if price.get('vat') is None:
+            vat_value = 20
+            vat_unit = 'Percent'
         else:
-            result['value'] = price['amount_brutto']['value'] - price['vat']['value']
+            vat_value = price['vat']['value']
+        if vat_unit == 'Percent':
+            result['value'] = price['amount_brutto']['value'] * (100 - vat_value) / 100.0
+        elif vat_unit != price['currency']['value']:
+            vat = convert_to_currency({'value': vat_value, 'currency': vat_unit}, price['currency']['value'])
+            result['value'] = price['amount_brutto']['value'] - vat['value']
+        else:
+            result['value'] = price['amount_brutto']['value'] - vat_value
     elif price.get('amount') is not None:
         result['value'] = price['amount']['value']
+    if result.get('value') is None:
+        return None
     return result
 
 
