@@ -109,7 +109,7 @@ class DbJsonDoc:
     return len(arrr)
 
   def is_analyzed(self) -> bool:
-    #TODO: this is waaaaay to complex
+    # TODO: this is waaaaay to complex
     if self.state == DocumentState.New.value:
       return False
 
@@ -139,7 +139,7 @@ class DbJsonDoc:
     return self.get_attribute('subject')
 
   def get_attribute_value(self, attr: str) -> str or None:
-    a = self.get_attribute(attr)
+    a = self.get_attributes_tree()[attr]
     if a is not None:
       return a['value']
     return None
@@ -147,7 +147,7 @@ class DbJsonDoc:
   def get_date_value(self) -> datetime.datetime or None:
     return self.get_attribute_value('date')
 
-  def get_attribute(self, attr) -> dict:
+  def get_attribute_OLD(self, attr) -> dict:
     atts = self.get_attributes()
     if attr in atts:
       return atts[attr]

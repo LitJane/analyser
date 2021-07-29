@@ -29,6 +29,7 @@ class HyperParameters:
   max_sentenses_to_embedd = 60
 
   max_doc_size_tokens = 15000
+
   max_doc_size_chars = max_doc_size_tokens * 5
 
   protocol_caption_max_size_words = 200
@@ -56,6 +57,9 @@ class HyperParameters:
   hdbscan_cluster_proximity = 0.8
 
   headers_detector_use_regressor = False  ## regressor vs classifyer
+
+  embedding_window = 3500
+  max_doc_size_tokens_for_training = 3500
 
 
 if __name__ == '__main__':
