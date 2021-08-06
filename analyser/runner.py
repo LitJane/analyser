@@ -138,7 +138,7 @@ class ContractProcessor(BaseProcessor):
 
 contract_processor = ContractProcessor()
 document_processors = {CONTRACT: contract_processor, CHARTER: CharterProcessor(), "PROTOCOL": ProtocolProcessor(),
-                       'ANNEX': contract_processor, 'SUPPLEMENTARY_AGREEMENT': contract_processor}
+                       'ANNEX': contract_processor, 'SUPPLEMENTARY_AGREEMENT': contract_processor, 'AGREEMENT': contract_processor}
 
 
 def get_audits() -> [dict]:
