@@ -625,16 +625,16 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
         company = False
         for key, value in legal_entity_types.items():
             if beneficiary['name'] is not None:
-                if beneficiary['name'].lower().strip().startswith(key):
+                if beneficiary['name'].lower().strip().startswith(key.lower()):
                     beneficiary['clean_name'] = beneficiary['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
                     beneficiary['legal_entity_type'] = key
-                if beneficiary['name'].lower().strip().startswith(value + ' '):
+                if beneficiary['name'].lower().strip().startswith(value.lower() + ' '):
                     beneficiary['clean_name'] = beneficiary['name'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
                     beneficiary['legal_entity_type'] = key
-            if beneficiary['namePerson'].lower().strip().startswith(key):
+            if beneficiary['namePerson'].lower().strip().startswith(key.lower()):
                 beneficiary['clean_name_person'] = beneficiary['namePerson'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
                 company = True
-            if beneficiary['namePerson'].lower().strip().startswith(value + ' '):
+            if beneficiary['namePerson'].lower().strip().startswith(value.lower() + ' '):
                 beneficiary['clean_name_person'] = beneficiary['namePerson'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
                 company = True
         if not company:
@@ -720,34 +720,53 @@ def is_already_added(result, beneficiary):
 def build_chain(name, beneficiaries):
     result = []
     links = deque()
+    participants = []
     for beneficiary in beneficiaries:
-        if beneficiary['clean_name'] == name and not is_already_added(result, beneficiary) and (beneficiary['share'] > 50 or 'руководитель' in beneficiary['roles']):
-            links.append(beneficiary)
-            result.append(beneficiary)
-    while len(links) > 0:
-        beneficiary_link = links.popleft()
-        for beneficiary in beneficiaries:
-            if beneficiary_link['personName'] == beneficiary['name'] and not is_already_added(result, beneficiary) and (beneficiary['share'] > 50 or 'руководитель' in beneficiary['roles']):
+        if beneficiary.get('clean_name') == name and not is_already_added(result, beneficiary):
+            if (beneficiary.get('share') is not None and beneficiary['share'] > 50) or 'руководитель' in beneficiary['roles']:
                 links.append(beneficiary)
                 result.append(beneficiary)
+            if beneficiary.get('share') is None and ('участник' in beneficiary['roles'] or 'акционер' in beneficiary['roles']):
+                participants.append(beneficiary)
+    if len(participants) == 1 and not is_already_added(result, participants[0]):
+        links.append(participants[0])
+        result.append(participants[0])
+
+    while len(links) > 0:
+        beneficiary_link = links.popleft()
+        participants = []
+        for beneficiary in beneficiaries:
+            if beneficiary_link['namePerson'] == beneficiary['name'] and not is_already_added(result, beneficiary):
+                beneficiary['parent'] = beneficiary_link
+                if (beneficiary.get('share') is not None and beneficiary['share'] > 50) or 'руководитель' in beneficiary['roles']:
+                    links.append(beneficiary)
+                    result.append(beneficiary)
+                if beneficiary.get('share') is None and ('участник' in beneficiary['roles'] or 'акционер' in beneficiary['roles']):
+                    participants.append(beneficiary)
+        if len(participants) == 1 and not is_already_added(result, participants[0]):
+            links.append(participants[0])
+            result.append(participants[0])
     return result
 
 
 def find_org_interest(result, name, interests):
     for key, value in interests.items():
-        for org in value['organizations']:
-            if org.get('clean_name') == name or org.get('clean_short_name') == name:
-                share = 100
-                if len(org['shareChain']) > 0:
-                    share = org["shareChain"][-1]['percents']
-                control_type = 'прямой контроль'
-                if org.get('control_type') is not None:
-                    control_type = org['control_type']
-                control_chain = ''
-                for controlled_org in org['shareChain']:
-                    control_chain += '\n' + controlled_org['text']
-                reason_text = f'Контролируемая доля {companies.get(key)} в уставном капитале контрагента {share}%\n{control_type} эмитента: {control_chain}'
-                result.append({'type': 'InterestControl', 'text': companies.get(key), 'reason': reason_text, 'notes': []})
+        if value is not None:
+            for org in value['organizations']:
+                if org.get('clean_name') == name or org.get('clean_short_name') == name:
+                    share = 100
+                    if len(org['shareChain']) > 0:
+                        share = org["shareChain"][-1]['percents']
+                    control_type = 'прямой контроль'
+                    if org.get('control_type') is not None:
+                        control_type = org['control_type']
+                    control_chain = ''
+                    for controlled_org in org['shareChain']:
+                        control_chain += '<br>' + controlled_org['text']
+                    reason_text = f'Контролируемая доля {companies.get(key)} в уставном капитале контрагента {share}%<br>{control_type} эмитента: {control_chain}'
+                    result.append({'type': 'InterestControl', 'text': companies.get(key), 'reason': reason_text, 'notes': []})
+                    return True
+    return False
 
 
 def find_person_interest(result, beneficiary, interests):
@@ -756,20 +775,48 @@ def find_person_interest(result, beneficiary, interests):
     reason_text = ''
     notes = []
     for key, value in interests.items():
-        for person in value['stakeholders']:
-            if textdistance.jaro_winkler.normalized_distance(last_name, person['last_name']) < 0.1:
-                if full_name is None and is_same_person(beneficiary['namePerson'], person['name']):
-                    full_name = person['name']
-                    gp_roles = ''
-                    contragent_roles = ','.join(beneficiary['roles'])
-                    for reason in person['reasons']:
-                        if reason.get('endDate') is None:
-                            gp_roles += '\n' + reason['organization'] + ', ' + reason['text']
-                    reason_text = f'Должности занимаемые в структурах ГП и ГПН: {gp_roles} \nДолжности в структуре контрагента: {contragent_roles}'
-                else:
-                    notes.append(person['name'])
+        if value is not None:
+            for person in value['stakeholders']:
+                if textdistance.jaro_winkler.normalized_distance(last_name, person['last_name']) < 0.1:
+                    if full_name is None and is_same_person(beneficiary['namePerson'], person['name']):
+                        full_name = person['name']
+                        gp_roles = ''
+                        contragent_roles = ','.join(beneficiary['roles'])
+                        for reason in person['reasons']:
+                            if reason.get('endDate') is None:
+                                gp_roles += '<br>' + reason['organization'] + ', ' + reason['text']
+                        reason_text = f'Должности занимаемые в структурах ГП и ГПН: {gp_roles} <br>Должности в структуре контрагента: {contragent_roles}'
+                    else:
+                        notes.append(person['name'])
     if full_name is not None or len(notes) > 0:
         result.append({'type': 'InterestControl', 'text': full_name, 'reason': reason_text, 'notes': notes})
+        return True
+    return False
+
+
+def find_gp_gpn(result, chain):
+    company_names = companies.values()
+    for beneficiary in chain:
+        if beneficiary.get('clean_name_person') is not None and beneficiary['clean_name_person'] in company_names:
+            share = 100
+            control_type = 'прямой контроль'
+            control_chain = ''
+            count = 0
+            org = beneficiary
+            while org is not None:
+                if count > 0:
+                    control_type = 'косвенный контроль'
+                org_share = 100
+                if org.get('share') is not None:
+                    org_share = org['share']
+                control_chain += f'<br>доля {org["namePerson"]} в {org["name"]} - {org_share}%'
+                share = org_share
+                org = org.get('parent')
+                count += 1
+            reason_text = f'Контролируемая доля {beneficiary["namePerson"]} в уставном капитале контрагента {share}%<br>{control_type} эмитента: {control_chain}'
+            result.append({'type': 'InterestControl', 'text': beneficiary["namePerson"], 'reason': reason_text, 'notes': []})
+            return True
+    return False
 
 
 def check_interest(contract, additional_docs, interests, beneficiaries):
@@ -787,20 +834,28 @@ def check_interest(contract, additional_docs, interests, beneficiaries):
             if contract_attrs.get('orgs') is not None:
                 for i, org in enumerate(contract_attrs['orgs']):
                     if i != 0 and org.get('name') is not None:
-                        org_name = org['name']['value']
+                        org_name = org['name']['value'].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        found = find_org_interest(result, org_name, interests)
+                        if found:
+                            return result
                         chain = build_chain(org_name, beneficiaries)
+                        found = find_gp_gpn(result, chain)
+                        # if found:
+                        #     return result
                         for beneficiary in chain:
                             if beneficiary.get('last_name') is not None:
-                                find_person_interest(result, beneficiary, interests)
+                                found = find_person_interest(result, beneficiary, interests)
                             else:
-                                find_org_interest(result, beneficiary['clean_name_person'], interests)
+                                found = find_org_interest(result, beneficiary['clean_name_person'], interests)
+                            if found:
+                                return result
     return result
 
 
 def check_contract_project(document, audit, interests, beneficiaries, docs):
     violations = []
     document_attrs = get_attrs(document)
-    if document.get('documentType') == 'CONTRACT' and 'InterestControl' in audit['checkTypes']:
+    if (document.get('documentType') == 'CONTRACT' or document.get('documentType') == 'AGREEMENT') and 'InterestControl' in audit['checkTypes']:
         additional_docs = list(filter(lambda x: x['_id'] != document['_id'], docs))
         interest_violations = check_interest(document, additional_docs, interests, beneficiaries)
         violations.extend(interest_violations)
