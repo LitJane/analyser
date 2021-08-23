@@ -16,6 +16,7 @@ from integration.db import get_mongodb_connection
 
 
 full_name_pattern = re.compile(r'(?P<last_name>[а-я,А-Я,a-z,A-Z]+) +(?P<first_name>[а-я,А-Я,a-z,A-Z]+)(\.? +)?(?P<middle_name>[а-я,А-Я,a-z,A-Z]+)?')
+company_name_pattern = re.compile(r'[«\'"](?P<company_name>.+)[»\'"]')
 companies = {'gp': 'Газпром', 'gpn': 'Газпром нефть'}
 
 
@@ -622,23 +623,46 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
     if audit.get('beneficiary_chain') is None:
         return result
     for beneficiary in audit['beneficiary_chain']['benefeciaries']:
-        company = False
-        for key, value in legal_entity_types.items():
-            if beneficiary['name'] is not None:
-                if beneficiary['name'].lower().strip().startswith(key.lower()):
-                    beneficiary['clean_name'] = beneficiary['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
-                    beneficiary['legal_entity_type'] = key
-                if beneficiary['name'].lower().strip().startswith(value.lower() + ' '):
-                    beneficiary['clean_name'] = beneficiary['name'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
-                    beneficiary['legal_entity_type'] = key
-            if beneficiary['namePerson'].lower().strip().startswith(key.lower()):
-                beneficiary['clean_name_person'] = beneficiary['namePerson'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+        if beneficiary.get('name') is not None:
+            match = re.search(company_name_pattern, beneficiary['name'])
+            if match is not None:
+                beneficiary['clean_name'] = match.group('company_name')
+                without_name = re.sub(company_name_pattern, '', beneficiary['name'])
+                for key, value in legal_entity_types.items():
+                    if key.lower() in without_name.lower():
+                        beneficiary['legal_entity_type'] = key
+                    if value and value.lower() in without_name.lower():
+                        beneficiary['legal_entity_type'] = key
+            else:
+                for key, value in legal_entity_types.items():
+                    if beneficiary['name'].lower().strip().startswith(key.lower()):
+                        beneficiary['clean_name'] = beneficiary['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        beneficiary['legal_entity_type'] = key
+                    if beneficiary['name'].lower().strip().startswith(value.lower() + ' '):
+                        beneficiary['clean_name'] = beneficiary['name'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        beneficiary['legal_entity_type'] = key
+        if beneficiary.get('namePerson') is not None:
+            company = False
+            match = re.search(company_name_pattern, beneficiary['namePerson'])
+            if match is not None:
+                beneficiary['clean_name_person'] = match.group('company_name')
+                without_name = re.sub(company_name_pattern, '', beneficiary['namePerson'])
                 company = True
-            if beneficiary['namePerson'].lower().strip().startswith(value.lower() + ' '):
-                beneficiary['clean_name_person'] = beneficiary['namePerson'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
-                company = True
-        if not company:
-            beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
+                for key, value in legal_entity_types.items():
+                    if key.lower() in without_name.lower():
+                        beneficiary['legal_entity_type_name_person'] = key
+                    if value and value.lower() in without_name.lower():
+                        beneficiary['legal_entity_type_name_person'] = key
+            else:
+                for key, value in legal_entity_types.items():
+                    if beneficiary['namePerson'].lower().strip().startswith(key.lower()):
+                        beneficiary['clean_name_person'] = beneficiary['namePerson'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        company = True
+                    if beneficiary['namePerson'].lower().strip().startswith(value.lower() + ' '):
+                        beneficiary['clean_name_person'] = beneficiary['namePerson'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        company = True
+            if not company:
+                beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
         result.append(beneficiary)
     return result
 
@@ -809,12 +833,21 @@ def find_gp_gpn(result, chain):
                 org_share = 100
                 if org.get('share') is not None:
                     org_share = org['share']
-                control_chain += f'<br>доля {org["namePerson"]} в {org["name"]} - {org_share}%'
+                name = org["name"]
+                if org.get('clean_name') is not None and org.get('legal_entity_type') is not None:
+                    name = org['legal_entity_type'] + ' ' + org['clean_name']
+                name_person = org["namePerson"]
+                if org.get('clean_name_person') is not None and org.get('legal_entity_type_name_person') is not None:
+                    name_person = org['legal_entity_type_name_person'] + ' ' + org['clean_name_person']
+                control_chain += f'<br>доля {name_person} в {name} - {org_share}%'
                 share = org_share
                 org = org.get('parent')
                 count += 1
-            reason_text = f'Контролируемая доля {beneficiary["namePerson"]} в уставном капитале контрагента {share}%<br>{control_type} эмитента: {control_chain}'
-            result.append({'type': 'InterestControl', 'text': beneficiary["namePerson"], 'reason': reason_text, 'notes': []})
+            name_person = beneficiary["namePerson"]
+            if beneficiary.get('clean_name_person') is not None and beneficiary.get('legal_entity_type_name_person') is not None:
+                name_person = beneficiary['legal_entity_type_name_person'] + ' ' + beneficiary['clean_name_person']
+            reason_text = f'Контролируемая доля {name_person} в уставном капитале контрагента {share}%<br>{control_type} эмитента: {control_chain}'
+            result.append({'type': 'InterestControl', 'text': name_person, 'reason': reason_text, 'notes': []})
             return True
     return False
 
@@ -839,9 +872,16 @@ def check_interest(contract, additional_docs, interests, beneficiaries):
                         if found:
                             return result
                         chain = build_chain(org_name, beneficiaries)
+                        if len(chain) == 0 and org.get('alt_name') is not None:
+                            org_name = org['alt_name']['value'].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                            found = find_org_interest(result, org_name, interests)
+                            if found:
+                                return result
+                            chain = build_chain(org_name, beneficiaries)
+
                         found = find_gp_gpn(result, chain)
-                        # if found:
-                        #     return result
+                        if found:
+                            return result
                         for beneficiary in chain:
                             if beneficiary.get('last_name') is not None:
                                 found = find_person_interest(result, beneficiary, interests)
@@ -855,7 +895,7 @@ def check_interest(contract, additional_docs, interests, beneficiaries):
 def check_contract_project(document, audit, interests, beneficiaries, docs):
     violations = []
     document_attrs = get_attrs(document)
-    if (document.get('documentType') == 'CONTRACT' or document.get('documentType') == 'AGREEMENT') and 'InterestControl' in audit['checkTypes']:
+    if (document.get('documentType') in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']) and 'InterestControl' in audit['checkTypes']:
         additional_docs = list(filter(lambda x: x['_id'] != document['_id'], docs))
         interest_violations = check_interest(document, additional_docs, interests, beneficiaries)
         violations.extend(interest_violations)
