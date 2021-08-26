@@ -166,17 +166,17 @@ def sync_csgk_data():
         coll.delete_many({})
         coll.insert_many(subsidiaries)
 
-    stakeholders = []
-    shareholders = get_shareholders()
-    if shareholders is not None:
-        stakeholders.extend(shareholders)
-    board_of_directors = get_board_of_directors()
-    if board_of_directors is not None:
-        stakeholders.extend(board_of_directors)
-    if len(stakeholders) > 0:
-        coll = db['affiliatesList']
-        coll.delete_many({'company': 'gpn'})
-        coll.insert_many(stakeholders)
+    # stakeholders = []
+    # shareholders = get_shareholders()
+    # if shareholders is not None:
+    #     stakeholders.extend(shareholders)
+    # board_of_directors = get_board_of_directors()
+    # if board_of_directors is not None:
+    #     stakeholders.extend(board_of_directors)
+    # if len(stakeholders) > 0:
+    #     coll = db['affiliatesList']
+    #     coll.delete_many({'company': 'gpn'})
+    #     coll.insert_many(stakeholders)
     db['catalog'].insert({'last_csgk_sync_date': datetime.today()})
     logger.info('CSGK synchronization finished.')
 
