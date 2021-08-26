@@ -8,7 +8,7 @@ import urllib3
 from analyser.log import logger
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-currency_rates = {"RUB": 1.0, "USD": 63.72, "EURO": 70.59, "KZT": 0.17}
+currency_rates = {"RUB": 1.0, "USD": 63.72, "EUR": 70.59, "KZT": 0.17}
 
 
 def _env_var(vname, default_val=None):
