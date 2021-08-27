@@ -62,10 +62,18 @@ def _get_rate_online(original_currency, new_currency, date):
         json_result = json.loads(response.content)
         original_rate = 1.0
         if original_currency != 'RUB':
-            original_rate_str = list(filter(lambda el: el['IsoCharCode'] == original_currency, json_result['item']))[0]['Rate']
-            original_rate = float(original_rate_str.strip())
+            rate_list = list(filter(lambda el: el['IsoCharCode'] == original_currency, json_result['item']))
+            if len(rate_list) > 0:
+                original_rate_str = rate_list[0]['Rate']
+                original_rate = float(original_rate_str.strip())
+            else:
+                return 1.0
         new_rate = 1.0
         if new_currency != 'RUB':
-            new_rate_str = list(filter(lambda el: el['IsoCharCode'] == new_currency, json_result['item']))[0]['Rate']
-            new_rate = float(new_rate_str.strip())
+            rate_list = list(filter(lambda el: el['IsoCharCode'] == new_currency, json_result['item']))
+            if len(rate_list) > 0:
+                new_rate_str = rate_list[0]['Rate']
+                new_rate = float(new_rate_str.strip())
+            else:
+                return 1.0
         return original_rate / new_rate
