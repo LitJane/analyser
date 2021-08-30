@@ -3,6 +3,7 @@ from datetime import datetime
 
 from zeep import Client, helpers
 
+from analyser.finalizer import normalize_only_company_name
 from analyser.log import logger
 from analyser.structures import legal_entity_types
 from gpn.gpn import update_subsidiaries_cache
@@ -39,15 +40,19 @@ def _clean_short_subsidiary_name(short_name, short_legal_entities):
     if len(split) > 1:
         for legal_entity in short_legal_entities:
             if legal_entity == split[0].strip():
-                return legal_entity, split[1].strip().replace('"', '').replace("'", '')
-    return '', short_name
+                name = normalize_only_company_name(split[1].strip().replace('"', '').replace("'", ''))
+                return legal_entity, name
+    name = normalize_only_company_name(short_name)
+    return name
 
 
 def _clean_subsidiary_name(name, legal_entities):
     for legal_entity in legal_entities:
         if name.lower().startswith(legal_entity):
-            return name[len(legal_entity):].strip().replace('"', '').replace("'", '')
-    return name
+            result = normalize_only_company_name(name[len(legal_entity):].strip().replace('"', '').replace("'", ''))
+            return result
+    result = normalize_only_company_name(name)
+    return result
 
 
 def get_subsidiary_list():

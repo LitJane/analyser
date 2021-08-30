@@ -10,6 +10,7 @@ from bson import ObjectId
 
 from analyser.log import logger
 from analyser.structures import legal_entity_types
+from analyser.text_normalize import normalize_company_name
 from integration import mail
 from integration.currencies import convert_to_currency
 from integration.db import get_mongodb_connection
@@ -18,6 +19,15 @@ from integration.db import get_mongodb_connection
 full_name_pattern = re.compile(r'(?P<last_name>[а-я,А-Я,a-z,A-Z]+) +(?P<first_name>[а-я,А-Я,a-z,A-Z]+)(\.? +)?(?P<middle_name>[а-я,А-Я,a-z,A-Z]+)?')
 company_name_pattern = re.compile(r'[«\'"](?P<company_name>.+)[»\'"]')
 companies = {'gp': 'Газпром', 'gpn': 'Газпром нефть'}
+
+
+def normalize_only_company_name(name: str) -> str:
+    _, result = normalize_company_name(name)
+    return result
+
+
+def compare_ignore_case(str1: str, str2: str) -> bool:
+    return str1.lower() == str2.lower()
 
 
 def get_audits():
@@ -142,19 +152,6 @@ def save_violations(audit, violations):
 
 def create_violation(document_id, founding_document_id, reference, violation_type, violation_reason):
     return {'id': ObjectId(), 'userViolation': False, "document": document_id, "founding_document": founding_document_id, "reference": reference, "violation_type": violation_type, "violation_reason": violation_reason}
-
-
-# def get_best_value(agenda_contract, contract_value):
-#     best_value = None
-#     sign = 0
-#     for key, value in doc_attrs.items():
-#         if key.endswith("/value"):
-#             if doc_attrs.get(key[:-5] + "sign") is not None:
-#                 sign = doc_attrs[key[:-5] + "sign"]["value"]
-#             current_value = convert_to_currency({"value": value["value"], "currency": doc_attrs[key[:-5] + "currency"]["value"]})
-#             if best_value is None or best_value["value"] < current_value["value"]:
-#                 best_value = current_value
-#     return best_value, sign
 
 
 def get_charter_diapasons(charter):
@@ -663,6 +660,8 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
                         company = True
             if not company:
                 beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
+            beneficiary['clean_name'] = normalize_only_company_name(beneficiary['clean_name'])
+            beneficiary['clean_name_person'] = normalize_only_company_name(beneficiary['clean_name_person'])
         result.append(beneficiary)
     return result
 
@@ -777,7 +776,7 @@ def find_org_interest(result, name, interests):
     for key, value in interests.items():
         if value is not None:
             for org in value['organizations']:
-                if org.get('clean_name') == name or org.get('clean_short_name') == name:
+                if compare_ignore_case(org.get('clean_name'), name) or compare_ignore_case(org.get('clean_short_name'), name):
                     share = 100
                     if len(org['shareChain']) > 0:
                         share = org["shareChain"][-1]['percents']
@@ -821,34 +820,36 @@ def find_person_interest(result, beneficiary, interests):
 def find_gp_gpn(result, chain):
     company_names = companies.values()
     for beneficiary in chain:
-        if beneficiary.get('clean_name_person') is not None and beneficiary['clean_name_person'] in company_names:
-            share = 100
-            control_type = 'прямой контроль'
-            control_chain = ''
-            count = 0
-            org = beneficiary
-            while org is not None:
-                if count > 0:
-                    control_type = 'косвенный контроль'
-                org_share = 100
-                if org.get('share') is not None:
-                    org_share = org['share']
-                name = org["name"]
-                if org.get('clean_name') is not None and org.get('legal_entity_type') is not None:
-                    name = org['legal_entity_type'] + ' ' + org['clean_name']
-                name_person = org["namePerson"]
-                if org.get('clean_name_person') is not None and org.get('legal_entity_type_name_person') is not None:
-                    name_person = org['legal_entity_type_name_person'] + ' ' + org['clean_name_person']
-                control_chain += f'<br>доля {name_person} в {name} - {org_share}%'
-                share = org_share
-                org = org.get('parent')
-                count += 1
-            name_person = beneficiary["namePerson"]
-            if beneficiary.get('clean_name_person') is not None and beneficiary.get('legal_entity_type_name_person') is not None:
-                name_person = beneficiary['legal_entity_type_name_person'] + ' ' + beneficiary['clean_name_person']
-            reason_text = f'Контролируемая доля {name_person} в уставном капитале контрагента {share}%<br>{control_type} эмитента: {control_chain}'
-            result.append({'type': 'InterestControl', 'text': name_person, 'reason': reason_text, 'notes': []})
-            return True
+        if beneficiary.get('clean_name_person') is not None:
+            for company_name in company_names:
+                if compare_ignore_case(beneficiary['clean_name_person'], company_name):
+                    share = 100
+                    control_type = 'прямой контроль'
+                    control_chain = ''
+                    count = 0
+                    org = beneficiary
+                    while org is not None:
+                        if count > 0:
+                            control_type = 'косвенный контроль'
+                        org_share = 100
+                        if org.get('share') is not None:
+                            org_share = org['share']
+                        name = org["name"]
+                        if org.get('clean_name') is not None and org.get('legal_entity_type') is not None:
+                            name = org['legal_entity_type'] + ' ' + org['clean_name']
+                        name_person = org["namePerson"]
+                        if org.get('clean_name_person') is not None and org.get('legal_entity_type_name_person') is not None:
+                            name_person = org['legal_entity_type_name_person'] + ' ' + org['clean_name_person']
+                        control_chain += f'<br>доля {name_person} в {name} - {org_share}%'
+                        share = org_share
+                        org = org.get('parent')
+                        count += 1
+                    name_person = beneficiary["namePerson"]
+                    if beneficiary.get('clean_name_person') is not None and beneficiary.get('legal_entity_type_name_person') is not None:
+                        name_person = beneficiary['legal_entity_type_name_person'] + ' ' + beneficiary['clean_name_person']
+                    reason_text = f'Контролируемая доля {name_person} в уставном капитале контрагента {share}%<br>{control_type} эмитента: {control_chain}'
+                    result.append({'type': 'InterestControl', 'text': name_person, 'reason': reason_text, 'notes': []})
+                    return True
     return False
 
 
@@ -868,12 +869,14 @@ def check_interest(contract, additional_docs, interests, beneficiaries):
                 for i, org in enumerate(contract_attrs['orgs']):
                     if i != 0 and org.get('name') is not None:
                         org_name = org['name']['value'].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        org_name = normalize_only_company_name(org_name)
                         found = find_org_interest(result, org_name, interests)
                         if found:
                             return result
                         chain = build_chain(org_name, beneficiaries)
                         if len(chain) == 0 and org.get('alt_name') is not None:
                             org_name = org['alt_name']['value'].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                            org_name = normalize_only_company_name(org_name)
                             found = find_org_interest(result, org_name, interests)
                             if found:
                                 return result
@@ -949,10 +952,10 @@ def prepare_interests(interest):
         for org in interest['organizations']:
             for key, value in legal_entity_types.items():
                 if org.get('name') is not None and org['name'].lower().strip().startswith(key):
-                    org['clean_name'] = org['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                    org['clean_name'] = normalize_only_company_name(org['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
                     org['legal_entity_type'] = key
                 if org.get('shortName') is not None and org['shortName'].lower().strip().startswith(value + ' '):
-                    org['clean_short_name'] = org['shortName'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                    org['clean_short_name'] = normalize_only_company_name(org['shortName'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
         for person in interest['stakeholders']:
             person['last_name'] = person['name'].split(' ')[0]
 
