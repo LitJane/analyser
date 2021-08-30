@@ -75,6 +75,7 @@ class ContractAgent(OrgItem):
     self.human_name: SemanticTag or None = None
     self.alt_name: SemanticTag or None = None
     self.type_ext: SemanticTag or None = None
+    self.is_known_subsidiary = False
 
   def as_list(self):
     warnings.warn("use OrgItem", DeprecationWarning)
@@ -209,6 +210,7 @@ def normalize_contract_agent(ca: ContractAgent or OrgItem) -> OrgItem:
     if known_org_name is not None:
       ca.name.value = known_org_name['_id']
       ca.name.confidence *= best_similarity
+      ca.is_known_subsidiary = True
 
   # normalize org_type names by find_closest_org_name
   if ca.type is not None:
