@@ -139,7 +139,7 @@ class DbJsonDoc:
     return self.get_attribute('subject')
 
   def get_attribute_value(self, attr: str) -> str or None:
-    a = self.get_attributes_tree()[attr]
+    a = self.get_attributes_tree().get(attr)
     if a is not None:
       return a['value']
     return None
