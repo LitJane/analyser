@@ -343,6 +343,33 @@ document_schemas = {
         }],
     },
 
+    "terms":{
+      "description": "Сроки/периоды договора",
+      "allOf": [
+        {"$ref": "#/definitions/tag"},
+        {
+          "properties": {
+            "term":{
+              "description":"Количество периодов. Пример: сроком на **11** (одиннадцать) месяцев",
+              "$ref": "#/definitions/numeric_tag"
+            },
+            "term_unit":{
+              "description":"Продолжительность периода. Пример: месяцев, лет, дней",
+              "$ref": "#/definitions/string_tag"
+            },
+            "date_start": {
+              "description":"Дата вступления договора в силу",
+              "$ref": "#/definitions/date_tag"
+            },
+            "date_stop": {
+              "description":"Дата окончания сил договора",
+              "$ref": "#/definitions/date_tag"
+            }
+          }
+        }
+      ]
+    },
+
     "currency": {
       "allOf": [
         {"$ref": "#/definitions/tag"},
@@ -366,6 +393,7 @@ document_schemas = {
             }
           }}]
     },
+
     "person": {
       "allOf": [
         {
@@ -535,6 +563,15 @@ document_schemas = {
     "contract": {
       "properties": {
 
+        "price_for_period": {
+          "$ref": "#/definitions/currency_value",
+          "description":"Не общая сумма договора, а стоимость за период, например, за месяц аренды",
+        },
+
+        "terms":{
+          "$ref": "#/definitions/terms"
+        },
+
         'subject': {
           "$ref": "#/definitions/subject"
         },
@@ -569,7 +606,8 @@ document_schemas = {
           "items": {
             "$ref": "#/definitions/contract_agent",
           }
-        },
+        }
+
 
       }
     },
