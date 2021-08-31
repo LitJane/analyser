@@ -27,6 +27,8 @@ def normalize_only_company_name(name: str) -> str:
 
 
 def compare_ignore_case(str1: str, str2: str) -> bool:
+    if str1 is None or str2 is None:
+        return False
     return str1.lower() == str2.lower()
 
 
