@@ -623,7 +623,7 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
         if beneficiary.get('name') is not None:
             match = re.search(company_name_pattern, beneficiary['name'])
             if match is not None:
-                beneficiary['clean_name'] = match.group('company_name')
+                beneficiary['clean_name'] = normalize_only_company_name(match.group('company_name'))
                 without_name = re.sub(company_name_pattern, '', beneficiary['name'])
                 for key, value in legal_entity_types.items():
                     if key.lower() in without_name.lower():
@@ -635,8 +635,10 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
                     if beneficiary['name'].lower().strip().startswith(key.lower()):
                         beneficiary['clean_name'] = beneficiary['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
                         beneficiary['legal_entity_type'] = key
+                        beneficiary['clean_name'] = normalize_only_company_name(beneficiary['clean_name'])
                     if beneficiary['name'].lower().strip().startswith(value.lower() + ' '):
                         beneficiary['clean_name'] = beneficiary['name'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        beneficiary['clean_name'] = normalize_only_company_name(beneficiary['clean_name'])
                         beneficiary['legal_entity_type'] = key
         if beneficiary.get('namePerson') is not None:
             company = False
@@ -660,8 +662,8 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
                         company = True
             if not company:
                 beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
-            beneficiary['clean_name'] = normalize_only_company_name(beneficiary['clean_name'])
-            beneficiary['clean_name_person'] = normalize_only_company_name(beneficiary['clean_name_person'])
+            else:
+                beneficiary['clean_name_person'] = normalize_only_company_name(beneficiary['clean_name_person'])
         result.append(beneficiary)
     return result
 
