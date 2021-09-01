@@ -581,13 +581,21 @@ def get_amount_netto(price):
     return result
 
 
-def check_inside(document):
+def check_inside(document, additional_docs):
     doc_attrs = get_attrs(document)
     inside_info = None
     if doc_attrs.get('insideInformation') is not None:
         inside_info = doc_attrs['insideInformation']
     elif doc_attrs.get('subject') is not None and doc_attrs['subject'].get('insideInformation') is not None:
         inside_info = doc_attrs['subject']['insideInformation']
+    amount_netto = find_contract_amount_netto(document, additional_docs)
+    gpn_book_value = get_latest_gpn_book_value()
+    if amount_netto is not None and gpn_book_value is not None:
+        if amount_netto['currency'] != 'RUB':
+            amount_netto = convert_to_currency(amount_netto, 'RUB')
+        if amount_netto['value'] > gpn_book_value['value'] * 0.1:
+            return {'type': 'InsiderControl', 'text': 'Крупная сделка(сумма договора более 10% балансовой стоимости ГПН)', 'reason': '', 'notes': [], 'inside_type': 'Deals'}
+
     if inside_info is not None:
         text = extract_text(inside_info['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
         return {'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': inside_info['value']}
@@ -861,9 +869,6 @@ def check_interest(contract, additional_docs, interests, beneficiaries):
     result = []
     contract_attrs = get_attrs(contract)
 
-    contract_date = None
-    if contract_attrs.get('date') is not None:
-        contract_date = contract_attrs['date'].get('value')
     amount_netto = find_contract_amount_netto(contract, additional_docs)
     if amount_netto is not None:
         if amount_netto['currency'] != 'RUB':
@@ -902,15 +907,16 @@ def check_interest(contract, additional_docs, interests, beneficiaries):
 def check_contract_project(document, audit, interests, beneficiaries, docs):
     violations = []
     document_attrs = get_attrs(document)
-    if (document.get('documentType') in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']) and 'InterestControl' in audit['checkTypes']:
+    if document.get('documentType') in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
         additional_docs = list(filter(lambda x: x['_id'] != document['_id'], docs))
-        interest_violations = check_interest(document, additional_docs, interests, beneficiaries)
-        violations.extend(interest_violations)
+        if 'InterestControl' in audit['checkTypes']:
+            interest_violations = check_interest(document, additional_docs, interests, beneficiaries)
+            violations.extend(interest_violations)
 
-    if 'InsiderControl' in audit['checkTypes']:
-        violation = check_inside(document)
-        if violation is not None:
-            violations.append(violation)
+        if 'InsiderControl' in audit['checkTypes']:
+            violation = check_inside(document, additional_docs)
+            if violation is not None:
+                violations.append(violation)
     if len(violations) > 0:
         orgs = []
         if document_attrs.get('orgs') is not None and len(document_attrs['orgs']) > 1:
@@ -973,6 +979,12 @@ def get_latest_interest():
     result['gpn'] = reports.find_one({'company': 'gpn'}, sort=[('uploadDate', pymongo.DESCENDING)])
     prepare_interests(result.get('gpn'))
     return result
+
+
+def get_latest_gpn_book_value():
+    db = get_mongodb_connection()
+    coll = db['bookvalues']
+    return coll.find_one({}, sort=[('date', pymongo.DESCENDING)])
 
 
 def finalize():
