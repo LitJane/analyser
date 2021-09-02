@@ -758,7 +758,7 @@ def build_chain(name, beneficiaries):
     participants = []
     for beneficiary in beneficiaries:
         if beneficiary.get('clean_name') == name and not is_already_added(result, beneficiary):
-            if (beneficiary.get('share') is not None and beneficiary['share'] > 50) or 'руководитель' in beneficiary['roles']:
+            if (beneficiary.get('last_name') is None and beneficiary.get('share') is not None and beneficiary['share'] > 50) or beneficiary.get('last_name') is not None:
                 links.append(beneficiary)
                 result.append(beneficiary)
             if beneficiary.get('share') is None and ('участник' in beneficiary['roles'] or 'акционер' in beneficiary['roles']):
@@ -773,7 +773,7 @@ def build_chain(name, beneficiaries):
         for beneficiary in beneficiaries:
             if beneficiary_link['namePerson'] == beneficiary['name'] and not is_already_added(result, beneficiary):
                 beneficiary['parent'] = beneficiary_link
-                if (beneficiary.get('share') is not None and beneficiary['share'] > 50) or 'руководитель' in beneficiary['roles']:
+                if (beneficiary.get('last_name') is None and beneficiary.get('share') is not None and beneficiary['share'] > 50) or beneficiary.get('last_name') is not None:
                     links.append(beneficiary)
                     result.append(beneficiary)
                 if beneficiary.get('share') is None and ('участник' in beneficiary['roles'] or 'акционер' in beneficiary['roles']):
