@@ -879,28 +879,20 @@ def check_interest(contract, additional_docs, interests, beneficiaries):
                     if i != 0 and org.get('name') is not None:
                         org_name = org['name']['value'].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
                         org_name = normalize_only_company_name(org_name)
-                        found = find_org_interest(result, org_name, interests)
-                        if found:
-                            return result
+                        find_org_interest(result, org_name, interests)
                         chain = build_chain(org_name, beneficiaries)
                         if len(chain) == 0 and org.get('alt_name') is not None:
                             org_name = org['alt_name']['value'].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
                             org_name = normalize_only_company_name(org_name)
-                            found = find_org_interest(result, org_name, interests)
-                            if found:
-                                return result
+                            find_org_interest(result, org_name, interests)
                             chain = build_chain(org_name, beneficiaries)
 
-                        found = find_gp_gpn(result, chain)
-                        if found:
-                            return result
+                        find_gp_gpn(result, chain)
                         for beneficiary in chain:
                             if beneficiary.get('last_name') is not None:
-                                found = find_person_interest(result, beneficiary, interests)
+                                find_person_interest(result, beneficiary, interests)
                             else:
-                                found = find_org_interest(result, beneficiary['clean_name_person'], interests)
-                            if found:
-                                return result
+                                find_org_interest(result, beneficiary['clean_name_person'], interests)
     return result
 
 
