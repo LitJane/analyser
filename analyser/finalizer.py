@@ -785,7 +785,7 @@ def build_chain(name, beneficiaries):
 
 
 def find_org_interest(result, name, interests):
-    for key, value in interests.items():
+    for key, value in list(reversed(sorted(interests.items()))):
         if value is not None:
             for org in value['organizations']:
                 if compare_ignore_case(org.get('clean_name'), name) or compare_ignore_case(org.get('clean_short_name'), name):
@@ -809,7 +809,7 @@ def find_person_interest(result, beneficiary, interests):
     full_name = None
     reason_text = ''
     notes = []
-    for key, value in interests.items():
+    for key, value in list(reversed(sorted(interests.items()))):
         if value is not None:
             for person in value['stakeholders']:
                 if textdistance.jaro_winkler.normalized_distance(last_name, person['last_name']) < 0.1:
@@ -953,10 +953,10 @@ def prepare_interests(interest):
     if interest is not None:
         for org in interest['organizations']:
             for key, value in legal_entity_types.items():
-                if org.get('name') is not None and org['name'].lower().strip().startswith(key):
+                if org.get('name') is not None and org['name'].lower().strip().startswith(key.lower()):
                     org['clean_name'] = normalize_only_company_name(org['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
                     org['legal_entity_type'] = key
-                if org.get('shortName') is not None and org['shortName'].lower().strip().startswith(value + ' '):
+                if org.get('shortName') is not None and org['shortName'].lower().strip().startswith(value.lower() + ' '):
                     org['clean_short_name'] = normalize_only_company_name(org['shortName'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
         for person in interest['stakeholders']:
             person['last_name'] = person['name'].split(' ')[0]
