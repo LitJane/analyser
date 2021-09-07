@@ -7,6 +7,7 @@ from bson import json_util
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser
+from analyser.finalizer import normalize_only_company_name, compare_ignore_case
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.parsing import AuditContext
@@ -116,7 +117,8 @@ class BaseProcessor:
 
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
     org = finalizer.get_org(db_doc.get_attributes_tree())
-    if org is not None and org.get('name') is not None and org['name'].get('value').strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '') == subsidiary:
+    org_name = normalize_only_company_name(org['name'].get('value').strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
+    if org is not None and org.get('name') is not None and compare_ignore_case(org_name, subsidiary):
       return True
     return False
 

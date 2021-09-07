@@ -43,7 +43,7 @@ def _clean_short_subsidiary_name(short_name, short_legal_entities):
                 name = normalize_only_company_name(split[1].strip().replace('"', '').replace("'", ''))
                 return legal_entity, name
     name = normalize_only_company_name(short_name)
-    return name
+    return '', name
 
 
 def _clean_subsidiary_name(name, legal_entities):
