@@ -37,10 +37,12 @@ legal_entity_types = {
   'Автономная некоммерческая организация': 'АНО',
 }
 
+
 class EnumExt(Enum):
   @classmethod
   def list_names(cls):
     return cls._member_names_
+
 
 class DisplayStringEnumMeta(EnumMeta):
   def __new__(mcs, name, bases, attrs):
@@ -82,15 +84,45 @@ ORG_LEVELS_names: [str] = [
 @unique
 class Currencies(EnumExt):
   RUB = 0
+  # RUR = 0
   USD = 1
   EUR = 2
   KZT = 3
   BYN = 4
   TJR = 5
-  RSD = 6
+  TJS = 972  # Таджикский сомони
+  RSD = 6  # Сербский динар	RSD	941
   KGS = 7
   UAH = 8
   Percent = 100
+
+  AUD = 36
+  AZN = 944
+  GBP = 826
+  AMD = 51
+  BGN = 975
+  BRL = 986
+  HUF = 348
+  HKD = 344
+  DKK = 208
+  INR = 356
+  CAD = 124
+  CNY = 156
+  MDL = 498
+  NOK = 578
+  PLN = 985
+  RON = 946
+  SGD = 702
+  TRY = 949
+  TMT = 934
+  UZS = 860
+  # UAH	= 	980
+  CZK = 203
+  SEK = 752
+  CHF = 756
+  ZAR = 710
+  KRW = 410
+  JPY = 392
 
 
 currencly_map = {
@@ -169,8 +201,6 @@ class ContractTags(Enum, metaclass=DisplayStringEnumMeta):
 #   Charity = 1, 'Благотворительность'
 #   RealEstate = 4, 'Сделки с недвижимым имуществом'
 #   Loans = 7, 'Займы, кредиты и др. обязательста'
-
-
 
 
 @unique
