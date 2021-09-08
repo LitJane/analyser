@@ -258,7 +258,7 @@ def find_protocol(contract, protocols, org_level, contract_value, check_orgs=Tru
                                                 if best_value['value'] == -1:
                                                     result = protocol
 
-        return result, best_value, best_sign
+    return result, best_value, best_sign
 
 
 def find_supplementary_agreements(contract, sup_agreements, audit):
