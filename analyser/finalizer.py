@@ -979,6 +979,11 @@ def get_latest_gpn_book_value():
     return coll.find_one({}, sort=[('date', pymongo.DESCENDING)])
 
 
+def save_email_sending_result(result, audit):
+    db = get_mongodb_connection()
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"mail_sent": result}})
+
+
 def finalize():
     audits = get_audits()
     interests = None
@@ -1032,7 +1037,9 @@ def finalize():
 
         save_violations(audit, violations)
         logger.info(f'.....audit {audit["_id"]} is waiting for approval')
-        mail.send_end_audit_email(audit)
+        if audit.get('mail_sent') is None or not audit['mail_sent']:
+            result = mail.send_end_audit_email(audit)
+            save_email_sending_result(result, audit)
 
 
 if __name__ == '__main__':

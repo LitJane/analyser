@@ -34,7 +34,7 @@ def send_email(smtp_server, port, sender_email, login, password, to, message):
         logger.error('SMTP error occurred: ' + str(e))
 
 
-def send_end_audit_email(audit):
+def send_end_audit_email(audit) -> bool:
     try:
         smtp_server = _env_var('GPN_SMTP_SERVER')
         port = _env_var('GPN_SMTP_PORT')
@@ -80,6 +80,8 @@ def send_end_audit_email(audit):
             message.attach(part2)
 
             send_email(smtp_server, port, sender_email, sender_email.split('@')[0], password, audit['author']['mail'], message.as_string())
+            return True
     except Exception as e:
         logger.exception(e)
+    return False
 
