@@ -65,12 +65,6 @@ def get_linked_docs(audit, contract_id):
     return result
 
 
-def add_link(audit_id, doc_id1, doc_id2):
-    db = get_mongodb_connection()
-    audit_collection = db['audits']
-    audit_collection.update_one({"_id": audit_id}, {"$push": {"links": {"fromId": doc_id1, "toId": doc_id2, "type": "analysis"}}})
-
-
 def change_contract_primary_subject(contract, new_subject):
     db = get_mongodb_connection()
     db['documents'].update_one({'_id': contract['_id']}, {'$set': {'primary_subject': new_subject}})
