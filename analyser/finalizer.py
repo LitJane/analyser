@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from collections import deque
 from types import SimpleNamespace
 
@@ -40,10 +41,14 @@ def get_audits():
     return res
 
 
-def remove_old_links(audit_id, contract_id):
+def update_links(audit, links):
     db = get_mongodb_connection()
-    audit_collection = db['audits']
-    audit_collection.update_one({"_id": audit_id}, {"$pull": {"links": {"type": "analysis", "$or": [{"toId": contract_id}, {"fromId": contract_id}]}}})
+    db['audits'].update_one({'_id': audit['_id']}, {'$pull': {'links': {"type": "analysis"}}})
+    db["audits"].update_one({'_id': audit["_id"]}, {"$push": {"links": {'$each': links}}})
+
+
+def create_link(from_id, to_id):
+    return {"fromId": from_id, "toId": to_id, "type": "analysis"}
 
 
 def get_linked_docs(audit, contract_id):
@@ -51,10 +56,11 @@ def get_linked_docs(audit, contract_id):
     result = []
     document_collection = db['documents']
     for link in audit['links']:
-        if link['fromId'] == contract_id:
-            result.append(document_collection.find_one({'_id': link['toId']}))
-        elif link['toId'] == contract_id:
-            result.append(document_collection.find_one({'_id': link['fromId']}))
+        if link.get('type') is not None and link.get('type') != 'analysis':
+            if link['fromId'] == contract_id:
+                result.append(document_collection.find_one({'_id': link['toId']}))
+            elif link['toId'] == contract_id:
+                result.append(document_collection.find_one({'_id': link['fromId']}))
 
     return result
 
@@ -272,7 +278,6 @@ def find_supplementary_agreements(contract, sup_agreements, audit):
         sup_agreement_attrs = get_attrs(sup_agreement)
         if sup_agreement_attrs.get('number') is not None and sup_agreement_attrs['number']['value'] == contract_number:
             result.append(sup_agreement)
-            add_link(audit['_id'], contract['_id'], sup_agreement['_id'])
     return result
 
 
@@ -297,14 +302,16 @@ def get_charter_span(charter_atts, org_level, subject):
 
 def check_contract(contract, charters, protocols, audit, supplementary_agreements):
     violations = []
+    links = []
     contract_attrs = get_attrs(contract)
     contract_number = ""
-    remove_old_links(audit["_id"], contract["_id"])
     user_linked_docs = get_linked_docs(audit, contract["_id"])
     if contract_attrs.get("number") is not None:
         contract_number = contract_attrs["number"]["value"]
         # linked_sup_agreements = list(filter(lambda doc: doc['documentType'] == 'SUPPLEMENTARY_AGREEMENT', user_linked_docs))
-        find_supplementary_agreements(contract, supplementary_agreements, audit)
+        found_supplementary_agreements = find_supplementary_agreements(contract, supplementary_agreements, audit)
+        for sup_agreement in found_supplementary_agreements:
+            links.append(create_link(contract['_id'], sup_agreement['_id']))
     eligible_charter = None
     linked_charters = list(filter(lambda doc: doc['documentType'] == 'CHARTER', user_linked_docs))
     if linked_charters:
@@ -314,7 +321,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
             charter_attrs = get_attrs(charter)
             if charter_attrs["date"]["value"] <= contract_attrs["date"]["value"]:
                 eligible_charter = charter
-                add_link(audit["_id"], contract["_id"], eligible_charter["_id"])
+                links.append(create_link(contract["_id"], eligible_charter["_id"]))
                 break
 
     if eligible_charter is None:
@@ -423,7 +430,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                     else:
                         eligible_protocol, protocol_value, sign = find_protocol(contract, protocols, competence, contract_value)
                         if eligible_protocol is not None:
-                            add_link(audit["_id"], contract["_id"], eligible_protocol["_id"])
+                            links.append(create_link(contract["_id"], eligible_protocol["_id"]))
                     if eligible_protocol is not None:
                         org_level = competence
                         break
@@ -543,7 +550,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                       "value": contract_value["original_value"],
                                       "currency": contract_value["original_currency"]
                                       }}))
-    return violations
+    return violations, links
 
 
 def get_amount_netto(price):
@@ -1014,6 +1021,7 @@ def finalize():
             continue
         logger.info(f'.....finalizing audit {audit["_id"]}')
         violations = []
+        links = []
         contract_ids = get_docs_by_audit_id(audit["_id"], 15, "CONTRACT", id_only=True)
         charters = []
         if audit.get("charters") is not None:
@@ -1031,10 +1039,12 @@ def finalize():
                 contract = get_doc_by_id(document_id["_id"])
                 if get_attrs(contract).get('date') is None:
                     continue
-                violations.extend(check_contract(contract, charters, protocols, audit, supplementary_agreements))
+                new_violations, new_links = check_contract(contract, charters, protocols, audit, supplementary_agreements)
+                violations.extend(new_violations)
+                links.extend(new_links)
             except Exception as err:
                 logger.exception(f'cant finalize contract {document_id["_id"]}')
-
+        update_links(audit, links)
         save_violations(audit, violations)
         logger.info(f'.....audit {audit["_id"]} is waiting for approval')
         if audit.get('mail_sent') is None or not audit['mail_sent']:
