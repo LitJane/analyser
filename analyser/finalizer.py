@@ -23,7 +23,8 @@ companies = {'gp': 'Газпром', 'gpn': 'Газпром нефть'}
 
 
 def normalize_only_company_name(name: str) -> str:
-    _, result = normalize_company_name(name)
+    result = name.strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+    _, result = normalize_company_name(result)
     return result
 
 
@@ -611,12 +612,12 @@ def prepare_affiliates(legal_entity_types):
         company = False
         for key, value in legal_entity_types.items():
             if affiliate['name'].lower().strip().startswith(key):
-                affiliate['clean_name'] = affiliate['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                affiliate['clean_name'] = normalize_only_company_name(affiliate['name'][len(key):])
                 affiliate['legal_entity_type'] = key
                 company = True
                 break
             if affiliate['name'].lower().strip().startswith(value + ' '):
-                affiliate['clean_name'] = affiliate['name'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                affiliate['clean_name'] = normalize_only_company_name(affiliate['name'][len(value):])
                 affiliate['legal_entity_type'] = key
                 company = True
                 break
@@ -644,18 +645,16 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
             else:
                 for key, value in legal_entity_types.items():
                     if beneficiary['name'].lower().strip().startswith(key.lower()):
-                        beneficiary['clean_name'] = beneficiary['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
                         beneficiary['legal_entity_type'] = key
-                        beneficiary['clean_name'] = normalize_only_company_name(beneficiary['clean_name'])
+                        beneficiary['clean_name'] = normalize_only_company_name(beneficiary['name'][len(key):])
                     if beneficiary['name'].lower().strip().startswith(value.lower() + ' '):
-                        beneficiary['clean_name'] = beneficiary['name'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
-                        beneficiary['clean_name'] = normalize_only_company_name(beneficiary['clean_name'])
+                        beneficiary['clean_name'] = normalize_only_company_name(beneficiary['name'][len(value):])
                         beneficiary['legal_entity_type'] = key
         if beneficiary.get('namePerson') is not None:
             company = False
             match = re.search(company_name_pattern, beneficiary['namePerson'])
             if match is not None:
-                beneficiary['clean_name_person'] = match.group('company_name')
+                beneficiary['clean_name_person'] = normalize_only_company_name(match.group('company_name'))
                 without_name = re.sub(company_name_pattern, '', beneficiary['namePerson'])
                 company = True
                 for key, value in legal_entity_types.items():
@@ -666,15 +665,13 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
             else:
                 for key, value in legal_entity_types.items():
                     if beneficiary['namePerson'].lower().strip().startswith(key.lower()):
-                        beneficiary['clean_name_person'] = beneficiary['namePerson'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        beneficiary['clean_name_person'] = normalize_only_company_name(beneficiary['namePerson'][len(key):])
                         company = True
                     if beneficiary['namePerson'].lower().strip().startswith(value.lower() + ' '):
-                        beneficiary['clean_name_person'] = beneficiary['namePerson'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+                        beneficiary['clean_name_person'] = normalize_only_company_name(beneficiary['namePerson'][len(value):])
                         company = True
             if not company:
                 beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
-            else:
-                beneficiary['clean_name_person'] = normalize_only_company_name(beneficiary['clean_name_person'])
         result.append(beneficiary)
     return result
 
@@ -878,13 +875,11 @@ def check_interest(contract, additional_docs, interests, beneficiaries):
             if contract_attrs.get('orgs') is not None:
                 for i, org in enumerate(contract_attrs['orgs']):
                     if i != 0 and org.get('name') is not None:
-                        org_name = org['name']['value'].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
-                        org_name = normalize_only_company_name(org_name)
+                        org_name = normalize_only_company_name(org['name']['value'])
                         find_org_interest(result, org_name, interests)
                         chain = build_chain(org_name, beneficiaries)
                         if len(chain) == 0 and org.get('alt_name') is not None:
-                            org_name = org['alt_name']['value'].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
-                            org_name = normalize_only_company_name(org_name)
+                            org_name = normalize_only_company_name(org['alt_name']['value'])
                             find_org_interest(result, org_name, interests)
                             chain = build_chain(org_name, beneficiaries)
 
@@ -955,10 +950,10 @@ def prepare_interests(interest):
         for org in interest['organizations']:
             for key, value in legal_entity_types.items():
                 if org.get('name') is not None and org['name'].lower().strip().startswith(key.lower()):
-                    org['clean_name'] = normalize_only_company_name(org['name'][len(key):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
+                    org['clean_name'] = normalize_only_company_name(org['name'][len(key):])
                     org['legal_entity_type'] = key
                 if org.get('shortName') is not None and org['shortName'].lower().strip().startswith(value.lower() + ' '):
-                    org['clean_short_name'] = normalize_only_company_name(org['shortName'][len(value):].strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
+                    org['clean_short_name'] = normalize_only_company_name(org['shortName'][len(value):])
         for person in interest['stakeholders']:
             person['last_name'] = person['name'].split(' ')[0]
 
