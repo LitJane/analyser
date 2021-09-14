@@ -10,4 +10,5 @@ export GPN_EVENT_GROUP=CN=Group2,OU=Company,DC=company,DC=loc
 
 printenv
 
-mongod --config /usr/local/etc/mongod.conf
+#mongod --config /usr/local/etc/mongod.conf
+mongod --config /opt/homebrew/etc/mongod.conf
