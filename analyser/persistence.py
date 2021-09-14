@@ -25,7 +25,8 @@ class DbJsonDoc:
     self.isActive: bool or None = None
     self.retry_number: int = 0
     self.__dict__.update(j)  # ------important
-    self.documentType = self.parse['documentType']
+    if self.parse is not None:
+      self.documentType = self.parse['documentType']
 
     if self.state == DocumentState.New.value:
       # reset user data, because it is bound to tokenisation map, re-tokenisation is possible
@@ -52,9 +53,11 @@ class DbJsonDoc:
   def asLegalDoc(self):
 
     if self.is_analyzed():
+      print('is_analyzed')
       # attributes are bound to an existing tokens map
       # -->  preserve saved tokenization
       doc = create_doc_by_type(self.parse['documentType'], self._id, filename=self.filename)
+
 
       doc.tokens_map_norm = self.get_tokens_for_embedding()
       doc.tokens_map = self.get_tokens_map_unchaged()
@@ -78,6 +81,7 @@ class DbJsonDoc:
           para = Paragraph(header_tag, body_tag)
           doc.paragraphs.append(para)
     else:
+      print('not is_analyzed')
       # re-combine parser data
       doc = join_paragraphs(self.parse, self._id, filename=self.filename)
       pass
@@ -114,9 +118,9 @@ class DbJsonDoc:
       return False
 
     return ((self.analysis is not None) and (
-            self.analysis.get('attributes', None) is not None)) or self.is_user_corrected()
+            self.analysis.get('attributes_tree', None) is not None)) or self.is_user_corrected()
 
-  def get_attributes(self) -> dict:
+  def get_attributes_OLD(self) -> dict:
     warnings.warn("switch to attributes_tree", DeprecationWarning)
     attributes = {}
     if self.user is not None:
@@ -136,7 +140,7 @@ class DbJsonDoc:
     return a
 
   def get_subject(self) -> dict:
-    return self.get_attribute('subject')
+    return self.get_attribute_OLD('subject')
 
   def get_attribute_value(self, attr: str) -> str or None:
     a = self.get_attributes_tree().get(attr, None)
@@ -148,7 +152,7 @@ class DbJsonDoc:
     return self.get_attribute_value('date')
 
   def get_attribute_OLD(self, attr) -> dict:
-    atts = self.get_attributes()
+    atts = self.get_attributes_OLD()
     if attr in atts:
       return atts[attr]
     else:
@@ -159,6 +163,6 @@ class DbJsonDoc:
       }  ## fallback for safety
 
   def get_attr_span_start(self, a):
-    att = self.get_attributes()
+    att = self.get_attributes_OLD()
     if a in att:
       return att[a]['span'][0]

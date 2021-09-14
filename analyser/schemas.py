@@ -140,7 +140,7 @@ class ContractSchema(DocumentSchema, HasOrgs):
   def __init__(self):
     super().__init__()
     self.subject: SemanticTagBase or None = None
-
+    self.insideInformation: SemanticTagBase
 
 class ProtocolSchema(DocumentSchema):
 

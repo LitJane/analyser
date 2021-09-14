@@ -134,9 +134,9 @@ class LegalDocument:
     # TODO: employ elf.sentence_map
     return self.tokens_map.sentence_at_index(i, return_delimiters)
 
-  def split_into_sentenses(self):
+  def split_into_sentenses(self, sentence_max_len=HyperParameters.protocol_sentence_max_len):
     self.sentence_map = tokenize_doc_into_sentences_map(self.tokens_map.get_full_text(),
-                                                        HyperParameters.protocol_sentence_max_len)
+                                                        sentence_max_len)
 
   def __len__(self):
     return self.tokens_map.get_len()
