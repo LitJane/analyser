@@ -7,12 +7,13 @@ import json
 import unittest
 
 from bson import ObjectId
-from jsonschema import validate, ValidationError, FormatChecker
+from jsonschema import validate, ValidationError, FormatChecker, Draft7Validator
 from pymongo import MongoClient
 
 import analyser
 from analyser.attributes import to_json, convert_one
 from analyser.ml_tools import SemanticTagBase
+from analyser.runner import schema_validator
 from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, ContractPrice, OrgItem, \
   Schema2LegacyListConverter, AgendaItemContract
 from analyser.schemas import document_schemas
@@ -57,7 +58,7 @@ class TestSchema(unittest.TestCase):
     }
 
     with self.assertRaises(ValidationError) as context:
-      validate(instance=wrong_tree, schema=db_document_schemas, format_checker=FormatChecker())
+      schema_validator.validate(wrong_tree)
 
     self.assertIsNotNone(context.exception)
     print(context.exception)
@@ -162,8 +163,9 @@ class TestSchema(unittest.TestCase):
       }
     }
 
-    with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas, format_checker=FormatChecker())
+    with self.assertRaises(Exception) as context:
+      schema_validator.validate(tree)
+      print(context)
 
     self.assertIsNotNone(context.exception)
     print(context.exception)
@@ -181,7 +183,7 @@ class TestSchema(unittest.TestCase):
     }
 
     with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas, format_checker=FormatChecker())
+      schema_validator.validate(tree)
 
     self.assertIsNotNone(context.exception)
     print(context.exception)
@@ -198,7 +200,7 @@ class TestSchema(unittest.TestCase):
     }
 
     with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas)
+      schema_validator.validate(tree)
 
     self.assertIsNotNone(context.exception)
 
@@ -214,7 +216,7 @@ class TestSchema(unittest.TestCase):
       }
     }
 
-    validate(instance=tree, schema=document_schemas)
+    schema_validator.validate(tree)
 
   def test_value_correct(self):
     tree = {
@@ -241,7 +243,7 @@ class TestSchema(unittest.TestCase):
       }
     }
 
-    validate(instance=tree, schema=document_schemas)
+    schema_validator.validate(tree)
 
   def test_value_missing_fields(self):
     tree = {
@@ -261,7 +263,7 @@ class TestSchema(unittest.TestCase):
       }
     }
     with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas)
+      schema_validator.validate(tree)
     self.assertIsNotNone(context.exception)
 
   def test_subject_correct(self):
@@ -275,7 +277,7 @@ class TestSchema(unittest.TestCase):
       }
     }
 
-    validate(instance=tree, schema=document_schemas)
+    schema_validator.validate(tree)
 
   def test_subject_wrong(self):
     tree = {
@@ -289,7 +291,7 @@ class TestSchema(unittest.TestCase):
     }
 
     with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas)
+      schema_validator.validate(tree)
     self.assertIsNotNone(context.exception)
 
   def test_org_correct(self):
@@ -310,7 +312,7 @@ class TestSchema(unittest.TestCase):
       }]}
     }
 
-    validate(instance=tree, schema=document_schemas)
+    schema_validator.validate(tree)
 
   def test_org_wrong(self):
     tree = {
@@ -332,7 +334,7 @@ class TestSchema(unittest.TestCase):
     }
 
     with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas)
+      schema_validator.validate(tree)
 
     self.assertIsNotNone(context.exception)
 
@@ -362,7 +364,6 @@ class TestSchema(unittest.TestCase):
     # a, _p = to_json(aic)
     # print(a)
     # print(a)
-
 
 
 unittest.main(argv=['-e utf-8'], verbosity=3, exit=False)

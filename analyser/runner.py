@@ -192,15 +192,16 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
   return res
 
 
-from jsonschema import validate, ValidationError, FormatChecker
+from jsonschema import validate, ValidationError, FormatChecker, Draft7Validator
+
+schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
 
 
 def validate_json_schema(db_document):
   try:
-
     json_str = json.dumps(db_document.analysis['attributes_tree'], ensure_ascii=False,
                           default=json_util.default)
-    validate(instance=json_str, schema=document_schemas, format_checker=FormatChecker())
+    schema_validator.validate(json_str)
   except ValidationError as e:
     logger.error(e)
     db_document.state = DocumentState.Error.value

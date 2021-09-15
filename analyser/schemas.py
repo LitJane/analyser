@@ -299,6 +299,7 @@ document_schemas = {
         },
 
         "date": {
+          "description": "Дата (чаще всего) договора",
           "$ref": "#/definitions/date_tag"
         },
 
