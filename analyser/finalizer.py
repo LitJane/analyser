@@ -863,11 +863,13 @@ def find_gp_gpn(result, chain):
     return False
 
 
-def check_interest(contract, additional_docs, interests, beneficiaries):
+def check_interest(audit, contract, additional_docs, interests, beneficiaries):
     result = []
     contract_attrs = get_attrs(contract)
-
-    amount_netto = find_contract_amount_netto(contract, additional_docs)
+    if audit.get('additionalFields') is not None and audit['additionalFields'].get('preAuditContractPrice') is not None:
+        amount_netto = audit['additionalFields']['preAuditContractPrice']
+    else:
+        amount_netto = find_contract_amount_netto(contract, additional_docs)
     if amount_netto is not None:
         if amount_netto['currency'] != 'RUB':
             amount_netto = convert_to_currency(amount_netto, 'RUB')
@@ -898,7 +900,7 @@ def check_contract_project(document, audit, interests, beneficiaries, docs):
     if document.get('documentType') in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
         additional_docs = list(filter(lambda x: x['_id'] != document['_id'], docs))
         if 'InterestControl' in audit['checkTypes']:
-            interest_violations = check_interest(document, additional_docs, interests, beneficiaries)
+            interest_violations = check_interest(audit, document, additional_docs, interests, beneficiaries)
             violations.extend(interest_violations)
 
         if 'InsiderControl' in audit['checkTypes']:
