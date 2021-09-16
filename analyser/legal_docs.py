@@ -67,7 +67,7 @@ class LegalDocument:
 
     self._id = None  # TODO
 
-    self.attributes_tree:DocumentSchema or None = None
+    self.attributes_tree:DocumentSchema or None = DocumentSchema()
     # self.date: SemanticTag or None = None
     # self.number: SemanticTag or None = None
 
