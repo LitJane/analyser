@@ -25,6 +25,7 @@ class DbJsonDoc:
     self.isActive: bool or None = None
     self.retry_number: int = 0
     self.__dict__.update(j)  # ------important
+
     if self.parse is not None:
       self.documentType = self.parse['documentType']
 
@@ -56,8 +57,8 @@ class DbJsonDoc:
       print('is_analyzed')
       # attributes are bound to an existing tokens map
       # -->  preserve saved tokenization
-      doc = create_doc_by_type(self.parse['documentType'], self._id, filename=self.filename)
-
+      kind: str = self.parse['documentType']
+      doc = create_doc_by_type(kind, self._id, filename=self.filename)
 
       doc.tokens_map_norm = self.get_tokens_for_embedding()
       doc.tokens_map = self.get_tokens_map_unchaged()
@@ -66,6 +67,8 @@ class DbJsonDoc:
         if doc.sentence_map is None:
           doc.split_into_sentenses()
 
+      doc.attributes_tree.__dict__.update(self.analysis.get('attributes_tree', {}).get(kind.lower(), {}))
+      
       headers = self.analysis.get('headers', None)
       if headers is not None:
         doc.paragraphs = []

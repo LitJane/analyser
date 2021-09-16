@@ -3,6 +3,7 @@ import traceback
 
 import pymongo
 from bson import json_util
+from jsonschema import ValidationError, FormatChecker, Draft7Validator
 
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
@@ -15,6 +16,8 @@ from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
 from integration.db import get_mongodb_connection
+
+schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
 
 CHARTER = 'CHARTER'
 CONTRACT = 'CONTRACT'
@@ -190,11 +193,6 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
     else:
       res.append(doc)
   return res
-
-
-from jsonschema import validate, ValidationError, FormatChecker, Draft7Validator
-
-schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
 
 
 def validate_json_schema(db_document):

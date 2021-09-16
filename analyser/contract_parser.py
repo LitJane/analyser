@@ -8,6 +8,7 @@ from analyser.contract_agents import ContractAgent, normalize_contract_agent
 from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
+from analyser.insides_finder import InsidesFinder
 from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
@@ -63,6 +64,7 @@ class ContractParser(ParsingContext):
   def __init__(self, embedder=None, sentence_embedder=None):
     ParsingContext.__init__(self, embedder, sentence_embedder)
     self.subject_prediction_model = load_subject_detection_trained_model()
+    self.insides_finder = InsidesFinder()
 
   def find_org_date_number(self, contract: ContractDocument, ctx: AuditContext) -> ContractDocument:
 
@@ -155,6 +157,8 @@ class ContractParser(ParsingContext):
     if len(contract.contract_values) > 0:
       contract.attributes_tree.price = contract.contract_values[0]
     # TODO: convert price!!
+
+    self.insides_finder.find_insides(contract)
 
     self.validate(contract, ctx)
     return contract
