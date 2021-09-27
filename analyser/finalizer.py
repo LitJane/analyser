@@ -345,7 +345,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
           violation_type="charter_not_found",
           violation_reason=violation_reason)
         )
-        return violations
+        return violations, links
     else:
         charter_subject_map, min_constraint, charter_currency = get_charter_diapasons(eligible_charter)
         eligible_charter_attrs = get_attrs(eligible_charter)
