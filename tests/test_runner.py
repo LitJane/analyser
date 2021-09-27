@@ -33,6 +33,8 @@ class TestRunner(unittest.TestCase):
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_is_valid(self):
     doc = get_doc_by_id(ObjectId('5fb3d79f78df3635f5441d31'))
+    if doc is None:
+      raise RuntimeError("fix unit test please, use valid OID")
 
     audit = get_audit_by_id(doc['auditId'])
     jdoc = DbJsonDoc(doc)

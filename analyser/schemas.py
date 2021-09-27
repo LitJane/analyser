@@ -19,6 +19,7 @@ class DocumentSchema:
 
   def __init__(self):
     super().__init__()
+    self.insideInformation: SemanticTagBase or None = None
 
 
 class HasOrgs:
@@ -299,6 +300,7 @@ document_schemas = {
         },
 
         "date": {
+          "description": "Дата (чаще всего) договора",
           "$ref": "#/definitions/date_tag"
         },
 

@@ -22,7 +22,7 @@ from analyser.log import logger
 from analyser.ml_tools import SemanticTag, FixedVector, Embeddings, filter_values_by_key_prefix, rectifyed_sum, \
   conditional_p_sum, clean_semantic_tag_copy
 from analyser.patterns import DIST_FUNC, AbstractPatternFactory, make_pattern_attention_vector
-from analyser.schemas import ContractPrice
+from analyser.schemas import ContractPrice, DocumentSchema
 from analyser.structures import ContractTags
 from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.text_tools import find_token_before_index
@@ -66,6 +66,8 @@ class LegalDocument:
   def __init__(self, original_text=None, name="legal_doc"):
 
     self._id = None  # TODO
+
+    self.attributes_tree:DocumentSchema or None = DocumentSchema()
     # self.date: SemanticTag or None = None
     # self.number: SemanticTag or None = None
 
@@ -134,9 +136,9 @@ class LegalDocument:
     # TODO: employ elf.sentence_map
     return self.tokens_map.sentence_at_index(i, return_delimiters)
 
-  def split_into_sentenses(self):
+  def split_into_sentenses(self, sentence_max_len=HyperParameters.protocol_sentence_max_len):
     self.sentence_map = tokenize_doc_into_sentences_map(self.tokens_map.get_full_text(),
-                                                        HyperParameters.protocol_sentence_max_len)
+                                                        sentence_max_len)
 
   def __len__(self):
     return self.tokens_map.get_len()
@@ -276,8 +278,8 @@ class LegalDocument:
 
 class LegalDocumentExt(LegalDocument):
 
-  def __init__(self, doc: LegalDocument):
-    super().__init__('')
+  def __init__(self, doc: LegalDocument=None, text=''):
+    super().__init__(text)
 
     if doc is not None:
       # self.__dict__ = doc.__dict__

@@ -65,7 +65,7 @@ def _get_semantic_map(doc: DbJsonDoc, confidence_override=None) -> DataFrame:
   _len = len(doc)
 
   df = DataFrame()
-  attributes = doc.get_attributes()
+  attributes = doc.get_attributes_OLD()
   for _kind, tag in attributes.items():
 
     _span = tag['span']

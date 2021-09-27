@@ -26,6 +26,8 @@ print(f"reports_dir: [{reports_dir}]")
 
 
 class HyperParameters:
+  mean_sentense_pattern_len = 300
+
   max_sentenses_to_embedd = 60
 
   max_doc_size_tokens = 15000
