@@ -996,6 +996,7 @@ def prepare_interests(interest):
 
 
 def prepare_insiders(insiders):
+    result = []
     if insiders is not None:
         for insider in insiders:
             for key, value in legal_entity_types.items():
@@ -1003,13 +1004,16 @@ def prepare_insiders(insiders):
                     if insider['isIndividual']:
                         insider['last_name'] = insider['name'].split(' ')[0]
                     else:
-                        insider['clean_name'] = insider['name']
                         if insider['name'].lower().strip().startswith(key.lower()):
                             insider['clean_name'] = normalize_only_company_name(insider['name'][len(key):])
                             insider['legal_entity_type'] = key
                         if insider['name'].lower().strip().startswith(value.lower() + ' '):
                             insider['clean_name'] = normalize_only_company_name(insider['name'][len(value):])
                             insider['legal_entity_type'] = key
+            if insider.get('clean_name') is None:
+                insider['clean_name'] = insider['name']
+            result.append(insider)
+    return result
 
 
 def get_latest_interest():
@@ -1031,8 +1035,8 @@ def get_latest_gpn_book_value():
 
 def get_insiders():
     db = get_mongodb_connection()
-    result = db['insiderlists'].find({})
-    prepare_insiders(result)
+    insiders = db['insiderlists'].find({})
+    result = prepare_insiders(insiders)
     return result
 
 
