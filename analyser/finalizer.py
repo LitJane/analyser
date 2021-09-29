@@ -583,8 +583,44 @@ def get_amount_netto(price):
     return result
 
 
-def check_inside(document, additional_docs):
+def check_inside(document, additional_docs, insiders) -> []:
     doc_attrs = get_attrs(document)
+    result = []
+    for insider in insiders:
+        if insider['isIndividual']:
+            last_name = insider['last_name']
+            if doc_attrs.get('people') is not None:
+                for person in doc_attrs['people']:
+                    if person.get('value') is not None:
+                        if person.get('lastName') is None:
+                            person_last_name = person['value'].split(' ')[0]
+                        else:
+                            person_last_name = person['lastName']['value']
+                        if textdistance.jaro_winkler.normalized_distance(last_name, person_last_name) < 0.1:
+                            if is_same_person(insider['name'], person['value']):
+                                if insider['isDefinitelyAnInsider']:
+                                    return [{'type': 'InsiderControl', 'text': f'Подписант {insider["name"]} входит в список инсайдеров', 'reason': '', 'notes': []}]
+                                else:
+                                    result.append({'type': 'InsiderControl', 'text': f'Подписант {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
+            if doc_attrs.get('orgs') is not None:
+                for org in doc_attrs.get('orgs'):
+                    if org.get('name') is not None and org['name'].get('value') is not None:
+                        if textdistance.jaro_winkler.normalized_distance(last_name, org['name']['value'].split(' ')[0]) < 0.1:
+                            if is_same_person(insider['name'], org['name']['value']):
+                                if insider['isDefinitelyAnInsider']:
+                                    return [{'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список инсайдеров', 'reason': '', 'notes': []}]
+                                else:
+                                    result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
+        else:
+            if doc_attrs.get('orgs') is not None:
+                for org in doc_attrs.get('orgs'):
+                    if org.get('name') is not None and org['name'].get('value') is not None:
+                        if compare_ignore_case(insider['clean_name'], normalize_only_company_name(org['name']['value'])):
+                            if insider['isDefinitelyAnInsider']:
+                                return [{'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список инсайдеров', 'reason': '', 'notes': []}]
+                            else:
+                                result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
+
     inside_info = None
     if doc_attrs.get('insideInformation') is not None:
         inside_info = doc_attrs['insideInformation']
@@ -596,12 +632,12 @@ def check_inside(document, additional_docs):
         if amount_netto['currency'] != 'RUB':
             amount_netto = convert_to_currency(amount_netto, 'RUB')
         if amount_netto['value'] > gpn_book_value['value'] * 0.1:
-            return {'type': 'InsiderControl', 'text': 'Крупная сделка(сумма договора более 10% балансовой стоимости ГПН)', 'reason': '', 'notes': [], 'inside_type': 'Deals'}
+            result.append({'type': 'InsiderControl', 'text': 'Крупная сделка(сумма договора более 10% балансовой стоимости ГПН)', 'reason': '', 'notes': [], 'inside_type': 'Deals'})
 
     if inside_info is not None:
         text = extract_text(inside_info['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
-        return {'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': inside_info['value']}
-    return None
+        result.append({'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': inside_info['value']})
+    return result
 
 
 def prepare_affiliates(legal_entity_types):
@@ -894,7 +930,7 @@ def check_interest(audit, contract, additional_docs, interests, beneficiaries):
     return result
 
 
-def check_contract_project(document, audit, interests, beneficiaries, docs):
+def check_contract_project(document, audit, interests, beneficiaries, docs, insiders):
     violations = []
     document_attrs = get_attrs(document)
     if document.get('documentType') in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
@@ -904,9 +940,8 @@ def check_contract_project(document, audit, interests, beneficiaries, docs):
             violations.extend(interest_violations)
 
         if 'InsiderControl' in audit['checkTypes']:
-            violation = check_inside(document, additional_docs)
-            if violation is not None:
-                violations.append(violation)
+            inside_violations = check_inside(document, additional_docs, insiders)
+            violations.extend(inside_violations)
     if len(violations) > 0:
         orgs = []
         if document_attrs.get('orgs') is not None and len(document_attrs['orgs']) > 1:
@@ -960,6 +995,23 @@ def prepare_interests(interest):
             person['last_name'] = person['name'].split(' ')[0]
 
 
+def prepare_insiders(insiders):
+    if insiders is not None:
+        for insider in insiders:
+            for key, value in legal_entity_types.items():
+                if insider.get('name') is not None:
+                    if insider['isIndividual']:
+                        insider['last_name'] = insider['name'].split(' ')[0]
+                    else:
+                        insider['clean_name'] = insider['name']
+                        if insider['name'].lower().strip().startswith(key.lower()):
+                            insider['clean_name'] = normalize_only_company_name(insider['name'][len(key):])
+                            insider['legal_entity_type'] = key
+                        if insider['name'].lower().strip().startswith(value.lower() + ' '):
+                            insider['clean_name'] = normalize_only_company_name(insider['name'][len(value):])
+                            insider['legal_entity_type'] = key
+
+
 def get_latest_interest():
     result = {}
     db = get_mongodb_connection()
@@ -977,6 +1029,13 @@ def get_latest_gpn_book_value():
     return coll.find_one({}, sort=[('date', pymongo.DESCENDING)])
 
 
+def get_insiders():
+    db = get_mongodb_connection()
+    result = db['insiderlists'].find({})
+    prepare_insiders(result)
+    return result
+
+
 def save_email_sending_result(result, audit):
     db = get_mongodb_connection()
     db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"mail_sent": result}})
@@ -985,6 +1044,7 @@ def save_email_sending_result(result, audit):
 def finalize():
     audits = get_audits()
     interests = None
+    insiders = None
     for audit in audits:
         if audit.get('pre-check'):
             logger.info(f'.....finalizing pre-audit {audit["_id"]}')
@@ -993,12 +1053,15 @@ def finalize():
                 if interests is None:
                     interests = get_latest_interest()
                 prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
+            if 'InsiderControl' in audit['checkTypes']:
+                if insiders is None:
+                    insiders = get_insiders()
             documents = get_docs_by_audit_id(audit["_id"], 15, without_large_fields=True)
             violations = []
             for document_id in documents:
                 try:
                     document = get_doc_by_id(document_id["_id"])
-                    violation = check_contract_project(document, audit, interests, prepared_beneficiaries, documents)
+                    violation = check_contract_project(document, audit, interests, prepared_beneficiaries, documents, insiders)
                     if violation is not None:
                         violations.append(violation)
                 except Exception as err:
