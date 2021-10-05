@@ -607,19 +607,13 @@ def check_inside(document, additional_docs, insiders) -> []:
                     if org.get('name') is not None and org['name'].get('value') is not None:
                         if textdistance.jaro_winkler.normalized_distance(last_name, org['name']['value'].split(' ')[0]) < 0.1:
                             if is_same_person(insider['name'], org['name']['value']):
-                                if insider['isDefinitelyAnInsider']:
-                                    return [{'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список инсайдеров', 'reason': '', 'notes': []}]
-                                else:
-                                    result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
+                                result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
         else:
             if doc_attrs.get('orgs') is not None:
                 for org in doc_attrs.get('orgs'):
                     if org.get('name') is not None and org['name'].get('value') is not None:
                         if compare_ignore_case(insider['clean_name'], normalize_only_company_name(org['name']['value'])):
-                            if insider['isDefinitelyAnInsider']:
-                                return [{'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список инсайдеров', 'reason': '', 'notes': []}]
-                            else:
-                                result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
+                            result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
 
     inside_info = None
     if doc_attrs.get('insideInformation') is not None:
