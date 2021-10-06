@@ -67,8 +67,8 @@ class DbJsonDoc:
         if doc.sentence_map is None:
           doc.split_into_sentenses()
 
-      doc.attributes_tree.__dict__.update(self.analysis.get('attributes_tree', {}).get(kind.lower(), {}))
-      
+      # doc.attributes_tree.__dict__.update(self.analysis.get('attributes_tree', {}).get(kind.lower(), {}))
+
       headers = self.analysis.get('headers', None)
       if headers is not None:
         doc.paragraphs = []

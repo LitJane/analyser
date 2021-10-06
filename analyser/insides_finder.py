@@ -37,7 +37,8 @@ class InsidesFinder():
 
     ########
 
-    threshold = 0.8  # 0.9 *  distance_matrix.max()
+
+    threshold = 0.85  # 0.9 *  distance_matrix.max()
 
     sim_max = threshold
 
