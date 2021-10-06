@@ -54,7 +54,6 @@ class DbJsonDoc:
   def asLegalDoc(self):
 
     if self.is_analyzed():
-      print('is_analyzed')
       # attributes are bound to an existing tokens map
       # -->  preserve saved tokenization
       kind: str = self.parse['documentType']
