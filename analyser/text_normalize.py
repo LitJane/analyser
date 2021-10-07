@@ -56,6 +56,7 @@ r_human_full_name = r_group(r_human_name_part + r'\s*' + r_human_name_part + r'\
 r_human_abbr_name = r_group(r_human_name_part + r'\s*' + r'([А-ЯA-Z][.]\s?){1,2}')
 r_human_name = r_group(r_human_full_name + '|' + r_human_abbr_name, 'human_name')
 
+r_human_name_compilled = re.compile(r'\W' + r_human_name, re.MULTILINE)
 
 def r_quoted(x):
   if x is None:

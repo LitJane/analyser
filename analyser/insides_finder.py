@@ -17,6 +17,9 @@ class InsidesFinder():
     logger.info(f'centroids.shape {self.centroids.shape}')
 
   def find_insides(self, sample_doc: LegalDocument):
+    if not hasattr(sample_doc, 'sentence_map'):
+      #todo: remove this hack
+      setattr(sample_doc, 'sentence_map', None)
 
     if sample_doc.sentence_map is None:
       sample_doc.sentence_map = tokenize_doc_into_sentences_map(sample_doc.tokens_map.get_full_text(),
