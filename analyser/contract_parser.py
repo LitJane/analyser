@@ -158,6 +158,7 @@ class ContractParser(ParsingContext):
       contract.attributes_tree.price = contract.contract_values[0]
     # TODO: convert price!!
 
+    self._logstep("finding insider info")
     self.insides_finder.find_insides(contract)
 
     self.validate(contract, ctx)

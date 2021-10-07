@@ -83,7 +83,6 @@ class DbJsonDoc:
           para = Paragraph(header_tag, body_tag)
           doc.paragraphs.append(para)
     else:
-      print('not is_analyzed')
       # re-combine parser data
       doc = join_paragraphs(self.parse, self._id, filename=self.filename)
       pass

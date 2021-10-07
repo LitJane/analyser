@@ -278,8 +278,8 @@ class LegalDocument:
 
 class LegalDocumentExt(LegalDocument):
 
-  def __init__(self, doc: LegalDocument=None, text=''):
-    super().__init__(text)
+  def __init__(self, doc: LegalDocument):
+    super().__init__('')
 
     if doc is not None:
       # self.__dict__ = doc.__dict__
