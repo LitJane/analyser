@@ -935,7 +935,12 @@ def check_contract_project(document, audit, interests, beneficiaries, docs, insi
 
         if 'InsiderControl' in audit['checkTypes']:
             inside_violations = check_inside(document, additional_docs, insiders)
-            violations.extend(inside_violations)
+            if len(inside_violations) == 0:
+                for add_doc in additional_docs:
+                    inside_violations = check_inside(add_doc, [], insiders)
+                    violations.extend(inside_violations)
+            else:
+                violations.extend(inside_violations)
     if len(violations) > 0:
         orgs = []
         if document_attrs.get('orgs') is not None and len(document_attrs['orgs']) > 1:
@@ -1054,7 +1059,7 @@ def finalize():
             if 'InsiderControl' in audit['checkTypes']:
                 if insiders is None:
                     insiders = get_insiders()
-            documents = get_docs_by_audit_id(audit["_id"], 15, without_large_fields=True)
+            documents = get_docs_by_audit_id(audit["_id"], 15, without_large_fields=False)
             violations = []
             for document_id in documents:
                 try:
