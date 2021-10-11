@@ -383,30 +383,6 @@ def convert_charter_db_attributes_to_tree(attrs):
   return tree
 
 
-# ----------------------
-
-
-def get_attributes_tree(id: str):
-  # x = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
-  # print(x.name, x.hometown.name, x.hometown.id)
-  db = get_mongodb_connection()
-  doc = get_doc_by_id(ObjectId(id))
-
-  analysis = doc.get('analysis')
-  if analysis:
-    tree = analysis.get('attributes_tree')
-    r = dotdict(tree)
-
-    return r.charter
-
-
-class dotdict(dict):
-  """dot.notation access to dictionary attributes"""
-  __getattr__ = dict.get
-  __setattr__ = dict.__setitem__
-  __delattr__ = dict.__delitem__
-
-
 def get_legacy_docs_ids() -> []:
   db = get_mongodb_connection()
   documents_collection = db['documents']

@@ -54,7 +54,6 @@ class DbJsonDoc:
   def asLegalDoc(self):
 
     if self.is_analyzed():
-      print('is_analyzed')
       # attributes are bound to an existing tokens map
       # -->  preserve saved tokenization
       kind: str = self.parse['documentType']
@@ -67,8 +66,8 @@ class DbJsonDoc:
         if doc.sentence_map is None:
           doc.split_into_sentenses()
 
-      doc.attributes_tree.__dict__.update(self.analysis.get('attributes_tree', {}).get(kind.lower(), {}))
-      
+      # doc.attributes_tree.__dict__.update(self.analysis.get('attributes_tree', {}).get(kind.lower(), {}))
+
       headers = self.analysis.get('headers', None)
       if headers is not None:
         doc.paragraphs = []
@@ -84,7 +83,6 @@ class DbJsonDoc:
           para = Paragraph(header_tag, body_tag)
           doc.paragraphs.append(para)
     else:
-      print('not is_analyzed')
       # re-combine parser data
       doc = join_paragraphs(self.parse, self._id, filename=self.filename)
       pass

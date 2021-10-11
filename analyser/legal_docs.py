@@ -169,6 +169,11 @@ class LegalDocument:
   def headers_as_sentences(self) -> [str]:
     return headers_as_sentences(self)
 
+  def get_headline(self):
+    hh = headers_as_sentences(self)
+    if (hh is not None) and len(hh)>0:
+      return hh[0]
+
   def to_json_obj(self) -> dict:
     j = DocumentJson(self)
     return j.__dict__
@@ -278,8 +283,8 @@ class LegalDocument:
 
 class LegalDocumentExt(LegalDocument):
 
-  def __init__(self, doc: LegalDocument=None, text=''):
-    super().__init__(text)
+  def __init__(self, doc: LegalDocument):
+    super().__init__('')
 
     if doc is not None:
       # self.__dict__ = doc.__dict__

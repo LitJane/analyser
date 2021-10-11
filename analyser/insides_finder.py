@@ -17,11 +17,14 @@ class InsidesFinder():
     logger.info(f'centroids.shape {self.centroids.shape}')
 
   def find_insides(self, sample_doc: LegalDocument):
+    if not hasattr(sample_doc, 'sentence_map'):
+      #todo: remove this hack
+      setattr(sample_doc, 'sentence_map', None)
 
-    sample_doc.sentence_map = tokenize_doc_into_sentences_map(sample_doc.tokens_map.get_full_text(),
-                                                              HyperParameters.mean_sentense_pattern_len)
+    if sample_doc.sentence_map is None:
+      sample_doc.sentence_map = tokenize_doc_into_sentences_map(sample_doc.tokens_map.get_full_text(),
+                                                                HyperParameters.mean_sentense_pattern_len)
 
-    print(sample_doc)
     if not hasattr(sample_doc, 'sentences_embeddings'):
       setattr(sample_doc, 'sentences_embeddings', None)
     if sample_doc.sentences_embeddings is None:
@@ -37,7 +40,8 @@ class InsidesFinder():
 
     ########
 
-    threshold = 0.8  # 0.9 *  distance_matrix.max()
+    # TODO: parametrize
+    threshold = 0.85  # 0.9 *  distance_matrix.max()
 
     sim_max = threshold
 
@@ -59,7 +63,6 @@ class InsidesFinder():
         # setattr(sample_doc.attributes_tree, "insideInformation", tag)
 
     # print(sim_max, i_max)
-
 
 # if __name__ == '__main__':
 #   TEST_DOC_ID = '61408a6e11c893efc81ddcb8'

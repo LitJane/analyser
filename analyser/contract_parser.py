@@ -15,6 +15,7 @@ from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
 from analyser.parsing import ParsingContext, AuditContext, find_value_sign_currency_attention
 from analyser.patterns import AV_SOFT, AV_PREFIX
 from analyser.schemas import ContractSchema, OrgItem, ContractPrice
+from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import find_top_spans
 from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, \
   nn_predict
@@ -79,6 +80,7 @@ class ContractParser(ParsingContext):
 
     contract.attributes_tree.orgs = nn_find_org_names(_head.tokens_map, semantic_map,
                                                       audit_ctx=ctx)
+    check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline())  # mutator
 
     # TODO: maybe move contract.tokens_map into text map
     contract.attributes_tree.number = nn_get_contract_number(_head.tokens_map, semantic_map)
@@ -124,11 +126,9 @@ class ContractParser(ParsingContext):
     if _contract_cut.embeddings is None:
       _contract_cut.embedd_tokens(self.get_embedder())
 
-    # self.find_org_date_number(_contract_cut, ctx)
-
-    semantic_map, subj_1hot = nn_predict(self.subject_prediction_model, _contract_cut)
-
+    # -------------------------------
     # repeat phase 1
+    semantic_map, subj_1hot = nn_predict(self.subject_prediction_model, _contract_cut)
 
     if not contract.attributes_tree.number:
       contract.attributes_tree.number = nn_get_contract_number(_contract_cut.tokens_map, semantic_map)
@@ -136,30 +136,30 @@ class ContractParser(ParsingContext):
     if not contract.date:
       contract.date = nn_get_contract_date(_contract_cut.tokens_map, semantic_map)
 
-    cas: [ContractAgent] = []
-    if len(contract.attributes_tree.orgs) < 2:
-      cas = nn_find_org_names(_contract_cut.tokens_map, semantic_map,
-                              audit_ctx=ctx)
+    # -------------------------------
+    # -------------------------------orgs, agents
+    if (contract.attributes_tree.orgs is None) or len(contract.attributes_tree.orgs) < 2:
+      contract.attributes_tree.orgs = nn_find_org_names(_contract_cut.tokens_map, semantic_map,
+                                                        audit_ctx=ctx)
+
+    check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline())  # mutator
 
     # -------------------------------subject
     contract.subject = nn_get_subject(_contract_cut.tokens_map, semantic_map, subj_1hot)
 
-    # -------------------------------values
+    # -------------------------------values, prices, amounts
+    self._logstep("finding contract values")
     contract.contract_values = nn_find_contract_value(_contract_cut, semantic_map)
 
-    self._logstep("finding contract values")
-    # --------------------------------------
-
-    ##
-    # migrate to attr_tree
-
-    contract.attributes_tree.orgs = cas
     if len(contract.contract_values) > 0:
       contract.attributes_tree.price = contract.contract_values[0]
     # TODO: convert price!!
 
+    # --------------------------------------insider
+    self._logstep("finding insider info")
     self.insides_finder.find_insides(contract)
 
+    # --------------------------------------
     self.validate(contract, ctx)
     return contract
 
@@ -213,9 +213,44 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
     contract_agents = sorted(contract_agents, key=lambda a: _name_val_safe(a))
     contract_agents = sorted(contract_agents, key=lambda a: not a.is_known_subsidiary)
 
-  check_org_intersections(contract_agents)  # mutator
+  contract_agents = check_org_intersections(contract_agents)  # mutator
 
   return contract_agents  # _swap_org_tags(cas)
+
+
+def check_orgs_natural_person(contract_agents: [OrgItem], header0: str):
+  if not contract_agents:
+    return
+
+  for contract_agent in contract_agents:
+    check_org_is_natural_person(contract_agent)
+
+  logger.info(f'header: {header0}')
+
+  if header0:
+    if header0.lower().find('с физическим лицом') >= 0:
+      _set_natural_person(contract_agents[-1])
+
+  return contract_agents
+
+
+def check_org_is_natural_person(contract_agent: OrgItem):
+  human_name = False
+  if contract_agent.name is not None:
+    name = contract_agent.name.value
+    x = r_human_name_compilled.search(name)
+    if x is not None:
+      human_name = True
+
+  if human_name:
+    _set_natural_person(contract_agent)
+
+
+def _set_natural_person(contract_agent: OrgItem):
+  if contract_agent.type is None:
+    contract_agent.type = SemanticTag(None, None)
+
+  contract_agent.type.value = 'Физическое лицо'
 
 
 def check_org_intersections(contract_agents: [OrgItem]):
