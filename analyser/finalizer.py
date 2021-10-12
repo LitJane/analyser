@@ -598,22 +598,19 @@ def check_inside(document, additional_docs, insiders) -> []:
                             person_last_name = person['lastName']['value']
                         if textdistance.jaro_winkler.normalized_distance(last_name, person_last_name) < 0.1:
                             if is_same_person(insider['name'], person['value']):
-                                if insider['isDefinitelyAnInsider']:
-                                    return [{'type': 'InsiderControl', 'text': f'Подписант {insider["name"]} входит в список инсайдеров', 'reason': '', 'notes': []}]
-                                else:
-                                    result.append({'type': 'InsiderControl', 'text': f'Подписант {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
+                                result.append({'type': 'InsiderControl', 'text': f'Подписант {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': []})
             if doc_attrs.get('orgs') is not None:
                 for org in doc_attrs.get('orgs'):
                     if org.get('name') is not None and org['name'].get('value') is not None:
                         if textdistance.jaro_winkler.normalized_distance(last_name, org['name']['value'].split(' ')[0]) < 0.1:
                             if is_same_person(insider['name'], org['name']['value']):
-                                result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
+                                result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': []})
         else:
             if doc_attrs.get('orgs') is not None:
                 for org in doc_attrs.get('orgs'):
                     if org.get('name') is not None and org['name'].get('value') is not None:
                         if compare_ignore_case(insider['clean_name'], normalize_only_company_name(org['name']['value'])):
-                            result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': [], 'confidence': 0.5})
+                            result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': []})
 
     inside_info = None
     if doc_attrs.get('insideInformation') is not None:
@@ -631,6 +628,12 @@ def check_inside(document, additional_docs, insiders) -> []:
     if inside_info is not None:
         text = extract_text(inside_info['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
         result.append({'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': inside_info['value']})
+
+    if len(result) == 0 and doc_attrs.get('orgs') is not None:
+        for org in doc_attrs.get('orgs'):
+            if org.get('type') is not None and org['type'].get('value') is not None and org['type']['value'] == 'Физическое лицо':
+                result.append({'type': 'InsiderControl', 'text': f'Договор с физическим лицом - возможна передача инсайдерской информации', 'reason': '', 'notes': []})
+                break
     return result
 
 
