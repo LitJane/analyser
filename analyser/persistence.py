@@ -3,6 +3,7 @@ import warnings
 
 import numpy as np
 
+
 from analyser.documents import TextMap, CaseNormalizer
 from analyser.legal_docs import Paragraph
 from analyser.ml_tools import SemanticTag
@@ -36,6 +37,13 @@ class DbJsonDoc:
 
   def get_id(self):
     return self._id
+
+  def get_version_string(self):
+    attr_tree = self.get_attributes_tree()
+    if 'version' in attr_tree:
+      return '.'.join([str(x) for x in attr_tree['version']])
+    else:
+      return self.analysis['version']
 
   def isPreprocessed(self):
     return self.state == DocumentState.Preprocessed.value or self.state == DocumentState.Error.value
