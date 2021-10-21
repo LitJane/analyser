@@ -195,7 +195,7 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
     ca: ContractAgent = ContractAgent()
     for n in ['name', 'alias', 'type']:
       tagname = f'org-{o}-{n}'
-      tag = nn_get_tag_value(tagname, textmap, semantic_map)
+      tag = nn_get_tag_value(tagname, textmap, semantic_map, threshold=0.27)
       setattr(ca, n, tag)
     normalize_contract_agent(ca)
     contract_agents.append(ca)
