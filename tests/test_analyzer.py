@@ -44,7 +44,7 @@ class AnalyzerTestCase(unittest.TestCase):
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_analyze_contract(self):
     processor: BaseProcessor = document_processors[CONTRACT]
-    doc = get_doc_by_id(ObjectId('5ded004e4ddc27bcf92dd47c'))
+    doc = get_doc_by_id(ObjectId('61712637dd4e72433fcd242f'))
     if doc is None:
       raise RuntimeError("fix unit test please")
 
