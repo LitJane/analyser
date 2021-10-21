@@ -45,7 +45,7 @@ class Runner:
 class BaseProcessor:
   parser = None
 
-  def preprocess(self, jdoc: DbJsonDoc, context: AuditContext):
+  def preprocess(self, jdoc: DbJsonDoc, context: AuditContext) -> DbJsonDoc:
     # phase I
     # TODO: include phase I into phase II, remove phase I
     if jdoc.is_user_corrected():
@@ -54,8 +54,8 @@ class BaseProcessor:
     else:
       legal_doc = jdoc.asLegalDoc()
       self.parser.find_org_date_number(legal_doc, context)
-      save_analysis(jdoc, legal_doc, state=DocumentState.Preprocessed.value)
-      return legal_doc
+      jdoc = save_analysis(jdoc, legal_doc, state=DocumentState.Preprocessed.value)
+    return jdoc
 
   def process(self, db_document: DbJsonDoc, audit, context: AuditContext) -> LegalDocument:
     # phase II
@@ -205,7 +205,7 @@ def validate_json_schema(db_document):
     db_document.state = DocumentState.Error.value
 
 
-def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_number: int = 0):
+def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_number: int = 0) -> DbJsonDoc:
   # TODO: does not save attributes
   analyse_json_obj: dict = doc.to_json_obj()
   db = get_mongodb_connection()
@@ -216,6 +216,7 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
 
   db_document.retry_number = retry_number
   documents_collection.update({'_id': doc.get_id()}, db_document.as_dict(), True)
+  return db_document
 
 
 def change_doc_state(doc, state):
