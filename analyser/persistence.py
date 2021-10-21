@@ -172,6 +172,7 @@ class DbJsonDoc:
       }  ## fallback for safety
 
   def get_attr_span_start(self, a):
+    warnings.warn("switch to attributes_tree", DeprecationWarning)
     att = self.get_attributes_OLD()
     if a in att:
       return att[a]['span'][0]
