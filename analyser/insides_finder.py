@@ -18,8 +18,7 @@ class InsidesFinder():
 
   def find_insides(self, sample_doc: LegalDocument):
     if not hasattr(sample_doc, 'sentence_map'):
-      #todo: remove this hack
-      setattr(sample_doc, 'sentence_map', None)
+      setattr(sample_doc, 'sentence_map', None) # todo: remove this hack
 
     if sample_doc.sentence_map is None:
       sample_doc.sentence_map = tokenize_doc_into_sentences_map(sample_doc.tokens_map.get_full_text(),
@@ -27,6 +26,7 @@ class InsidesFinder():
 
     if not hasattr(sample_doc, 'sentences_embeddings'):
       setattr(sample_doc, 'sentences_embeddings', None)
+
     if sample_doc.sentences_embeddings is None:
       embedder = ElmoEmbedder.get_instance()
       sample_doc.sentences_embeddings = embedder.embedd_strings(sample_doc.sentence_map.tokens)
@@ -41,7 +41,7 @@ class InsidesFinder():
     ########
 
     # TODO: parametrize
-    threshold = 0.85  # 0.9 *  distance_matrix.max()
+    threshold = 0.81  # 0.9 *  distance_matrix.max()
 
     sim_max = threshold
 
@@ -61,7 +61,10 @@ class InsidesFinder():
 
         sample_doc.attributes_tree.insideInformation = tag
         # setattr(sample_doc.attributes_tree, "insideInformation", tag)
-
+      # else:
+      #   _span = sample_doc.sentence_map.remap_span((ii, ii + 1), sample_doc.tokens_map)
+      #   s = sample_doc.sentence_map.text_range(_span)
+      #   logger.info(f'pattern {k}, hits {av[ii]}, span:{_span}, [{s}]')
     # print(sim_max, i_max)
 
 # if __name__ == '__main__':
