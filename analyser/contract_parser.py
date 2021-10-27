@@ -132,19 +132,19 @@ class ContractParser(ParsingContext):
     # self.find_org_date_number(contract, ctx)
     semantic_map, subj_1hot = nn_predict(self.subject_prediction_model, _contract_cut)
 
-    # if not contract.attributes_tree.number:
-    #   contract.attributes_tree.number = nn_get_contract_number(_contract_cut.tokens_map, semantic_map)
-    #
-    # if not contract.date:
-    #   contract.date = nn_get_contract_date(_contract_cut.tokens_map, semantic_map)
+    if not contract.attributes_tree.number:
+      contract.attributes_tree.number = nn_get_contract_number(_contract_cut.tokens_map, semantic_map)
+
+    if not contract.date:
+      contract.date = nn_get_contract_date(_contract_cut.tokens_map, semantic_map)
     #
     # # -------------------------------
     # # -------------------------------orgs, agents
-    # if (contract.attributes_tree.orgs is None) or len(contract.attributes_tree.orgs) < 2:
-    #   contract.attributes_tree.orgs = nn_find_org_names(_contract_cut.tokens_map, semantic_map,
-    #                                                     audit_ctx=ctx)
-    #
-    # check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline())  # mutator
+    if (contract.attributes_tree.orgs is None) or len(contract.attributes_tree.orgs) < 2:
+      contract.attributes_tree.orgs = nn_find_org_names(_contract_cut.tokens_map, semantic_map,
+                                                        audit_ctx=ctx)
+
+    check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline())  # mutator
 
     # -------------------------------subject
     contract.subject = nn_get_subject(_contract_cut.tokens_map, semantic_map, subj_1hot)
