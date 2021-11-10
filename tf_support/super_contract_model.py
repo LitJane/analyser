@@ -1,10 +1,17 @@
+from functools import lru_cache
+from pathlib import Path
 
-
+import numpy as np
+from pandas import DataFrame
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, MaxPooling1D
 from tensorflow.keras.layers import concatenate
 
+
 from analyser.headers_detector import TOKEN_FEATURES
+from analyser.hyperparams import work_dir
+
+from analyser.structures import ContractSubject
 from tf_support.addons import sigmoid_focal_crossentropy
 from tf_support.tools import KerasTrainingContext
 
@@ -20,19 +27,85 @@ seq_labels_contract_level_1 = [
 ]
 
 metrics = ['kullback_leibler_divergence', 'mse', 'binary_crossentropy']
+
 losses = {
   "O1_tagging": "binary_crossentropy",
   "O2_subject": "binary_crossentropy",
 }
 
-seq_labels_contract = seq_labels_contract_level_1 + seq_labels_dn + seq_labels_org_1 + seq_labels_org_2 + seq_labels_val
-seq_labels_contract_swap_orgs = seq_labels_contract_level_1 + seq_labels_dn + seq_labels_org_2 + seq_labels_org_1 + seq_labels_val
+# seq_labels_contract = seq_labels_contract_level_1 + seq_labels_dn + seq_labels_org_1 + seq_labels_org_2 + seq_labels_val
+# seq_labels_contract_swap_orgs = seq_labels_contract_level_1 + seq_labels_dn + seq_labels_org_2 + seq_labels_org_1 + seq_labels_val
+
+semantic_map_keys = [
+  'headline',
+  'subject',
+  'date',
+  'number',
+  'org-name',
+  'org-alias',
+  'org-type'
+]
+
+semantic_map_keys += ['amount', 'amount_brutto', 'amount_netto', 'vat', 'sign', 'currency', 'vat_unit', 'value']
+
+semantic_map_keys_contract = []
+for _name in semantic_map_keys:
+  semantic_map_keys_contract.append(_name + "-begin")
+  semantic_map_keys_contract.append(_name + "-end")
 
 DEFAULT_TRAIN_CTX = KerasTrainingContext()
 
 CLASSES = 43
-FEATURES = 14
+FEATURES = len(semantic_map_keys_contract)
 EMB = 1024
+
+
+
+
+@lru_cache(maxsize=72)
+def _load_arrays(doc_id):
+  def _dp_fn(doc_id, suffix):
+    return str(Path(work_dir) / 'datasets' / f'{doc_id}-datapoint-{suffix}.npy')
+
+  embeddings = np.load(_dp_fn(doc_id, 'embeddings'))
+  token_features = np.load(_dp_fn(doc_id, 'token_features'))
+  semantic_map = np.load(_dp_fn(doc_id, 'semantic_map'))
+
+  return embeddings, token_features, semantic_map
+
+
+def make_xyw(doc_id: str, meta: DataFrame):
+  row = meta.loc[doc_id]
+
+  _subj = row['subject']
+  subject_one_hot = ContractSubject.encode_1_hot()[_subj]
+
+  embeddings, token_features, semantic_map = _load_arrays(doc_id)
+
+  if embeddings.shape[0] != token_features.shape[0]:
+    msg = f'{doc_id} embeddings.shape {embeddings.shape} is incompatible with token_features.shape {token_features.shape}'
+    raise AssertionError(msg)
+
+  if embeddings.shape[0] != semantic_map.shape[0]:
+    msg = f'{doc_id} embeddings.shape {embeddings.shape} is incompatible with semantic_map.shape {semantic_map.shape}'
+    raise AssertionError(msg)
+
+  meta.at[doc_id, 'error'] = None
+  return (
+    (embeddings, token_features),
+    (semantic_map, subject_one_hot),
+    (row['sample_weight'], row['subject_weight']))
+
+
+def validate_datapoint(id: str, meta: DataFrame):
+  try:
+    (emb, tok_f), (sm, subj), (sample_weight, subject_weight) = make_xyw(id, meta)
+    if sm.shape[1] != len(semantic_map_keys_contract):
+      mxs = f'semantic map shape is {sm.shape[1]}, expected is {len(semantic_map_keys_contract)} source={meta.at[id, "source"]}'
+      raise ValueError(mxs)
+
+  except Exception as e:
+    raise ValueError(e)
 
 
 def structure_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
@@ -134,14 +207,14 @@ def uber_detection_model_003(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   return model
 
 
-def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False)-> Model:
+def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
   base_model, base_model_inputs = get_base_model(uber_detection_model_003, ctx=ctx, load_weights=not trained)
 
   # ---------------------
 
   _out_d = Dropout(0.35, name='alzheimer')(base_model)  # small_drops_of_poison
   _out = Bidirectional(LSTM(FEATURES * 2, return_sequences=True, name='paranoia'), name='self_reflection_1')(_out_d)
-  _out = Dropout(0.5  , name='alzheimer_11')(_out)
+  _out = Dropout(0.5, name='alzheimer_11')(_out)
   _out = LSTM(FEATURES, return_sequences=True, activation='sigmoid', name='O1_tagging')(_out)
 
   # OUT 2: subject detection
@@ -194,8 +267,6 @@ def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
   model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
   return model
-
-
 
 
 if __name__ == '__main__':

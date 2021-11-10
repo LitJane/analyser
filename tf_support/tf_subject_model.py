@@ -11,7 +11,8 @@ from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
 from analyser.ml_tools import FixedVector
 from analyser.structures import ContractSubject
-from tf_support.super_contract_model import seq_labels_contract, uber_detection_model_005_1_1
+from tf_support.super_contract_model import uber_detection_model_005_1_1, \
+  semantic_map_keys_contract
 from tf_support.tools import KerasTrainingContext
 from trainsets.trainset_tools import SubjectTrainsetManager
 
@@ -35,7 +36,7 @@ def nn_predict(umodel, doc):
   prediction = umodel.predict(x=[np.expand_dims(embeddings, axis=0), np.expand_dims(token_features, axis=0)],
                               batch_size=1)
 
-  semantic_map = pd.DataFrame(prediction[0][0], columns=seq_labels_contract)
+  semantic_map = pd.DataFrame(prediction[0][0], columns=semantic_map_keys_contract)
   return semantic_map, prediction[1][0]
 
 predict_subject = nn_predict

@@ -3,7 +3,6 @@ import warnings
 
 import numpy as np
 
-
 from analyser.documents import TextMap, CaseNormalizer
 from analyser.legal_docs import Paragraph
 from analyser.ml_tools import SemanticTag
@@ -140,7 +139,7 @@ class DbJsonDoc:
 
   def get_attributes_tree(self) -> dict:
     a = {}
-    if self.user is not None:
+    if hasattr(self,'user') and self.user is not None:
       a = self.user.get('attributes_tree', {})
       return next(iter(a.values()))
     elif self.analysis is not None:

@@ -105,11 +105,10 @@ class KerasTrainingContext:
     if verbose > 1:
       model.summary()
 
-    keras__version__ = keras.__version__
 
-    ch_fn =  self.model_checkpoint_path / f"{model_name}-{keras__version__}.h5"
+    ch_fn =  self.model_checkpoint_path / f"{model_name}.h5"
     if weights_file_override is not None:
-      ch_fn =  self.model_checkpoint_path / f"{weights_file_override}-{keras__version__}.h5"
+      ch_fn =  self.model_checkpoint_path / f"{weights_file_override}.h5"
     if weights is not None:
       ch_fn = weights
 

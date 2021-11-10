@@ -44,7 +44,7 @@ class AnalyzerTestCase(unittest.TestCase):
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_analyze_contract(self):
     processor: BaseProcessor = document_processors[CONTRACT]
-    doc = get_doc_by_id(ObjectId('5fb3b97f00881c332b5672d5'))
+    doc = get_doc_by_id(ObjectId('612cdb24ea1085618e02ff6c'))
     if doc is None:
       raise RuntimeError("fix unit test please")
 
@@ -54,8 +54,10 @@ class AnalyzerTestCase(unittest.TestCase):
     jdoc = DbJsonDoc(doc)
     logger.info(f'......pre-processing {jdoc._id}')
     ctx = AuditContext()
+    ctx.audit_subsidiary_name=audit.get('subsidiary',{}).get('name')
     processor.preprocess(jdoc, context=ctx)
     processor.process(jdoc, audit, ctx)
+
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_analyze_protocol(self):

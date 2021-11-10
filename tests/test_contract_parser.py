@@ -36,7 +36,7 @@ class TestContractParser(unittest.TestCase):
     contract, factory, ctx = self._get_doc_factory_ctx('Договор _2_.docx.pickle')
     contract.__dict__['warnings'] = []  # hack for old pickles
     semantic_map, subj_1hot = nn_predict(ctx.subject_prediction_model, contract)
-    r :[ContractPrice]= nn_find_contract_value(contract, semantic_map)
+    r :[ContractPrice]= nn_find_contract_value(contract.tokens_map, semantic_map)
     # r = ctx.find_contract_value_NEW(doc)
     print(len(r))
     for group in r:
@@ -84,6 +84,7 @@ class TestContractParser(unittest.TestCase):
     _tag = doc.contract_values[0].currency  # SemanticTag.find_by_kind(tags, ContractTags.Currency.display_string)
     quote = doc.tokens_map.text_range(_tag.span)
     self.assertEqual('рублей', quote)
+    self.assertEqual('RUB', doc.contract_values[0].currency.value)
 
   def print_semantic_tag(self, tag: SemanticTag, map: TextMap):
     print('print_semantic_tag:', tag, f"[{map.text_range(tag.span)}]", tag.parent)
