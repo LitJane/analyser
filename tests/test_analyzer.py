@@ -20,7 +20,7 @@ class AnalyzerTestCase(unittest.TestCase):
   @unittest.skip
   def test_analyse_acontract(self):
     # {_id:ObjectId('5de8a3fd1b3453848224a9d5')}
-    doc = get_doc_by_id(ObjectId('5de8a3fd1b3453848224a9d5'))
+    doc = get_doc_by_id(ObjectId('60b7a509061c76d775454b51'))
     # _db_client = MongoClient(f'mongodb://192.168.10.36:27017/')
     # _db_client.server_info()
 
@@ -44,17 +44,20 @@ class AnalyzerTestCase(unittest.TestCase):
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_analyze_contract(self):
     processor: BaseProcessor = document_processors[CONTRACT]
-    doc = get_doc_by_id(ObjectId('61712637dd4e72433fcd242f'))
+    doc = get_doc_by_id(ObjectId('612cdb24ea1085618e02ff6c'))
     if doc is None:
       raise RuntimeError("fix unit test please")
 
     audit = get_audit_by_id(doc['auditId'])
+    # print(audit)
 
     jdoc = DbJsonDoc(doc)
     logger.info(f'......pre-processing {jdoc._id}')
     ctx = AuditContext()
+    ctx.audit_subsidiary_name=audit.get('subsidiary',{}).get('name')
     processor.preprocess(jdoc, context=ctx)
     processor.process(jdoc, audit, ctx)
+
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_analyze_protocol(self):
@@ -86,7 +89,7 @@ class AnalyzerTestCase(unittest.TestCase):
     processor.preprocess(jdoc, context=ctx)
     doc = processor.process(jdoc, audit, ctx)
 
-    print(doc)
+    # print(doc)
 
 #
 

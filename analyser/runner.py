@@ -101,13 +101,20 @@ class BaseProcessor:
     return legal_doc
 
   def is_valid(self, audit, db_document: DbJsonDoc):
+    import pytz
+    utc = pytz.UTC
+
     # date must be ok
     # TODO: rename: -> is_eligible
     if audit.get('pre-check'):
       return True
     _date = db_document.get_date_value()
     if _date is not None:
-      date_is_ok = audit["auditStart"] <= _date <= audit["auditEnd"]
+      try:
+        date_is_ok = utc.localize(audit["auditStart"]) <= _date.replace(tzinfo=utc) <= utc.localize(audit["auditEnd"])
+      except TypeError as e:
+        logger.exception(e)
+        date_is_ok = False
     else:
       # if date not found, we keep processing the doc anyway
       date_is_ok = True

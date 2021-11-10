@@ -94,7 +94,7 @@ class KerasTrainingContext:
 
   def init_model(self, model_factory_fn, model_name_override=None, weights_file_override=None,
                  verbose=0,
-                 trainable=True, trained=False, load_weights=True) -> Model:
+                 trainable=True, trained=False, load_weights=True, weights=None) -> Model:
 
     model_name = model_factory_fn.__name__
     if model_name_override is not None:
@@ -105,11 +105,12 @@ class KerasTrainingContext:
     if verbose > 1:
       model.summary()
 
-    keras__version__ = keras.__version__
 
-    ch_fn = os.path.join(self.model_checkpoint_path, f"{model_name}-{keras__version__}.h5")
+    ch_fn =  self.model_checkpoint_path / f"{model_name}.h5"
     if weights_file_override is not None:
-      ch_fn = os.path.join(self.model_checkpoint_path, f"{weights_file_override}-{keras__version__}.h5")
+      ch_fn =  self.model_checkpoint_path / f"{weights_file_override}.h5"
+    if weights is not None:
+      ch_fn = weights
 
     if load_weights:
       try:
@@ -150,7 +151,7 @@ class KerasTrainingContext:
     _logger1 = CSVLogger(self.model_checkpoint_path / _log_fn, separator=',', append=not retrain)
     _logger2 = CSVLogger(_log_fn, separator=',', append=not retrain)
 
-    checkpoint_weights = ModelCheckpoint(self.model_checkpoint_path / (model.name + ".weights"),
+    checkpoint_weights = ModelCheckpoint(self.model_checkpoint_path / (model.name + ".h5"),
                                          monitor='val_loss', mode='min', save_best_only=True, save_weights_only=True,
                                          verbose=1)
 

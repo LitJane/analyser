@@ -69,7 +69,8 @@ class AuditContext:
       self.fixed_audit_subsidiary_name = known_org_name['_id']
 
   def is_same_org(self, name: str) -> bool:
-    return self.audit_subsidiary_name == name or self.fixed_audit_subsidiary_name == name
+    ret = self.audit_subsidiary_name == name or self.fixed_audit_subsidiary_name == name
+    return ret
 
 
 class ParsingContext(ParsingSimpleContext):
