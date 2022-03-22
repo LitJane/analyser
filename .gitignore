@@ -44,3 +44,9 @@ trainsets/uber_detection_model_003.0.log.csv
 
 trainsets/.ipynb_checkpoints
 /venv3.9/
+notebooks/.ipynb_checkpoints/**
+.DS_Store
+libs/document-parser-1.6.4.jar
+libs/document-parser-1.6.4-distribution.zip
+tmp.py
+trainsets/uber_detection_model_003.21.log.csv
