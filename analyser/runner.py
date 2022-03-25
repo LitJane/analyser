@@ -16,6 +16,7 @@ from analyser.persistence import DbJsonDoc
 from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
+from integration.classifier.search_text import wrapper
 from integration.db import get_mongodb_connection
 
 schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
@@ -229,6 +230,12 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
   return db_document
 
 
+def save_audit_practice(audit, classification_result):
+  db = get_mongodb_connection()
+  # audit['classification_result'] = classification_result
+  db['audits'].update_one({'_id': audit['_id']}, {"$set": {'classification_result': classification_result}})
+
+
 def change_doc_state(doc, state):
   db = get_mongodb_connection()
   db['documents'].update_one({'_id': doc.get_id()}, {"$set": {"state": state}})
@@ -247,7 +254,23 @@ def need_analysis(document: DbJsonDoc) -> bool:
   return _need_analysis
 
 
+def doc_classification(audit):
+  logger.info(f'.....classifying audit {audit["_id"]}')
+  document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=None, id_only=True)
+  for k, document_id in enumerate(document_ids):
+    _document = finalizer.get_doc_by_id(document_id)
+
+    if _document['parserResponseCode'] == 200:
+      classification_result = wrapper(_document['parse'])
+      if classification_result:
+        save_audit_practice(audit, classification_result)
+        return
+
+
 def audit_phase_1(audit, kind=None):
+  if audit.get('pre-check'):
+    doc_classification(audit)
+
   logger.info(f'.....processing audit {audit["_id"]}')
   if audit.get('subsidiary') is None:
     ctx = AuditContext()
