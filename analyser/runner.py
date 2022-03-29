@@ -1,6 +1,7 @@
 import json
 import traceback
 
+import gridfs
 import pymongo
 from bson import json_util
 from jsonschema import ValidationError, FormatChecker, Draft7Validator
@@ -16,8 +17,9 @@ from analyser.persistence import DbJsonDoc
 from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
-from integration.classifier.search_text import wrapper
+from integration.classifier.search_text import wrapper, all_labels
 from integration.db import get_mongodb_connection
+from integration.mail import send_classifier_email
 
 schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
 
@@ -264,6 +266,12 @@ def doc_classification(audit):
       classification_result = wrapper(_document['parse'])
       if classification_result:
         save_audit_practice(audit, classification_result)
+        to_email = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)['email']
+        attachments = []
+        fs = gridfs.GridFS(get_mongodb_connection())
+        for file_id in audit['additionalFields']['file_ids']:
+          attachments.append(fs.get(file_id))
+        send_classifier_email(audit, to_email, attachments, all_labels)
         return
 
 

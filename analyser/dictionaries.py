@@ -9,6 +9,7 @@ from analyser.schemas import document_schemas
 from analyser.structures import OrgStructuralLevel, ContractSubject, contract_subjects, \
     legal_entity_types
 from gpn.gpn import subsidiaries
+from integration.classifier.search_text import all_labels
 from integration.db import get_mongodb_connection
 
 
@@ -66,6 +67,10 @@ def update_db_dictionaries():
     coll = db["analyser"]
     coll.delete_many({})
     coll.insert_one({'version': analyser.__version__})
+
+    coll = db['practices']
+    coll.delete_many({})
+    coll.insert_many(all_labels)
 
     # indexing
     print('creating db indices')
