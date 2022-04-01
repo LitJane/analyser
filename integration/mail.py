@@ -27,12 +27,6 @@ def send_email(smtp_server, port, login, password, message):
             server.starttls(context=context)
             server.ehlo()
             server.login(login, password)
-            # recipients = message['To'].split(',')
-            # if message['Cc']:
-            #     recipients += message['Cc'].split(',')
-            # if message['Bcc']:
-            #     recipients += message['Bcc'].split(',')
-            # server.sendmail(message['From'], recipients, message.as_string())
             server.send_message(message)
     except (gaierror, ConnectionRefusedError):
         logger.error('Failed to connect to the server. Bad connection settings?')
@@ -102,20 +96,20 @@ def generate_links(audit, practices: [], web_url) -> str:
     return result
 
 
-def send_classifier_email(audit, to_email: str, attachments: [], practices) -> bool:
+def send_classifier_email(audit, top_classification_result, attachments: [], practices) -> bool:
     try:
         smtp_server = _env_var('GPN_SMTP_SERVER')
         port = _env_var('GPN_SMTP_PORT')
         sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
-        login = _env_var('GPN_SENDER_LOGIN')
-        password = _env_var('GPN_SENDER_PASSWORD')
+        login = _env_var('GPN_CLASSIFIER_LOGIN')
+        password = _env_var('GPN_CLASSIFIER_PASSWORD')
         web_url = _env_var('GPN_WEB_URL')
 
         if smtp_server and port and sender_email and password and login and web_url:
             message = EmailMessage()
             message["Subject"] = f"{audit['additionalFields']['email_subject']}"
             message["From"] = sender_email
-            message["To"] = to_email
+            message["To"] = top_classification_result['email']
             message['Cc'] = audit['additionalFields']['email_from']
 
             plain_text = f"""
@@ -123,7 +117,7 @@ def send_classifier_email(audit, to_email: str, attachments: [], practices) -> b
                 
                 Направляем вам результат определения юридической практики для высланного ранее документа.
                 
-                Результат: {audit['classification_result'][0]['label']}
+                Результат: {top_classification_result['label']}
                 """
 
             html = f"""\
@@ -136,7 +130,7 @@ def send_classifier_email(audit, to_email: str, attachments: [], practices) -> b
                         Направляем вам результат определения юридической практики для высланного ранее документа.
                     </p>
                     <p style="font-size: 200%">
-                        Результат: {audit['classification_result'][0]['label']}
+                        Результат: {top_classification_result['label']}
                     </p>
                     <p>
                         <b>Если юридическая практика для документа определена неверно, то кликните на верную юридическую практику:</b>
@@ -149,9 +143,67 @@ def send_classifier_email(audit, to_email: str, attachments: [], practices) -> b
             message.set_content(plain_text)
             message.add_alternative(html, subtype='html')
             for attachment in attachments:
-                # part = MIMEApplication(attachment.read(), Name=attachment.filename)
-                # part['Content-Disposition'] = 'attachment; filename="%s"' % attachment.filename
-                # message.attach(part)
+                maintype, subtype = attachment.ctype.split('/', 1)
+                message.add_attachment(attachment.read(), filename=attachment.filename, maintype=maintype, subtype=subtype)
+
+            send_email(smtp_server, port, login, password, message)
+            return True
+    except Exception as e:
+        logger.exception(e)
+    return False
+
+
+def generate_errors(audit, html) -> str:
+    result = ""
+    if html:
+        for error in audit['errors']:
+            result += f"""<p>Ошибка: {error}</p>"""
+    else:
+        for error in audit['errors']:
+            result += f"""Ошибка: {error}"""
+    return result
+
+
+def send_classifier_error_email(audit, attachments: []) -> bool:
+    try:
+        smtp_server = _env_var('GPN_SMTP_SERVER')
+        port = _env_var('GPN_SMTP_PORT')
+        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
+        login = _env_var('GPN_CLASSIFIER_LOGIN')
+        password = _env_var('GPN_CLASSIFIER_PASSWORD')
+        web_url = _env_var('GPN_WEB_URL')
+
+        if smtp_server and port and sender_email and password and login and web_url:
+            message = EmailMessage()
+            message["Subject"] = f"{audit['additionalFields']['email_subject']}"
+            message["From"] = sender_email
+            message['To'] = audit['additionalFields']['email_from']
+
+            plain_text = f"""
+                Здравствуйте!
+                
+                К сожалению, определить юридическую практику для высланного ранее документа не удалось.
+                
+                {generate_errors(audit, False)}
+                """
+
+            html = f"""\
+                <html>
+                  <body>
+                    <p>
+                        Здравствуйте!
+                    </p>
+                    <p>
+                        К сожалению, определить юридическую практику для высланного ранее документа не удалось.
+                    </p>
+                    {generate_errors(audit, True)}
+                  </body>
+                </html>
+                """
+
+            message.set_content(plain_text)
+            message.add_alternative(html, subtype='html')
+            for attachment in attachments:
                 maintype, subtype = attachment.ctype.split('/', 1)
                 message.add_attachment(attachment.read(), filename=attachment.filename, maintype=maintype, subtype=subtype)
 

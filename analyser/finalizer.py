@@ -4,6 +4,7 @@ import time
 from collections import deque
 from types import SimpleNamespace
 
+import gridfs
 import numpy as np
 import pymongo
 import textdistance
@@ -13,9 +14,10 @@ from analyser.log import logger
 from analyser.structures import legal_entity_types
 from analyser.text_normalize import normalize_company_name
 from integration import mail
+from integration.classifier.search_text import all_labels
 from integration.currencies import convert_to_currency
 from integration.db import get_mongodb_connection
-
+from integration.mail import send_classifier_email, send_classifier_error_email
 
 full_name_pattern = re.compile(r'(?P<last_name>[а-я,А-Я,a-z,A-Z]+) +(?P<first_name>[а-я,А-Я,a-z,A-Z]+)(\.? +)?(?P<middle_name>[а-я,А-Я,a-z,A-Z]+)?')
 company_name_pattern = re.compile(r'[«\'"](?P<company_name>.+)[»\'"]')
@@ -1044,7 +1046,30 @@ def get_insiders():
 
 def save_email_sending_result(result, audit):
     db = get_mongodb_connection()
-    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"mail_sent": result}})
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"email_sent": result}})
+
+
+def send_notifications():
+    db = get_mongodb_connection()
+    audit_collection = db['audits']
+    audits = audit_collection.find({'email_sent': False, 'pre-check': True})
+    for audit in audits:
+        if audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0 and audit.get('additionalFields') is not None:
+            additional_fields = audit['additionalFields']
+            if additional_fields.get('classification_result_user'):
+                class_id = audit['additionalFields']['classification_result_user']['id']
+                top_result = next(filter(lambda x: x['_id'] == class_id, all_labels), None)
+                attachments = []
+                fs = gridfs.GridFS(db)
+                for file_id in audit['additionalFields'].get('file_ids') or []:
+                    attachments.append(fs.get(file_id))
+                save_email_sending_result(send_classifier_email(audit, top_result, attachments, all_labels), audit)
+            elif audit.get('errors') and len(audit['errors']):
+                attachments = []
+                fs = gridfs.GridFS(db)
+                for file_id in audit['additionalFields'].get('file_ids') or []:
+                    attachments.append(fs.get(file_id))
+                save_email_sending_result(send_classifier_error_email(audit, attachments), audit)
 
 
 def finalize():
@@ -1107,9 +1132,11 @@ def finalize():
         update_links(audit, links)
         save_violations(audit, violations)
         logger.info(f'.....audit {audit["_id"]} is waiting for approval')
-        if audit.get('mail_sent') is None or not audit['mail_sent']:
+        if audit.get('email_sent') is None or not audit['email_sent']:
             result = mail.send_end_audit_email(audit)
             save_email_sending_result(result, audit)
+
+    send_notifications()
 
 
 if __name__ == '__main__':

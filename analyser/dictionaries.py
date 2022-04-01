@@ -88,6 +88,9 @@ def update_db_dictionaries():
     resp = coll.create_index(sorting)
     print("index response:", resp)
 
+    coll = db['audits']
+    coll.create_index('email_sent')
+
 
 if __name__ == '__main__':
     update_db_dictionaries()

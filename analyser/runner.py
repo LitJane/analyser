@@ -266,19 +266,19 @@ def doc_classification(audit):
       classification_result = wrapper(_document['parse'])
       if classification_result:
         save_audit_practice(audit, classification_result)
-        to_email = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)['email']
+        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
         attachments = []
         fs = gridfs.GridFS(get_mongodb_connection())
         for file_id in audit['additionalFields']['file_ids']:
           attachments.append(fs.get(file_id))
-        send_classifier_email(audit, to_email, attachments, all_labels)
+        send_classifier_email(audit, top_result, attachments, all_labels)
         return
 
 
 def audit_phase_1(audit, kind=None):
   if audit.get('pre-check'):
     doc_classification(audit)
-    if audit.get('checkTypes') and len(audit['checkTypes']) == 0:
+    if audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0:
       return
 
   logger.info(f'.....processing audit {audit["_id"]}')
@@ -305,7 +305,7 @@ def audit_phase_1(audit, kind=None):
 
 
 def audit_phase_2(audit, kind=None):
-  if audit.get('pre-check') and audit.get('checkTypes') and len(audit['checkTypes']) == 0:
+  if audit.get('pre-check') and audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0:
     change_audit_status(audit, "Finalizing")
     return
 
