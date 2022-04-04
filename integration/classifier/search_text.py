@@ -23,7 +23,7 @@ all_bad_keys = ['Термины и определения', 'Термин', 'о�
 
 all_good_keys = ['Цели и задачи']
 
-integration_path = '../integration/classifier'
+integration_path = 'integration/classifier'
 
 with open(os.path.join(integration_path, 'practices.json'), encoding='utf-8') as practice_json_file:
     all_labels = json.load(practice_json_file)
