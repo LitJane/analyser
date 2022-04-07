@@ -2,10 +2,10 @@ import os
 import smtplib
 import ssl
 from email.message import EmailMessage
-from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from socket import gaierror
+from urllib.parse import urljoin
 
 from analyser.log import logger
 
@@ -90,9 +90,10 @@ def send_end_audit_email(audit) -> bool:
 
 
 def generate_links(audit, practices: [], web_url) -> str:
+    url = urljoin(web_url, '#/user-practice')
     result = ""
     for practice in practices:
-        result += f"""<p><a href="{web_url + '?audit_id=' + str(audit['_id']) + '&practice_id=' + str(practice['_id'])}">{practice['label']}</a></p>"""
+        result += f"""<p><a href="{url + '?audit_id=' + str(audit['_id']) + '&practice_id=' + str(practice['_id'])}">{practice['label']}</a></p>"""
     return result
 
 

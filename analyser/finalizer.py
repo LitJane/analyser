@@ -1049,10 +1049,15 @@ def save_email_sending_result(result, audit):
     db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"email_sent": result}})
 
 
+def save_email_classification(result, audit):
+    db = get_mongodb_connection()
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"additionalFields.email_sent": result}})
+
+
 def send_notifications():
     db = get_mongodb_connection()
     audit_collection = db['audits']
-    audits = audit_collection.find({'email_sent': False, 'pre-check': True})
+    audits = audit_collection.find({'additionalFields.email_sent': False, 'pre-check': True})
     for audit in audits:
         if audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0 and audit.get('additionalFields') is not None:
             additional_fields = audit['additionalFields']
@@ -1063,13 +1068,13 @@ def send_notifications():
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
-                save_email_sending_result(send_classifier_email(audit, top_result, attachments, all_labels), audit)
+                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
             elif audit.get('errors') and len(audit['errors']):
                 attachments = []
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
-                save_email_sending_result(send_classifier_error_email(audit, attachments), audit)
+                save_email_classification(send_classifier_error_email(audit, attachments), audit)
 
 
 def finalize():
