@@ -276,9 +276,8 @@ def doc_classification(audit):
 
 
 def audit_phase_1(audit, kind=None):
-  if audit.get('pre-check'):
-    doc_classification(audit)
-    if audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0:
+  if audit.get('pre-check') and audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0:
+      doc_classification(audit)
       return
 
   logger.info(f'.....processing audit {audit["_id"]}')
