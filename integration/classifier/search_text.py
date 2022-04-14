@@ -61,7 +61,7 @@ def wrapper(document):
 
     json_from_text, sheet = find_text(document, path='There\\is\\nothing\\here')
 
-    if json_from_text is None or sheet == list_of_sheets.BAD or json_from_text['text'] == '':
+    if json_from_text is None or json_from_text['text'] == '':
         return None
 
     if tokenizer is None and model is None:
