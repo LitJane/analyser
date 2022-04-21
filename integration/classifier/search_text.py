@@ -5,6 +5,7 @@ import os.path
 import re
 from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
 import tensorflow as tf
+from nltk.tokenize import WhitespaceTokenizer
 
 all_key = {
     "CONTRACT": [
@@ -59,7 +60,7 @@ def wrapper(document):
     global model
     global tokenizer
 
-    json_from_text, sheet = find_text(document, path='There\\is\\nothing\\here')
+    json_from_text, sheet = get_text(document, path='There\\is\\nothing\\here')
 
     if json_from_text is None or json_from_text['text'] == '':
         return None
@@ -85,280 +86,112 @@ def wrapper(document):
     return sorted(result, key=lambda x: x['score'], reverse=True)
 
 
-def find_text(document, filename=None, path=None):
+def get_text(document, filename: str = "", path: str = ""):
+    text: str = ""
     for ind, par in enumerate(document['paragraphs']):
-        document['paragraphs'][ind]['paragraphBody']['text'] = re.sub('_+', '', par['paragraphBody']['text'])
-        document['paragraphs'][ind]['paragraphHeader']['text'] = re.sub(' +', ' ', par['paragraphHeader']['text'])
+        if ind < 2:
+            text += ' ' + document['paragraphs'][ind]['paragraphHeader']['text']
+            text += ' ' + document['paragraphs'][ind]['paragraphBody']['text']
+        text += ' ' + document['paragraphs'][ind]['paragraphBody']['text']
 
-    if document['documentType'] == "CONTRACT" or document['documentType'] == "AGREEMENT":
-        keys = all_key[document['documentType']]
+    text = clear_text(text)
+    text = remove_signature(text)
+    text, is_cut_off = remove_header(text)
+    text = remove_footer(text)
+    text = remove_equal(text)
 
-        index_of_paragraph, found_key = find_currency_header(document['paragraphs'], keys)
-        if index_of_paragraph >= 0:
-            paragraph = document['paragraphs'][index_of_paragraph]
-            return get_good_result(document, paragraph, path, filename, list_of_sheets.GOOD, found_key)
-
-        all_text = "".join('\n' + x['paragraphHeader']['text'] + '\n' + x['paragraphBody']['text'] for x in
-                           document['paragraphs'])
-        all_text = re.sub(' +', ' ', all_text)
-        text_from = ""
-        found_key = -1
-        # f"(?i)({key}([\w\u0430-\u044f]+|[ ]{1,}|))
-        for key in keys:
-            if key.lower() in all_text.lower():
-                found_key = key
-                array_of_text = re.split(f"(?i)({key})", all_text)
-                end_text = 0
-                try:
-                    last_symbol = re.search("\s\d[ .]\d?[\s|\u00A0|.\s]*$", array_of_text[0])
-                    if last_symbol:
-                        end_text = int(last_symbol.group().replace(" ", "").split(".")[0])
-                    else:
-                        text_from = " ".join(array_of_text[2].split()[:300])
-                except ValueError as ex:
-                    print(f"cannot converted str to int")
-                    text_from = " ".join(array_of_text[2].split()[:300])
-                    break
-
-                if end_text:
-                    end_text += 1
-                    text_from = re.split(f"\s({end_text})[. ]", array_of_text[2])[0]
-                break
-
-        if text_from != "":
-            return ({
-                        "path": path,
-                        "name": filename if not path else path.split("\\")[-1],
-                        "documentType": document['documentType'],
-                        "text": remove_bad_symbols(text_from),
-                        "length": len(text_from),
-                        "textHeader": "\n".join(str(x['paragraphHeader']['text']) for x in document['paragraphs']),
-                        "lengthHeader": sum(i['paragraphHeader']['length'] for i in document['paragraphs']),
-                        "key": found_key
-                    }, list_of_sheets.GOOD)
-
-        obj = find_let(document, filename=filename, path=path)
-        if obj is not None:
-            return obj, list_of_sheets.GOOD
-
-        return get_bad_results(document, path, filename, list_of_sheets.BAD)
-
-    elif document['documentType'] == "SUPPLEMENTARY_AGREEMENT":
-        for i, paragraph in enumerate(document['paragraphs']):
-            if paragraph['paragraphBody']['length'] > 20:
-                for key in ['Статья']:
-                    if key.lower() in paragraph['paragraphHeader']['text'].lower():
-                        return get_good_result(document, paragraph, path, filename, list_of_sheets.GOOD, key)
-
-        obj = find_let(document, filename=filename, document_type=document['documentType'], path=path)
-        if obj is not None:
-            return obj, list_of_sheets.GOOD
-
-        return get_bad_results(document, path, filename, list_of_sheets.GOOD)
+    list_of_tokenize_words: [str] = WhitespaceTokenizer().tokenize(text)
+    if len(list_of_tokenize_words) >= 300 and not is_cut_off:
+        text = ' '.join(list_of_tokenize_words[50:450])
     else:
-        if document['documentType'] == "POWER_OF_ATTORNEY":
-            paragraph = find_paragraph_by_keys(document, all_key[document['documentType']], path, filename)
-            if paragraph is not None:
-                return paragraph, list_of_sheets.TEST2
+        text = ' '.join(list_of_tokenize_words[:450])
 
-        keys = [
-            'Приказываю', 'Обязываю',
-            'СФЕРЕ ПРИРОДОПОЛЬЗОВАНИЯ', 'рыболовству', 'Природоохран',
-            'архитектур',
-            'дорожн',
-            'интеллектуальной деятельности',
-            'программного обеспечения',
-            'о взыскании',
-            'ПЕРЕЧЕНЬ НАРУШЕНИЙ',
-            'Перечень услуг',
-            'Недропользование',
-            'План развития',
-            'транспортировка', 'транспортировки',
-            'вагон',
-            'проверки',
-            'Авария',
-            'Аукцион',
-            'Выброс',
-            'Разлив',
-            'отход',
-        ]
-        keys += get_key_from_json()
-        paragraph = find_paragraph_by_keys(document, keys, path, filename)
-        if paragraph is not None:
-            return paragraph, list_of_sheets.TEST2
-
-        obj = find_let(document, filename=filename, path=path)
-        if obj is not None:
-            return obj, list_of_sheets.TEST2
-
-        return get_bad_results(document, path, filename, list_of_sheets.TEST)
+    validation, length, words_length = basic_text_validation(text)
+    return {
+               "path": path,
+               "documentType": document["documentType"],
+               "name": filename if not path else path.split("\\")[-1],
+               "text": text,
+               "length": len(text),
+               "characterLength": length,
+               "wordsLength": words_length,
+           }, list_of_sheets.GOOD if validation else list_of_sheets.BAD
 
 
-def find_paragraph_by_keys(document, keys, path, filename):
-    index = None
-    currency_text = ''
-    index_of_paragraph, found_key = find_currency_header(document['paragraphs'], keys)
+def clear_text(text: str) -> str:
+    text = re.sub(r'\s', ' ', text)
+    text = re.sub(r' +', ' ', text)
+    text = re.sub(r'(([а-яА-Яa-zA-Z\d\s\u0000-\u26FF]{1,2}( |\s)){5,})', '', text)
 
-    if index_of_paragraph >= 0:
-        index = index_of_paragraph
-        currency_text = document['paragraphs'][index_of_paragraph]['paragraphBody']['text']
-
-    if index_of_paragraph < 0:
-        for i, p in enumerate(document['paragraphs']):
-            currency_text, found_key = find_currency_text(p, keys)
-            if currency_text:
-                index = i
-                break
-
-    if index is not None:
-        while currency_text and len(currency_text.split()) < 300 and index != len(document['paragraphs']) - 1:
-            index += 1
-            currency_text += document['paragraphs'][index]['paragraphBody']['text']
-
-        return {
-            "path": path,
-            "name": filename if not path else path.split("\\")[-1],
-            "documentType": document['documentType'],
-            "text": remove_bad_symbols(currency_text),
-            "length": len(currency_text),
-            "textHeader": document['paragraphs'][index]['paragraphHeader']['text'],
-            "lengthHeader": document['paragraphs'][index]['paragraphHeader']['length'],
-            "key": found_key
-        }
-
-    return None
-
-
-def find_currency_header(paragraphs, keys):
-    for key in keys:
-        for index_of_paragraph, paragraph in enumerate(paragraphs):
-            header_text_in_low_reg = paragraph['paragraphHeader']['text'].lower()
-            header_text_in_low_reg = str(header_text_in_low_reg).replace(',', '')
-            if not basic_text_validation(paragraph):
-                continue
-            for key_from_good_keys in all_good_keys:
-                if key_from_good_keys.lower() in header_text_in_low_reg:
-                    return index_of_paragraph, key
-            if re.search(f"(?i)({key})", header_text_in_low_reg):
-                if 'Статья'.lower() in key.lower() and any(x.lower() in header_text_in_low_reg for x in all_bad_keys):
-                    continue
-                if any(x.lower() in header_text_in_low_reg for x in all_bad_keys):
-                    continue
-                if re.search("(:)\s*$", paragraph['paragraphBody']['text'].lower()):
-                    return -2, -1
-                return index_of_paragraph, key
-
-    return -1, -1
-
-
-def find_currency_text(paragraph, keys):
-    basic_text_in_low_reg = paragraph['paragraphBody']['text'].lower()
-    basic_text_in_low_reg = basic_text_in_low_reg.replace(',', '')
-    if not basic_text_validation(paragraph):
-        return False, -1
-    for key in all_good_keys:
-        if key.lower() in basic_text_in_low_reg:
-            return paragraph['paragraphBody']['text'], key
-    for key in keys:
-        if re.search(f"(?i)({key})", basic_text_in_low_reg):
-            if any(x.lower() in basic_text_in_low_reg for x in all_bad_keys):
-                return False, -1
-            # return ''.join(re.split(f"(?i)({key})", paragraph['paragraphBody']['text'])[1:])
-            return paragraph['paragraphBody']['text'], key
-    return False, -1
-
-
-def basic_text_validation(paragraph):
-    basic_text_in_low_reg = paragraph['paragraphBody']['text'].lower()
-    return len(basic_text_in_low_reg) >= 150 and len(basic_text_in_low_reg.split()) >= 15
-
-
-def find_let(document, filename=None, document_type=None, path=None):
-    key_value = ['о нижеследующем:', 'нижеследующем:', 'о нижеследующем', 'нижеследующем']
-    if document_type == 'SUPPLEMENTARY_AGREEMENT':
-        key_value.append('в следующей редакции:')
-        key_value.append('заключили настоящее Дополнительное соглашение к Договору.')
-        key_value.append('редакции:')
-
-    for i, p in enumerate(document['paragraphs']):
-        for index, key in enumerate(key_value):
-            if key.lower() in p['paragraphBody']['text'].lower() or key.lower() in p['paragraphHeader']['text'].lower():
-                text = p['paragraphBody']['text']
-                text_header = p['paragraphHeader']['text']
-                # text = ''.join(re.split(f"(?i)({x})", p['paragraphBody']['text'])[1:])
-
-                if len(document['paragraphs']) > 1:
-                    d = i + 1
-                    while len(text.split()) < 300 and d < len(document['paragraphs']):
-                        text += document['paragraphs'][d]['paragraphBody']['text']
-                        d += 1
-                return {
-                    "path": path,
-                    "name": filename if not path else path.split("\\")[-1],
-                    "documentType": document['documentType'],
-                    "text": remove_bad_symbols(text),
-                    "length": len(text),
-                    "textHeader": text_header,
-                    "lengthHeader": len(text_header),
-                    "key": key
-                }
-    return None
-
-
-def remove_signature(text):
-    for key in ["Подписи Сторон:"]:
-        if key.lower() in text.lower():
-            split_text = re.split(f"(?i)({key})", text)
-            text = ''.join(split_text[:-2])
+    bad_symbols = ['_+', '_x000D_', '\x07', 'FORMTEXT', 'FORMDROPDOWN',
+                   '\u0013', '\u0001', '\u0014', '\u0015', '\u0007', '<', '>']
+    for bad_symbol in bad_symbols:
+        text = re.sub(bad_symbol, '', text)
     return text
 
 
-def remove_bad_symbols(text):
-    bad_symbols = ['_+', '_x000D_', '\x07', 'FORMTEXT', 'FORMDROPDOWN', ]
-    text = remove_signature(text)
-    text = re.sub(' +', ' ', text)
-    for bad_symbol in bad_symbols:
-        text = re.sub(bad_symbol, '', text)
+def remove_header(text: str) -> (str, bool):
+    text = re.sub(r'(\d+, г\. [а-яА-Я\-]+, (ул\.| |)( |)[а-яА-Я\-]+(| )(проспект|улица|| ),( |)д\.( |)[\d\-]+)', ' ',
+                  text)
+    text = re.sub(
+        r'(\d+,(| )[а-яА-Я\- ]+(| ),(| )[а-яА-Я\-]+(| ),'
+        r'(| )г\. [а-яА-Я\-]+(|,| ) (ул\.| |)( |)[а-яА-Я\-]+(| |,)( |)д\.( |)[\d\-]+)',
+        ' ',
+        text)
+    text = re.sub(r'(\s+(ИНН|ОГРН|ОКПО|КПП)\s+\d+(\s+|,|\.))', ' ', text)
+    text = re.sub(r'(\((ИНН|ОГРН|ОКПО|КПП)\s+\d+\))', ' ', text)
+    text = re.sub(r'((ИНН|ОГРН|ОКПО|КПП)\s+\d+)', ' ', text)
+    text = re.sub(
+        r'((\s+|^)[а-яА-Я\- ]+, \d+, [а-яА-Я]+\. [а-яА-Я]+, г\. [а-яА-Я\-]+, '
+        r'(ул\.| |)( |)[а-яА-Я\-]+(,|\.)( |)д\.( |)[\d\-а-яА-Я]+)',
+        '', text)
+    text = re.sub(r'((\s+|^)[а-яА-Я\- ]+, \d+, [а-яА-Я]+,\s+[а-яА-Я\s]+,\s+г\.\s+[а-яА-Я\s]+,'
+                  r'\s+(ул\.|пр\.)\s+[а-яА-Я\s\d]+,\s+(д\.|дом)\s+\d+(\s+|)[а-яА-Я])', ' ', text)
 
-    return ' '.join(text.split()[:300])
+    text = re.sub(r'(\d+,(|\s+)[а-яА-Я\- ]+(|\s+),(\s+|)(г\.|город) [а-яА-Я\-]+(|,|\s+)\s(ул\.|\s+|улица)'
+
+                  r'( |)[а-яА-Я\-]+(| |,)(\s+|)(д\.|дом)(\s+|)[\d\-]+(\s+|)[а-яА-Я\-])', ' ', text)
+    text = re.sub(r'(\d+,(\s+[а-яА-Я\s\.\-\d]+,){4,}[а-яА-Я\s\.]+[\d\sа-яА-Я]+)', ' ', text)
+
+    phrase = re.findall(r'((?i)((\s+|^)([\d\.]{2,4})\s+Предмет Договора))', text)
+
+    if phrase:
+        try:
+            return ' '.join(text.split(phrase[0][0])[1:]), True
+        except Exception as e:
+            print(phrase)
+    else:
+        number = re.findall(r'(\d\.\d\.)', text)
+        if number:
+            return ' '.join(text.split(number[0])[1:]), True
+    return text, False
 
 
-def get_bad_results(document, path, filename, sheet):
-    return ({
-                "path": path,
-                "name": filename if not path else path.split("\\")[-1],
-                "documentType": document['documentType'],
-                "text": remove_bad_symbols("\n".join(x['paragraphBody']['text'] for x in document['paragraphs'])),
-                "length": sum(i['paragraphBody']['length'] for i in document['paragraphs']),
-                "textHeader": "\n+++++++++++++\n".join(x['paragraphHeader']['text'] for x in document['paragraphs']),
-                "lengthHeader": sum(i['paragraphHeader']['length'] for i in document['paragraphs']),
-                "key": -1
-            }, sheet)
+def basic_text_validation(text: str) -> (bool, int, int):
+    basic_text_in_low_reg = text.lower()
+    length = len(basic_text_in_low_reg)
+    words_length = len(WhitespaceTokenizer().tokenize(basic_text_in_low_reg))
+    return length >= 200 and words_length >= 20, length, words_length
 
 
-def get_good_result(document, paragraph, path, filename, sheet, key):
-    return ({
-                "path": path,
-                "name": filename if not path else path.split("\\")[-1],
-                "documentType": document['documentType'],
-                "text": remove_bad_symbols(paragraph['paragraphBody']['text']),
-                "length": paragraph['paragraphBody']['length'],
-                "textHeader": paragraph['paragraphHeader']['text'],
-                "lengthHeader": paragraph['paragraphHeader']['length'],
-                "key": key
-            }, sheet)
+def remove_footer(text: str) -> str:
+    for key in ['С уважением', 'Приложение:', 'ЗАКАЗЧИК:', 'ПОДРЯДЧИК:']:
+        array_of_text = re.split(f"(?i)({key})", text)
+        if array_of_text and len(array_of_text) > 1:
+            text = ''.join(array_of_text[:-2])
+    return text
 
 
-def get_key_from_json():
-    keys = []
+def remove_equal(text: str) -> str:
+    text = text.strip()
+    if text.startswith('='):
+        text = text[1:]
+    return text
 
-    for item in key_data:
-        item = str(item).replace('/', '|').replace('\n', '')
-        keys += re.split(r",|;", item)
 
-    for index, item in enumerate(keys):
-        if re.search(r'(\S+\|\S+)', item):
-            match = re.findall(r'(\S+\|\S+)', item)
-            for word in match:
-                keys[index] = keys[index].replace(word, f"({word})")
-    return list(filter(None, keys))
+def remove_signature(text: str) -> str:
+    for key in ["Подписи Сторон:"]:
+        if key.lower() in text.lower():
+            split_text = re.split(f"(?i)({key})", text)
+            text = ' '.join(split_text[:-2])
+    return text
