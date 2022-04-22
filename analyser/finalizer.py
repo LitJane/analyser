@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import time
 from collections import deque
@@ -1057,7 +1058,8 @@ def save_email_classification(result, audit):
 def send_notifications():
     db = get_mongodb_connection()
     audit_collection = db['audits']
-    audits = audit_collection.find({'additionalFields.email_sent': False, 'pre-check': True})
+    audits = audit_collection.find({'additionalFields.email_sent':  False, 'pre-check': True})
+
     for audit in audits:
         if audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0 and audit.get('additionalFields') is not None:
             additional_fields = audit['additionalFields']
@@ -1065,6 +1067,15 @@ def send_notifications():
                 class_id = audit['additionalFields']['classification_result_user']['id']
                 top_result = next(filter(lambda x: x['_id'] == class_id, all_labels), None)
                 attachments = []
+                fs = gridfs.GridFS(db)
+                for file_id in audit['additionalFields'].get('file_ids') or []:
+                    attachments.append(fs.get(file_id))
+                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
+            elif audit['additionalFields'].get('email_sent') == False and audit.get('classification_result') is not None:
+                logging.info('Retry send email message')
+                top_classification_result = audit['classification_result'][0]
+                attachments = []
+                top_result = next(filter(lambda x: x['_id'] == top_classification_result['id'], all_labels), None)
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
