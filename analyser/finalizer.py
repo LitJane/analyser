@@ -138,13 +138,13 @@ def get_docs_by_audit_id(id: str, state, kind=None, id_only=False, without_large
     return docs
 
 
-def get_doc_by_id(doc_id:ObjectId):
+def get_doc_by_id(doc_id: ObjectId):
     db = get_mongodb_connection()
     documents_collection = db['documents']
     return documents_collection.find_one({'_id': doc_id})
 
 
-def get_audit_by_id(aid:ObjectId):
+def get_audit_by_id(aid: ObjectId):
     db = get_mongodb_connection()
     return db['audits'].find_one({'_id': aid})
 
@@ -157,11 +157,19 @@ def save_violations(audit, violations):
 
 
 def create_violation(document_id, founding_document_id, reference, violation_type, violation_reason):
-    return {'id': ObjectId(), 'userViolation': False, "document": document_id, "founding_document": founding_document_id, "reference": reference, "violation_type": violation_type, "violation_reason": violation_reason}
+    return {
+        'id': ObjectId(),
+        'userViolation': False,
+        "document": document_id,
+        "founding_document": founding_document_id,
+        "reference": reference,
+        "violation_type": violation_type,
+        "violation_reason": violation_reason
+    }
 
 
 def get_charter_diapasons(charter):
-    #group by subjects
+    # group by subjects
     subjects = {}
     charter_attrs = get_attrs(charter)
     min_constraint = np.inf
@@ -223,7 +231,7 @@ def find_protocol(contract, protocols, org_level, contract_value, check_orgs=Tru
     result = None
     best_value = {'value': -1, 'currency': 'RUB'}
     best_sign = 0
-    clean_contract_orgs=[]
+    clean_contract_orgs = []
     for contract_org in contract_attrs['orgs']:
         if contract_org.get('name') is not None and contract_org['name'].get('value') is not None:
             clean_contract_orgs.append(clean_name(contract_org['name']['value']))
@@ -241,7 +249,8 @@ def find_protocol(contract, protocols, org_level, contract_value, check_orgs=Tru
                                         distance = textdistance.levenshtein.normalized_distance(clean_contract_org, clean_protocol_org)
                                         if distance < 0.1 or not check_orgs:
                                             if contract_value is not None and agenda_contract.get('price') is not None:
-                                                protocol_value = convert_to_currency({'value': agenda_contract['price']['amount']['value'], 'currency': agenda_contract['price']['currency']['value']}, contract_value['currency'])
+                                                protocol_value = convert_to_currency({'value': agenda_contract['price']['amount']['value'], 'currency': agenda_contract['price']['currency']['value']},
+                                                                                     contract_value['currency'])
                                                 if contract_value['value'] <= best_value['value']:
                                                     if best_value['value'] >= protocol_value['value'] >= contract_value['value']:
                                                         result = protocol
@@ -328,25 +337,26 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
             charter_attrs = get_attrs(charter)
             json_charters.append({"id": charter["_id"], "date": charter_attrs["date"]["value"]})
 
-        violation_reason = {"contract":
-                              {"id": contract["_id"],
-                               "number": contract_number,
-                               "type": contract["documentType"],
-                               'date': contract_attrs["date"]["value"]
-                               },
-                            "charters": json_charters
-                            }
+        violation_reason = {
+            "contract": {
+                "id": contract["_id"],
+                "number": contract_number,
+                "type": contract["documentType"],
+                'date': contract_attrs["date"]["value"]
+            },
+            "charters": json_charters
+        }
 
         violations.append(create_violation(
-          document_id={
-            "id": contract["_id"],
-            "number": contract_number,
-            "type": contract["documentType"]
-          },
-          founding_document_id=None,
-          reference=None,
-          violation_type="charter_not_found",
-          violation_reason=violation_reason)
+            document_id={
+                "id": contract["_id"],
+                "number": contract_number,
+                "type": contract["documentType"]
+            },
+            founding_document_id=None,
+            reference=None,
+            violation_type="charter_not_found",
+            violation_reason=violation_reason)
         )
         return violations, links
     else:
@@ -369,10 +379,12 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                 org = get_org(eligible_charter_attrs)
                 if org is not None and org.get('type') is not None and 'акционерное общество' == org['type']['value'].lower():
                     if book_value * 0.25 < contract_value["value"] <= book_value * 0.5:
-                        competences = {'BoardOfDirectors': {"min": 25, "currency_min": "Percent", "max": 50, "currency_max": "Percent", "competence_attr_name": get_charter_span(eligible_charter_attrs, 'BoardOfDirectors', 'BigDeal')}}
+                        competences = {'BoardOfDirectors': {"min": 25, "currency_min": "Percent", "max": 50, "currency_max": "Percent",
+                                                            "competence_attr_name": get_charter_span(eligible_charter_attrs, 'BoardOfDirectors', 'BigDeal')}}
                         change_contract_primary_subject(contract, 'BigDeal')
                     elif contract_value["value"] > book_value * 0.5:
-                        competences = {'ShareholdersGeneralMeeting': {"min": 50, "currency_min": "Percent", "max": np.inf, "competence_attr_name": get_charter_span(eligible_charter_attrs, 'ShareholdersGeneralMeeting', 'BigDeal')}}
+                        competences = {'ShareholdersGeneralMeeting': {"min": 50, "currency_min": "Percent", "max": np.inf,
+                                                                      "competence_attr_name": get_charter_span(eligible_charter_attrs, 'ShareholdersGeneralMeeting', 'BigDeal')}}
                         change_contract_primary_subject(contract, 'BigDeal')
                 else:
                     if charter_subject_map.get('BigDeal') is not None:
@@ -423,7 +435,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                     linked_protocols = list(filter(lambda doc: doc['documentType'] == 'PROTOCOL', user_linked_docs))
                     if linked_protocols:
                         eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value)
-                        if eligible_protocol is None: #force find protocol_value and sign
+                        if eligible_protocol is None:  # force find protocol_value and sign
                             eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value, check_orgs=False)
                     else:
                         eligible_protocol, protocol_value, sign = find_protocol(contract, protocols, competence, contract_value)
@@ -488,7 +500,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "org_name": contract_org2_name,
                                               "value": contract_value["original_value"],
                                               "currency": contract_value["original_currency"]},
-                                "protocol": {
+                                 "protocol": {
                                      "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
                                      "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
 
@@ -505,7 +517,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "org_name": contract_org2_name,
                                               "value": contract_value["original_value"],
                                               "currency": contract_value["original_currency"]},
-                                "protocol": {
+                                 "protocol": {
                                      "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
                                      "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
 
@@ -523,7 +535,7 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "org_name": contract_org2_name,
                                               "value": contract_value["original_value"],
                                               "currency": contract_value["original_currency"]},
-                                "protocol": {
+                                 "protocol": {
                                      "org_structural_level": protocol_structural_level,
                                      "date": eligible_protocol_attrs["date"]["value"],
                                      "value": protocol_value["original_value"],
@@ -909,7 +921,7 @@ def check_interest(audit, contract, additional_docs, interests, beneficiaries):
     if amount_netto is not None:
         if amount_netto['currency'] != 'RUB':
             amount_netto = convert_to_currency(amount_netto, 'RUB')
-        if amount_netto['value'] >= 1000000000:#need interest check
+        if amount_netto['value'] >= 1000000000:  # need interest check
             if contract_attrs.get('orgs') is not None:
                 for i, org in enumerate(contract_attrs['orgs']):
                     if i != 0 and org.get('name') is not None:
@@ -1058,7 +1070,7 @@ def save_email_classification(result, audit):
 def send_notifications():
     db = get_mongodb_connection()
     audit_collection = db['audits']
-    audits = audit_collection.find({'additionalFields.email_sent':  False, 'pre-check': True})
+    audits = audit_collection.find({'additionalFields.email_sent': False, 'pre-check': True})
 
     for audit in audits:
         if audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0 and audit.get('additionalFields') is not None:
@@ -1095,7 +1107,26 @@ def finalize():
     for audit in audits:
         if audit.get('pre-check'):
             logger.info(f'.....finalizing pre-audit {audit["_id"]}')
+            documents = get_docs_by_audit_id(audit["_id"], 15, without_large_fields=False)
             prepared_beneficiaries = None
+            violations = []
+
+            if 'Classification' in audit['checkTypes']:
+                if audit.get('beneficiary_chain'):
+                    if interests is None:
+                        interests = get_latest_interest()
+                    prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
+                for doc in documents:
+                    if doc.get('documentType') == 'CONTRACT':
+                        attrs_from_analysis = get_attrs(doc)
+                        orgs = attrs_from_analysis.get('contract.orgs')
+                        if orgs:
+                            for org in orgs:
+                                type = org.get('type.value')
+                                name = org.get('name.value')
+                                if type == 'Публичное акционерное общество' and re.search(r'(Газпром[\s\-]нефть)', name):
+                                    if insiders is None:
+                                        insiders = get_insiders()
             if 'InterestControl' in audit['checkTypes']:
                 if interests is None:
                     interests = get_latest_interest()
@@ -1103,8 +1134,6 @@ def finalize():
             if 'InsiderControl' in audit['checkTypes']:
                 if insiders is None:
                     insiders = get_insiders()
-            documents = get_docs_by_audit_id(audit["_id"], 15, without_large_fields=False)
-            violations = []
             for document_id in documents:
                 try:
                     document = get_doc_by_id(document_id["_id"])
@@ -1157,4 +1186,3 @@ def finalize():
 
 if __name__ == '__main__':
     finalize()
-
