@@ -1119,11 +1119,15 @@ def finalize():
                 for doc in documents:
                     if doc.get('documentType') == 'CONTRACT':
                         attrs_from_analysis = get_attrs(doc)
-                        orgs = attrs_from_analysis.get('contract.orgs')
+                        orgs = attrs_from_analysis.get('orgs')
                         if orgs:
                             for org in orgs:
-                                type = org.get('type.value')
-                                name = org.get('name.value')
+                                type = org.get('type')
+                                if type:
+                                    type = type.get('value')
+                                name = org.get('name')
+                                if name:
+                                    name = name.get('value')
                                 if type == 'Публичное акционерное общество' and re.search(r'(Газпром[\s\-]нефть)', name):
                                     if insiders is None:
                                         insiders = get_insiders()
