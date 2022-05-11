@@ -1067,6 +1067,11 @@ def save_email_classification(result, audit):
     db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"additionalFields.email_sent": result}})
 
 
+def save_check_types(audit):
+    db = get_mongodb_connection()
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"checkTypes": audit['checkTypes']}})
+
+
 def send_notifications():
     db = get_mongodb_connection()
     audit_collection = db['audits']
@@ -1111,9 +1116,21 @@ def finalize():
             prepared_beneficiaries = None
             violations = []
 
+            if 'InterestControl' in audit['checkTypes']:
+                if interests is None:
+                    interests = get_latest_interest()
+                prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
+
+            if 'InsiderControl' in audit['checkTypes']:
+                if insiders is None:
+                    insiders = get_insiders()
+
             if 'Classification' in audit['checkTypes']:
                 if audit.get('beneficiary_chain'):
                     if interests is None:
+                        if 'InterestControl' not in audit['checkTypes']:
+                            audit['checkTypes'].append('InterestControl')
+                            save_check_types(audit)
                         interests = get_latest_interest()
                     prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
                 for doc in documents:
@@ -1130,14 +1147,10 @@ def finalize():
                                     name = name.get('value')
                                 if type == 'Публичное акционерное общество' and re.search(r'(Газпром[\s\-]нефть)', name):
                                     if insiders is None:
+                                        if 'InsiderControl' not in audit['checkTypes']:
+                                            audit['checkTypes'].append('InsiderControl')
+                                            save_check_types(audit)
                                         insiders = get_insiders()
-            if 'InterestControl' in audit['checkTypes']:
-                if interests is None:
-                    interests = get_latest_interest()
-                prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
-            if 'InsiderControl' in audit['checkTypes']:
-                if insiders is None:
-                    insiders = get_insiders()
             for document_id in documents:
                 try:
                     document = get_doc_by_id(document_id["_id"])
