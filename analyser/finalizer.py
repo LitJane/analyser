@@ -1078,7 +1078,9 @@ def send_notifications():
     audits = audit_collection.find({'additionalFields.email_sent': False, 'pre-check': True})
 
     for audit in audits:
-        if audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0 and audit.get('additionalFields') is not None:
+        if audit.get('checkTypes') is not None and \
+                (len(audit['checkTypes']) == 0 or 'Classification' in audit.get('checkTypes')) and \
+                audit.get('additionalFields') is not None:
             additional_fields = audit['additionalFields']
             if additional_fields.get('classification_result_user'):
                 class_id = audit['additionalFields']['classification_result_user']['id']
