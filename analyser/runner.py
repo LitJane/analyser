@@ -370,22 +370,20 @@ def run(run_pahse_2=True, kind=None):
   if run_pahse_2:
     audit_charters_phase_2()
 
-  # -----------------------
-  # I
-  logger.info('-> PHASE I...')
   for audit in get_audits():
+    # -----------------------
+    # I
+    logger.info('-> PHASE I...')
     audit_phase_1(audit, kind)
 
-  # -----------------------
-  # II
-  logger.info('-> PHASE II..')
-  if run_pahse_2:
-    # phase 2
-    for audit in get_audits():
+    # -----------------------
+    # II
+    if run_pahse_2:
+      logger.info('-> PHASE II..')
+      # phase 2
       audit_phase_2(audit, kind)
-
-  else:
-    logger.info("phase 2 is skipped")
+    else:
+      logger.info("phase 2 is skipped")
 
   # -----------------------
   # III
