@@ -232,10 +232,9 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
   return db_document
 
 
-def save_audit_practice(audit, classification_result):
+def save_audit_practice(audit, classification_result, zip_classified):
   db = get_mongodb_connection()
-  # audit['classification_result'] = classification_result
-  db['audits'].update_one({'_id': audit['_id']}, {"$set": {'classification_result': classification_result}})
+  db['audits'].update_one({'_id': audit['_id']}, {"$set": {'classification_result': classification_result, "additionalFields.zip_classified": zip_classified}})
 
 
 def change_doc_state(doc, state):
@@ -256,23 +255,41 @@ def need_analysis(document: DbJsonDoc) -> bool:
   return _need_analysis
 
 
+def get_doc4classification(audit):
+  main_doc = None
+  if audit.get('additionalFields', '').get('main_document_id') is not None:
+    main_doc = finalizer.get_doc_by_id(audit['additionalFields']['main_document_id'])
+    main_doc_type = main_doc['documentType']
+    if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
+      return main_doc, True
+  document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=None, id_only=True)
+  for document_id in document_ids:
+    _document = finalizer.get_doc_by_id(document_id)
+    if _document['parserResponseCode'] == 200:
+      doc_type = _document['documentType']
+      if doc_type == 'CONTRACT':
+        return _document, False
+  if main_doc is not None and main_doc['parserResponseCode'] == 200:
+    return main_doc, True
+  for document_id in document_ids:
+    _document = finalizer.get_doc_by_id(document_id)
+    if _document['parserResponseCode'] == 200:
+        return _document, False
+
+
 def doc_classification(audit):
   logger.info(f'.....classifying audit {audit["_id"]}')
-  document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=None, id_only=True)
-  for k, document_id in enumerate(document_ids):
-    _document = finalizer.get_doc_by_id(document_id)
-
-    if _document['parserResponseCode'] == 200:
-      classification_result = wrapper(_document['parse'])
-      if classification_result:
-        save_audit_practice(audit, classification_result)
-        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
-        attachments = []
-        fs = gridfs.GridFS(get_mongodb_connection())
-        for file_id in audit['additionalFields']['file_ids']:
-          attachments.append(fs.get(file_id))
-        send_classifier_email(audit, top_result, attachments, all_labels)
-        return
+  doc4classification, main_doc = get_doc4classification(audit)
+  classification_result = wrapper(doc4classification['parse'])
+  if classification_result:
+    save_audit_practice(audit, classification_result, not main_doc)
+    top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+    attachments = []
+    fs = gridfs.GridFS(get_mongodb_connection())
+    for file_id in audit['additionalFields']['file_ids']:
+      attachments.append(fs.get(file_id))
+    send_classifier_email(audit, top_result, attachments, all_labels)
+    return
 
 
 def audit_phase_1(audit, kind=None):
