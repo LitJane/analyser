@@ -233,6 +233,8 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
 
 
 def save_audit_practice(audit, classification_result, zip_classified):
+  if audit['additionalFields']['external_source'] != 'email':
+    zip_classified = False
   db = get_mongodb_connection()
   db['audits'].update_one({'_id': audit['_id']}, {"$set": {'classification_result': classification_result, "additionalFields.zip_classified": zip_classified}})
 
@@ -283,13 +285,13 @@ def doc_classification(audit):
   classification_result = wrapper(doc4classification['parse'])
   if classification_result:
     save_audit_practice(audit, classification_result, not main_doc)
-    top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
-    attachments = []
-    fs = gridfs.GridFS(get_mongodb_connection())
-    for file_id in audit['additionalFields']['file_ids']:
-      attachments.append(fs.get(file_id))
-    send_classifier_email(audit, top_result, attachments, all_labels)
-    return
+    if audit['additionalFields']['external_source'] == 'email':
+      top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+      attachments = []
+      fs = gridfs.GridFS(get_mongodb_connection())
+      for file_id in audit['additionalFields']['file_ids']:
+        attachments.append(fs.get(file_id))
+      send_classifier_email(audit, top_result, attachments, all_labels)
 
 
 def audit_phase_1(audit, kind=None):

@@ -71,6 +71,7 @@ def update_db_dictionaries():
     coll = db['practices']
     coll.delete_many({})
     coll.insert_many(all_labels)
+    coll.create_index('tessa_id')
 
     # indexing
     print('creating db indices')
@@ -90,6 +91,7 @@ def update_db_dictionaries():
 
     coll = db['audits']
     coll.create_index('email_sent')
+    coll.create_index('additionalFields.external_source')
 
 
 if __name__ == '__main__':
