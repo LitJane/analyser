@@ -89,7 +89,7 @@ def wrapper(document):
 def get_text(document, filename: str = "", path: str = ""):
     text: str = ""
     for ind, par in enumerate(document['paragraphs']):
-        if ind < 2:
+        if ind < 7:
             text += ' ' + document['paragraphs'][ind]['paragraphHeader']['text']
             text += ' ' + document['paragraphs'][ind]['paragraphBody']['text']
         text += ' ' + document['paragraphs'][ind]['paragraphBody']['text']
@@ -101,10 +101,10 @@ def get_text(document, filename: str = "", path: str = ""):
     text = remove_equal(text)
 
     list_of_tokenize_words: [str] = WhitespaceTokenizer().tokenize(text)
-    if len(list_of_tokenize_words) >= 300 and not is_cut_off:
-        text = ' '.join(list_of_tokenize_words[50:450])
-    else:
-        text = ' '.join(list_of_tokenize_words[:450])
+    # if len(list_of_tokenize_words) >= 300 and not is_cut_off:
+    #     text = ' '.join(list_of_tokenize_words[50:450])
+    # else:
+    text = ' '.join(list_of_tokenize_words[:450])
 
     validation, length, words_length = basic_text_validation(text)
     return {
