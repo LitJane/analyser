@@ -1075,7 +1075,7 @@ def save_check_types(audit):
 def send_notifications():
     db = get_mongodb_connection()
     audit_collection = db['audits']
-    audits = audit_collection.find({'additionalFields.email_sent': False, 'pre-check': True})
+    audits = audit_collection.find({'additionalFields.email_sent': False, 'pre-check': True, 'additionalFields.external_source': 'email'})
 
     for audit in audits:
         if audit.get('checkTypes') is not None and \

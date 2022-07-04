@@ -27,12 +27,19 @@ def get_mongodb_connection():
       print(f"DB HOST IS: {host}")
       user = _env_var('GPN_DB_USER', None)
       password = _env_var('GPN_DB_PASSWORD', None)
+      mongo_tls = _env_var('GPN_USE_MONGO_TLS', False)
+      ca_file = _env_var('GPN_DB_TLS_CA')
+      cert_file = _env_var('GPN_DB_TLS_KEY')
+      if mongo_tls:
+        tls_opts = f'?tls=true&tlsCAFile={ca_file}&tlsCertificateKeyFile={cert_file}'
+      else:
+        tls_opts = ''
       if user is not None and password is not None:
         user = urllib.parse.quote_plus(user)
         password = urllib.parse.quote_plus(password)
-        _db_client = MongoClient(f'mongodb://{user}:{password}@{host}:{port}/')
+        _db_client = MongoClient(f'mongodb://{user}:{password}@{host}:{port}/{tls_opts}')
       else:
-        _db_client = MongoClient(f'mongodb://{host}:{port}/')
+        _db_client = MongoClient(f'mongodb://{host}:{port}/{tls_opts}')
       _db_client.server_info()
 
     except Exception as err:

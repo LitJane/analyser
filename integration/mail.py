@@ -158,10 +158,10 @@ def generate_errors(audit, html) -> str:
     result = ""
     if html:
         for error in audit['errors']:
-            result += f"""<p>Ошибка: {error}</p>"""
+            result += f"""<p>Ошибка: {error['text']}</p>"""
     else:
         for error in audit['errors']:
-            result += f"""Ошибка: {error}"""
+            result += f"""Ошибка: {error['text']}"""
     return result
 
 
