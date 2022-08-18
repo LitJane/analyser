@@ -41,6 +41,17 @@ class NumpyFloatHandler(jsonpickle.handlers.BaseHandler):
     return round(obj, 6)
 
 
+class AgendaItemContractHandler(jsonpickle.handlers.BaseHandler):
+  def flatten(self, obj: AgendaItemContract, data):
+    pickler = self.context
+    data['span'] = pickler.flatten(obj.span)
+    data['orgs'] = pickler.flatten(obj.orgs)
+    data['date'] = pickler.flatten(obj.date)
+    data['price'] = pickler.flatten(obj.price)
+    data['number'] = pickler.flatten(obj.number)
+    return data  # [obj.span, pickler.flatten(obj.orgs), obj.date, obj.price, obj.number]
+
+
 class EnumHandler(jsonpickle.handlers.BaseHandler):
   def flatten(self, e: Enum, data):
     return e.name
@@ -53,6 +64,8 @@ jsonpickle.handlers.registry.register(Enum, EnumHandler, base=True)
 jsonpickle.handlers.registry.register(np.float, NumpyFloatHandler)
 jsonpickle.handlers.registry.register(np.float32, NumpyFloatHandler)
 jsonpickle.handlers.registry.register(np.float64, NumpyFloatHandler)
+
+jsonpickle.handlers.registry.register(AgendaItemContract, AgendaItemContractHandler)
 
 
 def del_none(d):
@@ -370,30 +383,6 @@ def convert_charter_db_attributes_to_tree(attrs):
   return tree
 
 
-# ----------------------
-
-
-def get_attributes_tree(id: str):
-  # x = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
-  # print(x.name, x.hometown.name, x.hometown.id)
-  db = get_mongodb_connection()
-  doc = get_doc_by_id(ObjectId(id))
-
-  analysis = doc.get('analysis')
-  if analysis:
-    tree = analysis.get('attributes_tree')
-    r = dotdict(tree)
-
-    return r.charter
-
-
-class dotdict(dict):
-  """dot.notation access to dictionary attributes"""
-  __getattr__ = dict.get
-  __setattr__ = dict.__setitem__
-  __delattr__ = dict.__delitem__
-
-
 def get_legacy_docs_ids() -> []:
   db = get_mongodb_connection()
   documents_collection = db['documents']
@@ -490,7 +479,7 @@ def should_i_migrate(ids) -> bool:
 
   if '-forcemigration' in sys.argv:
     return True
-  
+
   print("use -forcemigration cmd line arg if your answer is always yes")
   print("use -skipmigration cmd line arg if your answer is always no")
   print('\a')

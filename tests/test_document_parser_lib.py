@@ -9,16 +9,16 @@ from analyser.legal_docs import LegalDocument, Paragraph
 from analyser.ml_tools import SemanticTag
 from analyser.text_normalize import normalize_text, replacements_regex
 
-
+@unittest.skip
 class TestContractParser(unittest.TestCase):
 
   def n(self, txt):
     return normalize_text(txt, replacements_regex)
 
+  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_doc_parser(self):
     db = get_mongodb_connection()
-    if db is None:  # TODO: this is a weird way of detecting we're on CI
-      return
+
 
     FILENAME = "/Users/artem/work/nemo/goil/IN/Другие договоры/Договор Формула.docx"
 

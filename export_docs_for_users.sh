@@ -1,0 +1,2 @@
+export GPN_DB_HOST=192.168.10.36
+papermill trainsets/export_docs_for_manual_markup.ipynb trainsets/export_docs_for_manual_markup.ipynb

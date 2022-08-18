@@ -12,7 +12,6 @@ from enum import Enum
 import numpy as np
 from bson import json_util
 from overrides import final
-from pandas import DataFrame
 
 import analyser
 from analyser.doc_structure import get_tokenized_line_number
@@ -23,7 +22,7 @@ from analyser.log import logger
 from analyser.ml_tools import SemanticTag, FixedVector, Embeddings, filter_values_by_key_prefix, rectifyed_sum, \
   conditional_p_sum, clean_semantic_tag_copy
 from analyser.patterns import DIST_FUNC, AbstractPatternFactory, make_pattern_attention_vector
-from analyser.schemas import ContractPrice
+from analyser.schemas import ContractPrice, DocumentSchema
 from analyser.structures import ContractTags
 from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.text_tools import find_token_before_index
@@ -67,6 +66,8 @@ class LegalDocument:
   def __init__(self, original_text=None, name="legal_doc"):
 
     self._id = None  # TODO
+
+    self.attributes_tree:DocumentSchema or None = DocumentSchema()
     # self.date: SemanticTag or None = None
     # self.number: SemanticTag or None = None
 
@@ -135,9 +136,9 @@ class LegalDocument:
     # TODO: employ elf.sentence_map
     return self.tokens_map.sentence_at_index(i, return_delimiters)
 
-  def split_into_sentenses(self):
+  def split_into_sentenses(self, sentence_max_len=HyperParameters.protocol_sentence_max_len):
     self.sentence_map = tokenize_doc_into_sentences_map(self.tokens_map.get_full_text(),
-                                                        HyperParameters.protocol_sentence_max_len)
+                                                        sentence_max_len)
 
   def __len__(self):
     return self.tokens_map.get_len()
@@ -165,45 +166,13 @@ class LegalDocument:
 
     return self
 
-  def get_tags(self) -> [SemanticTag]:
-    warnings.warn("please switch to attributes_tree struktur", DeprecationWarning)
-    return []
-
   def headers_as_sentences(self) -> [str]:
     return headers_as_sentences(self)
 
-  def get_semantic_map(self, confidence_override=None) -> DataFrame:
-
-    '''
-    #TODO: do not ignore user corrections
-    used in jupyter notebooks
-    :return:
-    '''
-
-    _tags = self.get_tags()
-    _attention = np.zeros((len(_tags), self.__len__()))
-
-    df = DataFrame()
-    for i, t in enumerate(_tags):
-      df[t.kind] = 0
-      _conf = t.confidence
-      if confidence_override is not None:
-        _conf = confidence_override
-
-      _attention[i][t.as_slice()] = _conf
-
-    for i, t in enumerate(_tags):
-      df[t.kind] = 0
-      df[t.kind] = _attention[i]
-
-    return df
-
-  def get_tags_attention(self) -> FixedVector:
-    _attention = np.zeros(self.__len__())
-
-    for t in self.get_tags():
-      _attention[t.as_slice()] += t.confidence
-    return _attention
+  def get_headline(self):
+    hh = headers_as_sentences(self)
+    if (hh is not None) and len(hh)>0:
+      return hh[0]
 
   def to_json_obj(self) -> dict:
     j = DocumentJson(self)
@@ -212,19 +181,6 @@ class LegalDocument:
   def to_json(self) -> str:
     j = DocumentJson(self)
     return json.dumps(j.__dict__, indent=4, ensure_ascii=False, default=lambda o: '<not serializable>')
-
-  def tags_to_json_attributes(self) -> dict:
-    warnings.warn("use LegalDoc.tags_to_attributes_dict", DeprecationWarning)
-    attributes = {}
-    for t in self.get_tags():
-      key, attr = t.as_json_attribute()
-
-      if key in attributes:
-        raise RuntimeError(key + ' duplicated key')
-
-      attributes[key] = attr
-
-    return attributes
 
   def get_tokens_cc(self):
     return self.tokens_map.tokens
@@ -265,7 +221,8 @@ class LegalDocument:
     if self.embeddings is None:
       raise UnboundLocalError(f'Embedd document first, {self._id}')
 
-    self.distances_per_pattern_dict = calculate_distances_per_pattern(self, pattern_factory, dist_function, merge=merge,
+    self.distances_per_pattern_dict = calculate_distances_per_pattern(self, pattern_factory, dist_function,
+                                                                      merge=merge,
                                                                       verbosity=verbosity,
                                                                       pattern_prefix=pattern_prefix)
 
@@ -317,26 +274,11 @@ class LegalDocument:
                                     max_tokens=max_tokens,
                                     log_key=f'_id:{self._id}')
 
-  def is_same_org(self, org_name: str) -> bool:
-    tags: [SemanticTag] = self.get_tags()
-    for t in tags:
-      if t.kind in ['org-1-name', 'org-2-name', 'org-3-name']:
-        if t.value == org_name:
-          return True
-    return False
-
   def get_tag_text(self, tag: SemanticTag) -> str:
     return self.tokens_map.text_range(tag.span)
 
   def substr(self, tag: SemanticTag) -> str:
     return self.tokens_map.text_range(tag.span)
-
-  def tag_value(self, tagname):
-    t = SemanticTag.find_by_kind(self.get_tags(), tagname)
-    if t:
-      return t.value
-    else:
-      return None
 
 
 class LegalDocumentExt(LegalDocument):
@@ -412,7 +354,6 @@ class DocumentJson:
     self.original_text = doc.original_text
     self.normal_text = doc.normal_text
 
-    self.attributes = doc.tags_to_json_attributes()
     self.headers = self.__tags_to_attributes_list([hi.header for hi in doc.paragraphs])
 
   def __tags_to_attributes_list(self, _tags) -> []:
@@ -558,7 +499,8 @@ def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> Contrac
     value_tag = SemanticTag(ContractTags.Value.display_string, results.value, value_span, parent=group)
     value_tag.offset(subdoc.start)
 
-    currency = SemanticTag(ContractTags.Currency.display_string, results.currencly_name, currency_span, parent=group)
+    currency = SemanticTag(ContractTags.Currency.display_string, results.currencly_name, currency_span,
+                           parent=group)
     currency.offset(subdoc.start)
 
     groupspan = [0, 0]
@@ -566,6 +508,7 @@ def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> Contrac
     groupspan[1] = max(sign.span[1], value_tag.span[1], currency.span[1], group.span[1])
     group.span = groupspan
 
+    # TODO: return ContractPrice
     return ContractValue(sign, value_tag, currency, group)
   else:
     return None

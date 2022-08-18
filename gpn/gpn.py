@@ -25,10 +25,11 @@ data = {
       ]
     },
     {
-      "_id": "ИПП Мастерская печати",
+      "_id": "Издательско-полиграфическое предприятие «Мастерская печати»",
       "legal_entity_type": "ООО",
       "aliases": [
-        "ИПП Мастерская печати"
+        "ИПП Мастерская печати",
+        "ИПП «Мастерская печати»"
       ]
     },
     {
@@ -36,9 +37,7 @@ data = {
       "legal_entity_type": "ООО",
       "aliases": [
         "РИА Город",
-        "РИА «Город»",
-        "Рекламно-информационное агентство «Город»",
-        "Рекламно-Информационное агентство «Город»"
+        "РИА «Город»"
       ]
     },
     {
@@ -349,11 +348,10 @@ data = {
       ]
     },
     {
-      "_id": "Газпром нефть Оренбург",
+      "_id": "Газпромнефть-Оренбург",
       "legal_entity_type": "ООО",
       "aliases": [
-        "Газпром нефть Оренбург",
-        "Газпромнефть Оренбург"
+        "Газпромнефть-Оренбург"
       ]
     },
     {
@@ -677,7 +675,7 @@ data = {
   ]
 }
 
-subsidiaries = data['Subsidiary']
+subsidiaries = []
 
 
 def all_do_names():
@@ -706,6 +704,12 @@ def estimate_subsidiary_name_match_min_jaro_similarity():
   return top_similarity
 
 
-HyperParameters.subsidiary_name_match_min_jaro_similarity = estimate_subsidiary_name_match_min_jaro_similarity()
-print('HyperParameters.subsidiary_name_match_min_jaro_similarity',
-      HyperParameters.subsidiary_name_match_min_jaro_similarity)
+def update_subsidiaries_cache(new_subsidiaries):
+  global subsidiaries
+  subsidiaries = new_subsidiaries
+  HyperParameters.subsidiary_name_match_min_jaro_similarity = estimate_subsidiary_name_match_min_jaro_similarity()
+  print('HyperParameters.subsidiary_name_match_min_jaro_similarity',
+        HyperParameters.subsidiary_name_match_min_jaro_similarity)
+
+
+update_subsidiaries_cache(data['Subsidiary'])

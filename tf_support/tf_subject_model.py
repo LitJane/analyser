@@ -1,25 +1,26 @@
 # see  /notebooks/TF_subjects.ipynb
 import warnings
 
-from keras.layers import Conv1D, LSTM, Dense, Bidirectional, Input, Dropout
-from keras.layers import MaxPooling1D
+import numpy as np
+import pandas as pd
+from tensorflow.keras.layers import Conv1D, LSTM, Dense, Bidirectional, Input, Dropout
+from tensorflow.keras.layers import MaxPooling1D
+from tensorflow.keras.models import Model
 
 from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
 from analyser.ml_tools import FixedVector
 from analyser.structures import ContractSubject
-from tf_support.super_contract_model import seq_labels_contract, uber_detection_model_005_1_1
+from tf_support.super_contract_model import uber_detection_model_005_1_1, \
+  semantic_map_keys_contract
 from tf_support.tools import KerasTrainingContext
 from trainsets.trainset_tools import SubjectTrainsetManager
 
 VALIDATION_SET_PROPORTION = 0.25
 
-from keras.models import Model
+
 
 EMB = 1024  # embedding dimentionality
-
-import numpy as np
-import pandas as pd
 
 
 def decode_subj_prediction(result: FixedVector) -> (ContractSubject, float, int):
@@ -35,7 +36,7 @@ def nn_predict(umodel, doc):
   prediction = umodel.predict(x=[np.expand_dims(embeddings, axis=0), np.expand_dims(token_features, axis=0)],
                               batch_size=1)
 
-  semantic_map = pd.DataFrame(prediction[0][0], columns=seq_labels_contract)
+  semantic_map = pd.DataFrame(prediction[0][0], columns=semantic_map_keys_contract)
   return semantic_map, prediction[1][0]
 
 predict_subject = nn_predict

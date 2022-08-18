@@ -4,8 +4,8 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from keras.preprocessing.sequence import pad_sequences
 from pandas import DataFrame
+from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 from analyser.legal_docs import LegalDocument
 from analyser.structures import ContractSubject

@@ -1,7 +1,9 @@
+import json
 import traceback
-import warnings
 
 import pymongo
+from bson import json_util
+from jsonschema import ValidationError, FormatChecker, Draft7Validator
 
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
@@ -11,8 +13,11 @@ from analyser.log import logger
 from analyser.parsing import AuditContext
 from analyser.persistence import DbJsonDoc
 from analyser.protocol_parser import ProtocolParser
+from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
 from integration.db import get_mongodb_connection
+
+schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
 
 CHARTER = 'CHARTER'
 CONTRACT = 'CONTRACT'
@@ -40,7 +45,7 @@ class Runner:
 class BaseProcessor:
   parser = None
 
-  def preprocess(self, jdoc: DbJsonDoc, context: AuditContext):
+  def preprocess(self, jdoc: DbJsonDoc, context: AuditContext) -> DbJsonDoc:
     # phase I
     # TODO: include phase I into phase II, remove phase I
     if jdoc.is_user_corrected():
@@ -49,8 +54,8 @@ class BaseProcessor:
     else:
       legal_doc = jdoc.asLegalDoc()
       self.parser.find_org_date_number(legal_doc, context)
-      save_analysis(jdoc, legal_doc, state=DocumentState.Preprocessed.value)
-      return legal_doc
+      jdoc = save_analysis(jdoc, legal_doc, state=DocumentState.Preprocessed.value)
+    return jdoc
 
   def process(self, db_document: DbJsonDoc, audit, context: AuditContext) -> LegalDocument:
     # phase II
@@ -58,7 +63,7 @@ class BaseProcessor:
       db_document.retry_number = 0
 
     if db_document.retry_number > 2:
-      logger.error(
+      logger.info(
         f'{db_document.documentType} {db_document.get_id()} exceeds maximum retries for analysis and is skipped')
       return None
 
@@ -95,11 +100,20 @@ class BaseProcessor:
     return legal_doc
 
   def is_valid(self, audit, db_document: DbJsonDoc):
+    import pytz
+    utc = pytz.UTC
+
     # date must be ok
     # TODO: rename: -> is_eligible
+    if audit.get('pre-check'):
+      return True
     _date = db_document.get_date_value()
     if _date is not None:
-      date_is_ok = audit["auditStart"] <= _date <= audit["auditEnd"]
+      try:
+        date_is_ok = utc.localize(audit["auditStart"]) <= _date.replace(tzinfo=utc) <= utc.localize(audit["auditEnd"])
+      except TypeError as e:
+        logger.exception(e)
+        date_is_ok = False
     else:
       # if date not found, we keep processing the doc anyway
       date_is_ok = True
@@ -111,19 +125,10 @@ class BaseProcessor:
     return org_is_ok and date_is_ok
 
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
-    o1: str = db_doc.get_attribute_value("org-1-name")
-    o2: str = db_doc.get_attribute_value("org-2-name")
-
-    return subsidiary in (o1, o2)
-
-  def is_same_org(self, legal_doc: LegalDocument, db_doc, subsidiary: str):
-    warnings.warn("use _same_org", DeprecationWarning)
-    if db_doc.get("user") is not None and db_doc["user"].get("attributes") is not None and db_doc["user"][
-      "attributes"].get("org-1-name") is not None:
-      if subsidiary == db_doc["user"]["attributes"]["org-1-name"]["value"]:
-        return True
-    else:
-      return legal_doc.is_same_org(subsidiary)
+    org = finalizer.get_org(db_doc.get_attributes_tree())
+    if org is not None and org.get('name') is not None and org['name'].get('value') == subsidiary:
+      return True
+    return False
 
 
 class ProtocolProcessor(BaseProcessor):
@@ -181,7 +186,7 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
       query["$and"][2]["$or"].append({"state": state})
 
   if kind is not None:
-    query["$and"].append({'parse.documentType': kind})
+    query["$and"].append({'documentType': kind})
 
   if id_only:
     cursor = documents_collection.find(query, projection={'_id': True})
@@ -197,15 +202,28 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
   return res
 
 
-def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_number: int = 0):
+def validate_json_schema(db_document):
+  try:
+    json_str = json.dumps(db_document.analysis['attributes_tree'], ensure_ascii=False,
+                          default=json_util.default)
+    schema_validator.validate(json_str)
+  except ValidationError as e:
+    logger.error(e)
+    db_document.state = DocumentState.Error.value
+
+
+def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_number: int = 0) -> DbJsonDoc:
   # TODO: does not save attributes
   analyse_json_obj: dict = doc.to_json_obj()
   db = get_mongodb_connection()
   documents_collection = db['documents']
   db_document.analysis = analyse_json_obj
   db_document.state = state
+  validate_json_schema(db_document)
+
   db_document.retry_number = retry_number
   documents_collection.update({'_id': doc.get_id()}, db_document.as_dict(), True)
+  return db_document
 
 
 def change_doc_state(doc, state):
@@ -228,7 +246,10 @@ def need_analysis(document: DbJsonDoc) -> bool:
 
 def audit_phase_1(audit, kind=None):
   logger.info(f'.....processing audit {audit["_id"]}')
-  ctx = AuditContext(audit["subsidiary"]["name"])
+  if audit.get('subsidiary') is None:
+    ctx = AuditContext()
+  else:
+    ctx = AuditContext(audit["subsidiary"]["name"])
 
   document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=kind, id_only=True)
   _charter_ids = audit.get("charters", [])
@@ -248,7 +269,10 @@ def audit_phase_1(audit, kind=None):
 
 
 def audit_phase_2(audit, kind=None):
-  ctx = AuditContext(audit["subsidiary"]["name"])
+  if audit.get('subsidiary') is None:
+    ctx = AuditContext()
+  else:
+    ctx = AuditContext(audit["subsidiary"]["name"])
 
   print(f'.....processing audit {audit["_id"]}')
 

@@ -7,27 +7,37 @@ import unittest
 
 from analyser.contract_agents import find_closest_org_name, ContractAgent
 from analyser.contract_parser import check_org_intersections
+from analyser.hyperparams import HyperParameters
 from analyser.ml_tools import SemanticTagBase
 from analyser.schemas import OrgItem
 from analyser.text_tools import compare_masked_strings
-from analyser.hyperparams import HyperParameters
 from gpn.gpn import subsidiaries
 
 
 class ContractAgentsTestCase(unittest.TestCase):
 
-  def test_check_org_intersections(self):
-
+  def test_check_org_intersections_solo_org(self):
 
     ca1 = OrgItem()
-    ca1.alias=SemanticTagBase()
-    ca1.alias.span=[20, 30]
-    ca1.alias.confidence=0.9
+    ca1.alias = SemanticTagBase()
+    ca1.alias.span = [20, 30]
+    ca1.alias.confidence = 0.9
+
+    check_org_intersections([ca1])
+
+    self.assertIsNotNone(ca1.alias)
+
+  def test_check_org_intersections(self):
+
+    ca1 = OrgItem()
+    ca1.alias = SemanticTagBase()
+    ca1.alias.span = [20, 30]
+    ca1.alias.confidence = 0.9
 
     ca2 = OrgItem()
     ca2.alias = SemanticTagBase()
     ca2.alias.span = [25, 30]
-    ca2.alias.confidence = 0.95 #preferred
+    ca2.alias.confidence = 0.95  # preferred
 
     check_org_intersections([ca1, ca2])
     self.assertIsNone(ca1.alias)
@@ -108,8 +118,6 @@ class ContractAgentsTestCase(unittest.TestCase):
     s = find_closest_org_name(subsidiaries, 'Газпромнефть-ОНПЗ', 0)[0]
     self.assertEqual(expected, s['_id'])
 
-
-
   def test_find_closest_org_names_self(self):
     _threshold = HyperParameters.subsidiary_name_match_min_jaro_similarity
     # finding self
@@ -149,9 +157,6 @@ class ContractAgentsTestCase(unittest.TestCase):
       self.assertIsNotNone(known_org_name, f'{augmented} -> NOTHING {similarity}')
       self.assertEqual(s1['_id'], known_org_name['_id'])
       print(known_org_name)
-
-
-
 
   def test_find_closest_org_names_cut_begin(self):
     _threshold = 0.8

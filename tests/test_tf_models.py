@@ -4,9 +4,9 @@
 
 import unittest
 
-import keras
 import numpy as np
-from keras import Model
+from tensorflow import keras
+from tensorflow.keras import Model
 
 from analyser.ml_tools import Embeddings
 from tests.test_utilits import load_json_sample
