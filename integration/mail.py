@@ -90,7 +90,7 @@ def send_end_audit_email(audit) -> bool:
 
 
 def generate_links(audit, practices: [], web_url) -> str:
-    url = urljoin(web_url, '#/user-practice')
+    url = urljoin(web_url, 'user-practice')
     result = ""
     for practice in practices:
         result += f"""<p><a href="{url + '?audit_id=' + str(audit['_id']) + '&practice_id=' + str(practice['_id'])}">{practice['label']}</a></p>"""
