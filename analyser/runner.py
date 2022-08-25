@@ -1,6 +1,6 @@
 import json
-import traceback
 
+import gridfs
 import pymongo
 from bson import json_util
 from jsonschema import ValidationError, FormatChecker, Draft7Validator
@@ -8,6 +8,7 @@ from jsonschema import ValidationError, FormatChecker, Draft7Validator
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser
+from analyser.finalizer import normalize_only_company_name, compare_ignore_case
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.parsing import AuditContext
@@ -15,7 +16,9 @@ from analyser.persistence import DbJsonDoc
 from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
+from integration.classifier.search_text import wrapper, all_labels
 from integration.db import get_mongodb_connection
+from integration.mail import send_classifier_email
 
 schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
 
@@ -92,7 +95,6 @@ class BaseProcessor:
         change_doc_state(db_document, state=DocumentState.Excluded.value)
 
     except Exception as err:
-      traceback.print_tb(err.__traceback__)
       logger.exception(f'cant process document {db_document.get_id()}')
       # TODO: do not save the entire doc here, data loss possible
       save_analysis(db_document, legal_doc, DocumentState.Error.value, db_document.retry_number + 1)
@@ -126,8 +128,10 @@ class BaseProcessor:
 
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
     org = finalizer.get_org(db_doc.get_attributes_tree())
-    if org is not None and org.get('name') is not None and org['name'].get('value') == subsidiary:
-      return True
+    if org is not None and org.get('name') is not None:
+      org_name = normalize_only_company_name(org['name'].get('value').strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
+      if compare_ignore_case(org_name, subsidiary):
+        return True
     return False
 
 
@@ -148,7 +152,7 @@ class ContractProcessor(BaseProcessor):
 
 contract_processor = ContractProcessor()
 document_processors = {CONTRACT: contract_processor, CHARTER: CharterProcessor(), "PROTOCOL": ProtocolProcessor(),
-                       'ANNEX': contract_processor, 'SUPPLEMENTARY_AGREEMENT': contract_processor}
+                       'ANNEX': contract_processor, 'SUPPLEMENTARY_AGREEMENT': contract_processor, 'AGREEMENT': contract_processor}
 
 
 def get_audits() -> [dict]:
@@ -226,6 +230,13 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
   return db_document
 
 
+def save_audit_practice(audit, classification_result, zip_classified):
+  if audit['additionalFields']['external_source'] != 'email':
+    zip_classified = False
+  db = get_mongodb_connection()
+  db['audits'].update_one({'_id': audit['_id']}, {"$set": {'classification_result': classification_result, "additionalFields.zip_classified": zip_classified}})
+
+
 def change_doc_state(doc, state):
   db = get_mongodb_connection()
   db['documents'].update_one({'_id': doc.get_id()}, {"$set": {"state": state}})
@@ -244,7 +255,51 @@ def need_analysis(document: DbJsonDoc) -> bool:
   return _need_analysis
 
 
+def get_doc4classification(audit):
+  main_doc = None
+  if audit.get('additionalFields', '').get('main_document_id') is not None:
+    main_doc = finalizer.get_doc_by_id(audit['additionalFields']['main_document_id'])
+    main_doc_type = main_doc['documentType']
+    if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
+      return main_doc, True
+  document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=None, id_only=True)
+  for document_id in document_ids:
+    _document = finalizer.get_doc_by_id(document_id)
+    if _document['parserResponseCode'] == 200:
+      doc_type = _document['documentType']
+      if doc_type == 'CONTRACT':
+        return _document, False
+  if main_doc is not None and main_doc['parserResponseCode'] == 200:
+    return main_doc, True
+  for document_id in document_ids:
+    _document = finalizer.get_doc_by_id(document_id)
+    if _document['parserResponseCode'] == 200:
+        return _document, False
+
+
+def doc_classification(audit):
+  try:
+    logger.info(f'.....classifying audit {audit["_id"]}')
+    doc4classification, main_doc = get_doc4classification(audit)
+    classification_result = wrapper(doc4classification['parse'])
+    if classification_result:
+      save_audit_practice(audit, classification_result, not main_doc)
+      if audit['additionalFields']['external_source'] == 'email':
+        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+        attachments = []
+        fs = gridfs.GridFS(get_mongodb_connection())
+        for file_id in audit['additionalFields']['file_ids']:
+          attachments.append(fs.get(file_id))
+        send_classifier_email(audit, top_result, attachments, all_labels)
+  except Exception as ex:
+    logger.exception(ex)
+
+
 def audit_phase_1(audit, kind=None):
+  if audit.get('pre-check') and audit.get('checkTypes') is not None and 'Classification' in audit.get('checkTypes'):
+      doc_classification(audit)
+      # return
+
   logger.info(f'.....processing audit {audit["_id"]}')
   if audit.get('subsidiary') is None:
     ctx = AuditContext()
@@ -269,6 +324,10 @@ def audit_phase_1(audit, kind=None):
 
 
 def audit_phase_2(audit, kind=None):
+  # if audit.get('pre-check') and audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0:
+  #   change_audit_status(audit, "Finalizing")
+  #   return
+
   if audit.get('subsidiary') is None:
     ctx = AuditContext()
   else:
@@ -331,22 +390,20 @@ def run(run_pahse_2=True, kind=None):
   if run_pahse_2:
     audit_charters_phase_2()
 
-  # -----------------------
-  # I
-  logger.info('-> PHASE I...')
   for audit in get_audits():
+    # -----------------------
+    # I
+    logger.info('-> PHASE I...')
     audit_phase_1(audit, kind)
 
-  # -----------------------
-  # II
-  logger.info('-> PHASE II..')
-  if run_pahse_2:
-    # phase 2
-    for audit in get_audits():
+    # -----------------------
+    # II
+    if run_pahse_2:
+      logger.info('-> PHASE II..')
+      # phase 2
       audit_phase_2(audit, kind)
-
-  else:
-    logger.info("phase 2 is skipped")
+    else:
+      logger.info("phase 2 is skipped")
 
   # -----------------------
   # III

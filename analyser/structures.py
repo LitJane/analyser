@@ -86,8 +86,7 @@ class Currencies(EnumExt):
   RUB = 0
   # RUR = 0
   USD = 1
-  EURO = 2
-  EUR = 978
+  EUR = 2
   KZT = 3
   BYN = 4
   TJR = 5
@@ -129,7 +128,7 @@ class Currencies(EnumExt):
 currencly_map = {
   'руб': Currencies.RUB.name,
   'дол': Currencies.USD.name,
-  'евр': Currencies.EURO.name,
+  'евр': Currencies.EUR.name,
   'тэн': Currencies.KZT.name,
   'тен': Currencies.KZT.name,
 

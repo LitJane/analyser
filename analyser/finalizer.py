@@ -1,7 +1,11 @@
 import json
+import logging
 import re
+import time
+from collections import deque
 from types import SimpleNamespace
 
+import gridfs
 import numpy as np
 import pymongo
 import textdistance
@@ -9,11 +13,28 @@ from bson import ObjectId
 
 from analyser.log import logger
 from analyser.structures import legal_entity_types
+from analyser.text_normalize import normalize_company_name
+from integration import mail
+from integration.classifier.search_text import all_labels
 from integration.currencies import convert_to_currency
 from integration.db import get_mongodb_connection
-
+from integration.mail import send_classifier_email, send_classifier_error_email
 
 full_name_pattern = re.compile(r'(?P<last_name>[а-я,А-Я,a-z,A-Z]+) +(?P<first_name>[а-я,А-Я,a-z,A-Z]+)(\.? +)?(?P<middle_name>[а-я,А-Я,a-z,A-Z]+)?')
+company_name_pattern = re.compile(r'[«\'"](?P<company_name>.+)[»\'"]')
+companies = {'gp': 'Газпром', 'gpn': 'Газпром нефть'}
+
+
+def normalize_only_company_name(name: str) -> str:
+    result = name.strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
+    _, result = normalize_company_name(result)
+    return result
+
+
+def compare_ignore_case(str1: str, str2: str) -> bool:
+    if str1 is None or str2 is None:
+        return False
+    return str1.lower() == str2.lower()
 
 
 def get_audits():
@@ -24,31 +45,28 @@ def get_audits():
     return res
 
 
-def remove_old_links(audit_id, contract_id):
+def update_links(audit, links):
     db = get_mongodb_connection()
-    audit_collection = db['audits']
-    audit_collection.update_one({"_id": audit_id}, {"$pull": {"links": {"type": "analysis", "$or": [{"toId": contract_id}, {"fromId": contract_id}]}}})
+    db['audits'].update_one({'_id': audit['_id']}, {'$pull': {'links': {"type": "analysis"}}})
+    db["audits"].update_one({'_id': audit["_id"]}, {"$push": {"links": {'$each': links}}})
 
 
-def get_linked_docs(audit_id, contract_id):
+def create_link(from_id, to_id):
+    return {"fromId": from_id, "toId": to_id, "type": "analysis"}
+
+
+def get_linked_docs(audit, contract_id):
     db = get_mongodb_connection()
-    audit_collection = db['audits']
-    links = audit_collection.find({"_id": audit_id, "$or": [{"links.toId": contract_id}, {"links.fromId": contract_id}]})
     result = []
     document_collection = db['documents']
-    for link in links:
-        if link['fromId'] == contract_id:
-            result.append(document_collection.find_one({'_id': link['toId']}))
-        else:
-            result.append(document_collection.find_one({'_id': link['fromId']}))
+    for link in audit['links']:
+        if link.get('type') is not None and link.get('type') != 'analysis':
+            if link['fromId'] == contract_id:
+                result.append(document_collection.find_one({'_id': link['toId']}))
+            elif link['toId'] == contract_id:
+                result.append(document_collection.find_one({'_id': link['fromId']}))
 
     return result
-
-
-def add_link(audit_id, doc_id1, doc_id2):
-    db = get_mongodb_connection()
-    audit_collection = db['audits']
-    audit_collection.update_one({"_id": audit_id}, {"$push": {"links": {"fromId": doc_id1, "toId": doc_id2, "type": "analysis"}}})
 
 
 def change_contract_primary_subject(contract, new_subject):
@@ -65,7 +83,7 @@ def get_book_value(audit, target_year: str):
 
 def extract_text(span, words, text):
     first_idx = words[span[0]][0]
-    last_idx = words[span[1]][0] - 1
+    last_idx = words[span[1]][0]
     return text[first_idx:last_idx]
 
 
@@ -120,13 +138,13 @@ def get_docs_by_audit_id(id: str, state, kind=None, id_only=False, without_large
     return docs
 
 
-def get_doc_by_id(doc_id:ObjectId):
+def get_doc_by_id(doc_id: ObjectId):
     db = get_mongodb_connection()
     documents_collection = db['documents']
     return documents_collection.find_one({'_id': doc_id})
 
 
-def get_audit_by_id(aid:ObjectId):
+def get_audit_by_id(aid: ObjectId):
     db = get_mongodb_connection()
     return db['audits'].find_one({'_id': aid})
 
@@ -139,70 +157,66 @@ def save_violations(audit, violations):
 
 
 def create_violation(document_id, founding_document_id, reference, violation_type, violation_reason):
-    return {'id': ObjectId(), 'userViolation': False, "document": document_id, "founding_document": founding_document_id, "reference": reference, "violation_type": violation_type, "violation_reason": violation_reason}
-
-
-def get_max_value(doc_attrs):
-    max_value = None
-    sign = 0
-    for key, value in doc_attrs.items():
-        if key.endswith("/value"):
-            if doc_attrs.get(key[:-5] + "sign") is not None:
-                sign = doc_attrs[key[:-5] + "sign"]["value"]
-            current_value = convert_to_currency({"value": value["value"], "currency": doc_attrs[key[:-5] + "currency"]["value"]})
-            if max_value is None or max_value["value"] < current_value["value"]:
-                max_value = current_value
-    return max_value, sign
+    return {
+        'id': ObjectId(),
+        'userViolation': False,
+        "document": document_id,
+        "founding_document": founding_document_id,
+        "reference": reference,
+        "violation_type": violation_type,
+        "violation_reason": violation_reason
+    }
 
 
 def get_charter_diapasons(charter):
-    #group by subjects
+    # group by subjects
     subjects = {}
     charter_attrs = get_attrs(charter)
     min_constraint = np.inf
     charter_currency = 'RUB'
     if charter_attrs.get('structural_levels') is not None:
         for structural_level in charter_attrs['structural_levels']:
-            structural_level_name = structural_level['value']
-            if structural_level.get('competences') is not None:
-                for competence in structural_level['competences']:
-                    if competence.get('value') is None:
-                        continue
-                    subject_type = competence['value']
-                    subject_map = subjects.get(subject_type)
-                    if subject_map is None:
-                        subject_map = {}
-                        subjects[subject_type] = subject_map
-                    if subject_map.get(structural_level_name) is None:
-                        subject_map[structural_level_name] = {"min": 0, "max": np.inf, "competence_attr_name": competence.get('span')}
-                    constraints = competence.get('constraints')
-                    if constraints is not None:
-                        if len(constraints) == 0:
-                            min_constraint = 0
-                        for constraint in constraints:
-                            constraint_currency = constraint['currency']['value']
-                            constraint_amount = constraint['amount']['value']
-                            if constraint_currency != 'Percent':
-                                charter_currency = constraint_currency
-                            if constraint.get('sign') is not None and int(constraint['sign'].get("value", 0)) > 0:
-                                if subject_map[structural_level_name]["min"] == 0:
-                                    subject_map[structural_level_name]["min"] = constraint_amount
-                                    subject_map[structural_level_name]["currency_min"] = constraint_currency
-                                else:
-                                    old_value = subject_map[structural_level_name]["min"]
-                                    if constraint_amount < old_value:
+            if structural_level.get('value') is not None:
+                structural_level_name = structural_level['value']
+                if structural_level.get('competences') is not None:
+                    for competence in structural_level['competences']:
+                        if competence.get('value') is None:
+                            continue
+                        subject_type = competence['value']
+                        subject_map = subjects.get(subject_type)
+                        if subject_map is None:
+                            subject_map = {}
+                            subjects[subject_type] = subject_map
+                        if subject_map.get(structural_level_name) is None:
+                            subject_map[structural_level_name] = {"min": 0, "max": np.inf, "competence_attr_name": competence.get('span')}
+                        constraints = competence.get('constraints')
+                        if constraints is not None:
+                            if len(constraints) == 0:
+                                min_constraint = 0
+                            for constraint in constraints:
+                                constraint_currency = constraint['currency']['value']
+                                constraint_amount = constraint['amount']['value']
+                                if constraint_currency != 'Percent':
+                                    charter_currency = constraint_currency
+                                if constraint.get('sign') is not None and int(constraint['sign'].get("value", 0)) > 0:
+                                    if subject_map[structural_level_name]["min"] == 0:
                                         subject_map[structural_level_name]["min"] = constraint_amount
                                         subject_map[structural_level_name]["currency_min"] = constraint_currency
-                                min_constraint = min(min_constraint, constraint_amount)
-                            else:
-                                if subject_map[structural_level_name]["max"] == np.inf:
-                                    subject_map[structural_level_name]["max"] = constraint_amount
-                                    subject_map[structural_level_name]["currency_max"] = constraint_currency
+                                    else:
+                                        old_value = subject_map[structural_level_name]["min"]
+                                        if constraint_amount < old_value:
+                                            subject_map[structural_level_name]["min"] = constraint_amount
+                                            subject_map[structural_level_name]["currency_min"] = constraint_currency
+                                    min_constraint = min(min_constraint, constraint_amount)
                                 else:
-                                    old_value = subject_map[structural_level_name]["max"]
-                                    if constraint_amount > old_value:
+                                    if subject_map[structural_level_name]["max"] == np.inf:
                                         subject_map[structural_level_name]["max"] = constraint_amount
                                         subject_map[structural_level_name]["currency_max"] = constraint_currency
+                                    else:
+                                        old_value = subject_map[structural_level_name]["max"]
+                                        if constraint_amount > old_value:
+                                            subject_map[structural_level_name]["max"] = constraint_amount
+                                            subject_map[structural_level_name]["currency_max"] = constraint_currency
     if min_constraint == np.inf:
         min_constraint = 0
     return subjects, min_constraint, charter_currency
@@ -212,9 +226,15 @@ def clean_name(name):
     return name.replace(" ", "").replace("-", "").replace("_", "").lower()
 
 
-def find_protocol(contract, protocols, org_level, audit):
+def find_protocol(contract, protocols, org_level, contract_value, check_orgs=True):
     contract_attrs = get_attrs(contract)
-    result = []
+    result = None
+    best_value = {'value': -1, 'currency': 'RUB'}
+    best_sign = 0
+    clean_contract_orgs = []
+    for contract_org in contract_attrs['orgs']:
+        if contract_org.get('name') is not None and contract_org['name'].get('value') is not None:
+            clean_contract_orgs.append(clean_name(contract_org['name']['value']))
     for protocol in protocols:
         protocol_attrs = get_attrs(protocol)
         if protocol_attrs.get("structural_level") is not None and protocol_attrs["structural_level"]["value"] == org_level and protocol_attrs.get('agenda_items') is not None:
@@ -222,21 +242,36 @@ def find_protocol(contract, protocols, org_level, audit):
                 if agenda_item.get('contracts') is not None:
                     for agenda_contract in agenda_item['contracts']:
                         if agenda_contract.get('orgs') is not None and contract_attrs.get('orgs') is not None:
-                            clean_contract_orgs=[]
-                            for contract_org in contract_attrs['orgs']:
-                                if contract_org.get('name') is not None and contract_org['name'].get('value') is not None:
-                                    clean_contract_orgs.append(clean_name(contract_org['name']['value']))
                             for agenda_org in agenda_contract['orgs']:
                                 if agenda_org.get('name') is not None and agenda_org['name'].get('value') is not None:
                                     clean_protocol_org = clean_name(agenda_org['name']["value"])
                                     for clean_contract_org in clean_contract_orgs:
                                         distance = textdistance.levenshtein.normalized_distance(clean_contract_org, clean_protocol_org)
-                                        if distance < 0.1:
-                                            result.append(protocol)
-    if len(result) == 0:
-        return None
-    else:
-        return result[0]
+                                        if distance < 0.1 or not check_orgs:
+                                            if contract_value is not None and agenda_contract.get('price') is not None:
+                                                protocol_value = convert_to_currency({'value': agenda_contract['price']['amount']['value'], 'currency': agenda_contract['price']['currency']['value']},
+                                                                                     contract_value['currency'])
+                                                if contract_value['value'] <= best_value['value']:
+                                                    if best_value['value'] >= protocol_value['value'] >= contract_value['value']:
+                                                        result = protocol
+                                                        best_value = protocol_value
+                                                        sign = 0
+                                                        if agenda_contract['price'].get('sign') is not None:
+                                                            sign = agenda_contract['price']['sign']['value']
+                                                        best_sign = sign
+                                                else:
+                                                    if protocol_value['value'] > best_value['value']:
+                                                        result = protocol
+                                                        best_value = protocol_value
+                                                        sign = 0
+                                                        if agenda_contract['price'].get('sign') is not None:
+                                                            sign = agenda_contract['price']['sign']['value']
+                                                        best_sign = sign
+                                            else:
+                                                if best_value['value'] == -1:
+                                                    result = protocol
+
+    return result, best_value, best_sign
 
 
 def find_supplementary_agreements(contract, sup_agreements, audit):
@@ -250,7 +285,6 @@ def find_supplementary_agreements(contract, sup_agreements, audit):
         sup_agreement_attrs = get_attrs(sup_agreement)
         if sup_agreement_attrs.get('number') is not None and sup_agreement_attrs['number']['value'] == contract_number:
             result.append(sup_agreement)
-            add_link(audit['_id'], contract['_id'], sup_agreement['_id'])
     return result
 
 
@@ -275,21 +309,27 @@ def get_charter_span(charter_atts, org_level, subject):
 
 def check_contract(contract, charters, protocols, audit, supplementary_agreements):
     violations = []
+    links = []
     contract_attrs = get_attrs(contract)
     contract_number = ""
-    remove_old_links(audit["_id"], contract["_id"])
-    # user_linked_docs = get_linked_docs(audit["_id"], contract["_id"])
+    user_linked_docs = get_linked_docs(audit, contract["_id"])
     if contract_attrs.get("number") is not None:
         contract_number = contract_attrs["number"]["value"]
-        # linked_sup_agreements = list(filter(lambda doc: doc['parse']['documentType'] == 'SUPPLEMENTARY_AGREEMENT', user_linked_docs))
-        find_supplementary_agreements(contract, supplementary_agreements, audit)
+        # linked_sup_agreements = list(filter(lambda doc: doc['documentType'] == 'SUPPLEMENTARY_AGREEMENT', user_linked_docs))
+        found_supplementary_agreements = find_supplementary_agreements(contract, supplementary_agreements, audit)
+        for sup_agreement in found_supplementary_agreements:
+            links.append(create_link(contract['_id'], sup_agreement['_id']))
     eligible_charter = None
-    for charter in charters:
-        charter_attrs = get_attrs(charter)
-        if charter_attrs["date"]["value"] <= contract_attrs["date"]["value"]:
-            eligible_charter = charter
-            add_link(audit["_id"], contract["_id"], eligible_charter["_id"])
-            break
+    linked_charters = list(filter(lambda doc: doc['documentType'] == 'CHARTER', user_linked_docs))
+    if linked_charters:
+        eligible_charter = linked_charters[0]
+    else:
+        for charter in charters:
+            charter_attrs = get_attrs(charter)
+            if charter_attrs["date"]["value"] <= contract_attrs["date"]["value"]:
+                eligible_charter = charter
+                links.append(create_link(contract["_id"], eligible_charter["_id"]))
+                break
 
     if eligible_charter is None:
         json_charters = []
@@ -297,27 +337,28 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
             charter_attrs = get_attrs(charter)
             json_charters.append({"id": charter["_id"], "date": charter_attrs["date"]["value"]})
 
-        violation_reason = {"contract":
-                              {"id": contract["_id"],
-                               "number": contract_number,
-                               "type": contract["documentType"],
-                               'date': contract_attrs["date"]["value"]
-                               },
-                            "charters": json_charters
-                            }
+        violation_reason = {
+            "contract": {
+                "id": contract["_id"],
+                "number": contract_number,
+                "type": contract["documentType"],
+                'date': contract_attrs["date"]["value"]
+            },
+            "charters": json_charters
+        }
 
         violations.append(create_violation(
-          document_id={
-            "id": contract["_id"],
-            "number": contract_number,
-            "type": contract["documentType"]
-          },
-          founding_document_id=None,
-          reference=None,
-          violation_type="charter_not_found",
-          violation_reason=violation_reason)
+            document_id={
+                "id": contract["_id"],
+                "number": contract_number,
+                "type": contract["documentType"]
+            },
+            founding_document_id=None,
+            reference=None,
+            violation_type="charter_not_found",
+            violation_reason=violation_reason)
         )
-        return violations
+        return violations, links
     else:
         charter_subject_map, min_constraint, charter_currency = get_charter_diapasons(eligible_charter)
         eligible_charter_attrs = get_attrs(eligible_charter)
@@ -330,17 +371,20 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
         book_value = None
         if audit.get('bookValues') is not None:
             book_value = get_book_value(audit, str(contract_attrs["date"]["value"].year - 1))
-        if contract_attrs.get('price') is not None:
-            contract_value = convert_to_currency({"value": contract_attrs['price']['amount']["value"], "currency": contract_attrs['price']['currency']["value"]}, charter_currency)
+        contract_value = get_amount_netto(contract_attrs.get('price'))
+        if contract_value is not None:
+            contract_value = convert_to_currency(contract_value, charter_currency)
 
             if contract_value is not None and book_value is not None:
                 org = get_org(eligible_charter_attrs)
                 if org is not None and org.get('type') is not None and 'акционерное общество' == org['type']['value'].lower():
                     if book_value * 0.25 < contract_value["value"] <= book_value * 0.5:
-                        competences = {'BoardOfDirectors': {"min": 25, "currency_min": "Percent", "max": 50, "currency_max": "Percent", "competence_attr_name": get_charter_span(eligible_charter_attrs, 'BoardOfDirectors', 'BigDeal')}}
+                        competences = {'BoardOfDirectors': {"min": 25, "currency_min": "Percent", "max": 50, "currency_max": "Percent",
+                                                            "competence_attr_name": get_charter_span(eligible_charter_attrs, 'BoardOfDirectors', 'BigDeal')}}
                         change_contract_primary_subject(contract, 'BigDeal')
                     elif contract_value["value"] > book_value * 0.5:
-                        competences = {'ShareholdersGeneralMeeting': {"min": 50, "currency_min": "Percent", "max": np.inf, "competence_attr_name": get_charter_span(eligible_charter_attrs, 'ShareholdersGeneralMeeting', 'BigDeal')}}
+                        competences = {'ShareholdersGeneralMeeting': {"min": 50, "currency_min": "Percent", "max": np.inf,
+                                                                      "competence_attr_name": get_charter_span(eligible_charter_attrs, 'ShareholdersGeneralMeeting', 'BigDeal')}}
                         change_contract_primary_subject(contract, 'BigDeal')
                 else:
                     if charter_subject_map.get('BigDeal') is not None:
@@ -370,13 +414,17 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
             need_protocol_check = False
             competence_constraint = None
             org_level = None
+            protocol_value = None
+            sign = None
 
             for competence, constraint in competences.items():
-                if constraint['currency_min'] == 'Percent' and book_value is not None:
+                constraint_currency_min = constraint.get('currency_min')
+                constraint_currency_max = constraint.get('currency_max')
+                if constraint_currency_min is not None and constraint_currency_min == 'Percent' and book_value is not None:
                     abs_min = constraint['min'] * book_value / 100
                 else:
                     abs_min = constraint['min']
-                if constraint['currency_max'] == 'Percent' and book_value is not None:
+                if constraint_currency_max is not None and constraint_currency_max == 'Percent' and book_value is not None:
                     abs_max = constraint['max'] * book_value / 100
                 else:
                     abs_max = constraint['max']
@@ -384,7 +432,15 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                 if abs_min <= contract_value["value"] <= abs_max:
                     need_protocol_check = True
                     competence_constraint = constraint
-                    eligible_protocol = find_protocol(contract, protocols, competence, audit)
+                    linked_protocols = list(filter(lambda doc: doc['documentType'] == 'PROTOCOL', user_linked_docs))
+                    if linked_protocols:
+                        eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value)
+                        if eligible_protocol is None:  # force find protocol_value and sign
+                            eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value, check_orgs=False)
+                    else:
+                        eligible_protocol, protocol_value, sign = find_protocol(contract, protocols, competence, contract_value)
+                        if eligible_protocol is not None:
+                            links.append(create_link(contract["_id"], eligible_protocol["_id"]))
                     if eligible_protocol is not None:
                         org_level = competence
                         break
@@ -411,7 +467,6 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                 contract_org2_name = contract_attrs["orgs"][1].get("value")
 
             if eligible_protocol is not None:
-                add_link(audit["_id"], contract["_id"], eligible_protocol["_id"])
                 eligible_protocol_attrs = get_attrs(eligible_protocol)
                 protocol_structural_level = None
                 if eligible_protocol_attrs.get("org_structural_level") is not None:
@@ -431,7 +486,6 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                          "protocol": {"org_structural_level": protocol_structural_level,
                                       "date": eligible_protocol_attrs["date"]["value"]}}))
                 else:
-                    protocol_value, sign = get_max_value(eligible_protocol_attrs)
                     if protocol_value is not None:
                         if sign < 0 and min_constraint <= protocol_value["value"] < contract_value["value"]:
                             violations.append(create_violation(
@@ -444,9 +498,9 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "date": contract_attrs["date"]["value"],
                                               "org_type": contract_org2_type,
                                               "org_name": contract_org2_name,
-                                              "value": contract_attrs["sign_value_currency/value"]["value"],
-                                              "currency": contract_attrs["sign_value_currency/currency"]["value"]},
-                                "protocol": {
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
+                                 "protocol": {
                                      "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
                                      "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
 
@@ -461,9 +515,9 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "date": contract_attrs["date"]["value"],
                                               "org_type": contract_org2_type,
                                               "org_name": contract_org2_name,
-                                              "value": contract_attrs["sign_value_currency/value"]["value"],
-                                              "currency": contract_attrs["sign_value_currency/currency"]["value"]},
-                                "protocol": {
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
+                                 "protocol": {
                                      "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
                                      "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
 
@@ -479,10 +533,9 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                               "date": contract_attrs["date"]["value"],
                                               "org_type": contract_org2_type,
                                               "org_name": contract_org2_name,
-                                              "value": contract_attrs["sign_value_currency/value"]["value"],
-                                              "currency": contract_attrs["sign_value_currency/currency"][
-                                                  "value"]},
-                                "protocol": {
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
+                                 "protocol": {
                                      "org_structural_level": protocol_structural_level,
                                      "date": eligible_protocol_attrs["date"]["value"],
                                      "value": protocol_value["original_value"],
@@ -504,9 +557,10 @@ def check_contract(contract, charters, protocols, audit, supplementary_agreement
                                       "date": contract_attrs["date"]["value"],
                                       "org_type": contract_org2_type,
                                       "org_name": contract_org2_name,
-                                      "value": contract_attrs["sign_value_currency/value"]["value"],
-                                      "currency": contract_attrs["sign_value_currency/currency"]["value"]}}))
-    return violations
+                                      "value": contract_value["original_value"],
+                                      "currency": contract_value["original_currency"]
+                                      }}))
+    return violations, links
 
 
 def get_amount_netto(price):
@@ -516,28 +570,86 @@ def get_amount_netto(price):
     # price_obj = json.loads(json.dumps(price), object_hook=lambda item: SimpleNamespace(**item))
     if price.get('currency') is not None:
         result['currency'] = price['currency']['value']
+    else:
+        return None
     if price.get('amount_netto') is not None:
         result['value'] = price['amount_netto']['value']
         return result
-    elif price.get('amount_brutto') is not None and price.get('vat') is not None and price.get('vat_unit') is not None:
-        if price['vat_unit']['value'] == 'Percent':
-            result['value'] = price['amount_brutto']['value'] * (100 - price['vat']['value']) / 100.0
-        elif price['vat_unit']['value'] != price['currency']['value']:
-            vat = convert_to_currency({'value': price['vat']['value'], 'currency': price['vat_unit']['value']}, price['currency']['value'])
-            result['value'] = price['amount_brutto']['value'] - vat
+    elif price.get('amount_brutto') is not None:
+        vat_unit = price['currency']['value']
+        if price.get('vat_unit') is not None:
+            vat_unit = price['vat_unit']['value']
+        if price.get('vat') is None:
+            vat_value = 20
+            vat_unit = 'Percent'
         else:
-            result['value'] = price['amount_brutto']['value'] - price['vat']['value']
+            vat_value = price['vat']['value']
+        if vat_unit == 'Percent':
+            result['value'] = price['amount_brutto']['value'] * (100 - vat_value) / 100.0
+        elif vat_unit != price['currency']['value']:
+            vat = convert_to_currency({'value': vat_value, 'currency': vat_unit}, price['currency']['value'])
+            result['value'] = price['amount_brutto']['value'] - vat['value']
+        else:
+            result['value'] = price['amount_brutto']['value'] - vat_value
     elif price.get('amount') is not None:
         result['value'] = price['amount']['value']
+    if result.get('value') is None:
+        return None
     return result
 
 
-def check_inside(document):
+def check_inside(document, additional_docs, insiders) -> []:
     doc_attrs = get_attrs(document)
+    result = []
+    for insider in insiders:
+        if insider['isIndividual']:
+            last_name = insider['last_name']
+            if doc_attrs.get('people') is not None:
+                for person in doc_attrs['people']:
+                    if person.get('value') is not None:
+                        if person.get('lastName') is None:
+                            person_last_name = person['value'].split(' ')[0]
+                        else:
+                            person_last_name = person['lastName']['value']
+                        if textdistance.jaro_winkler.normalized_distance(last_name, person_last_name) < 0.1:
+                            if is_same_person(insider['name'], person['value']):
+                                result.append({'type': 'InsiderControl', 'text': f'Подписант {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': []})
+            if doc_attrs.get('orgs') is not None:
+                for org in doc_attrs.get('orgs'):
+                    if org.get('name') is not None and org['name'].get('value') is not None:
+                        if textdistance.jaro_winkler.normalized_distance(last_name, org['name']['value'].split(' ')[0]) < 0.1:
+                            if is_same_person(insider['name'], org['name']['value']):
+                                result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': []})
+        else:
+            if doc_attrs.get('orgs') is not None:
+                for org in doc_attrs.get('orgs'):
+                    if org.get('name') is not None and org['name'].get('value') is not None:
+                        if compare_ignore_case(insider['clean_name'], normalize_only_company_name(org['name']['value'])):
+                            result.append({'type': 'InsiderControl', 'text': f'Контрагент {insider["name"]} входит в список потенциальных инсайдеров', 'reason': '', 'notes': []})
+
+    inside_info = None
     if doc_attrs.get('insideInformation') is not None:
-        text = extract_text(doc_attrs['insideInformation']['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
-        return {'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': doc_attrs['insideInformation']['value']}
-    return None
+        inside_info = doc_attrs['insideInformation']
+    elif doc_attrs.get('subject') is not None and doc_attrs['subject'].get('insideInformation') is not None:
+        inside_info = doc_attrs['subject']['insideInformation']
+    amount_netto = find_contract_amount_netto(document, additional_docs)
+    gpn_book_value = get_latest_gpn_book_value()
+    if amount_netto is not None and gpn_book_value is not None:
+        if amount_netto['currency'] != 'RUB':
+            amount_netto = convert_to_currency(amount_netto, 'RUB')
+        if amount_netto['value'] > gpn_book_value['value'] * 0.1:
+            result.append({'type': 'InsiderControl', 'text': 'Крупная сделка(сумма договора более 10% балансовой стоимости ГПН)', 'reason': '', 'notes': [], 'inside_type': 'Deals'})
+
+    if inside_info is not None:
+        text = extract_text(inside_info['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
+        result.append({'type': 'InsiderControl', 'text': text, 'reason': '', 'notes': [], 'inside_type': inside_info['value']})
+
+    if len(result) == 0 and doc_attrs.get('orgs') is not None:
+        for org in doc_attrs.get('orgs'):
+            if org.get('type') is not None and org['type'].get('value') is not None and org['type']['value'] == 'Физическое лицо':
+                result.append({'type': 'InsiderControl', 'text': f'Договор с физическим лицом - возможна передача инсайдерской информации', 'reason': '', 'notes': []})
+                break
+    return result
 
 
 def prepare_affiliates(legal_entity_types):
@@ -545,14 +657,21 @@ def prepare_affiliates(legal_entity_types):
     coll = get_mongodb_connection().get_collection('affiliatesList')
     affiliates = coll.find({})
     for affiliate in affiliates:
-        exclude = False
-        for legal_entity_type in legal_entity_types:
-            if legal_entity_type in affiliate['name']:
-                exclude = True
+        company = False
+        for key, value in legal_entity_types.items():
+            if affiliate['name'].lower().strip().startswith(key):
+                affiliate['clean_name'] = normalize_only_company_name(affiliate['name'][len(key):])
+                affiliate['legal_entity_type'] = key
+                company = True
                 break
-        if not exclude:
+            if affiliate['name'].lower().strip().startswith(value + ' '):
+                affiliate['clean_name'] = normalize_only_company_name(affiliate['name'][len(value):])
+                affiliate['legal_entity_type'] = key
+                company = True
+                break
+        if not company:
             affiliate['last_name'] = affiliate['name'].split(' ')[0]
-            result.append(affiliate)
+        result.append(affiliate)
     return result
 
 
@@ -561,19 +680,51 @@ def prepare_beneficiary_chain(audit, legal_entity_types):
     if audit.get('beneficiary_chain') is None:
         return result
     for beneficiary in audit['beneficiary_chain']['benefeciaries']:
-        exclude = False
-        for legal_entity_type in legal_entity_types:
-            if legal_entity_type in beneficiary['namePerson']:
-                exclude = True
-                break
-        if not exclude:
-            beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
-            result.append(beneficiary)
-
+        if beneficiary.get('name') is not None:
+            match = re.search(company_name_pattern, beneficiary['name'])
+            if match is not None:
+                beneficiary['clean_name'] = normalize_only_company_name(match.group('company_name'))
+                without_name = re.sub(company_name_pattern, '', beneficiary['name'])
+                for key, value in legal_entity_types.items():
+                    if key.lower() in without_name.lower():
+                        beneficiary['legal_entity_type'] = key
+                    if value and value.lower() in without_name.lower():
+                        beneficiary['legal_entity_type'] = key
+            else:
+                for key, value in legal_entity_types.items():
+                    if beneficiary['name'].lower().strip().startswith(key.lower()):
+                        beneficiary['legal_entity_type'] = key
+                        beneficiary['clean_name'] = normalize_only_company_name(beneficiary['name'][len(key):])
+                    if beneficiary['name'].lower().strip().startswith(value.lower() + ' '):
+                        beneficiary['clean_name'] = normalize_only_company_name(beneficiary['name'][len(value):])
+                        beneficiary['legal_entity_type'] = key
+        if beneficiary.get('namePerson') is not None:
+            company = False
+            match = re.search(company_name_pattern, beneficiary['namePerson'])
+            if match is not None:
+                beneficiary['clean_name_person'] = normalize_only_company_name(match.group('company_name'))
+                without_name = re.sub(company_name_pattern, '', beneficiary['namePerson'])
+                company = True
+                for key, value in legal_entity_types.items():
+                    if key.lower() in without_name.lower():
+                        beneficiary['legal_entity_type_name_person'] = key
+                    if value and value.lower() in without_name.lower():
+                        beneficiary['legal_entity_type_name_person'] = key
+            else:
+                for key, value in legal_entity_types.items():
+                    if beneficiary['namePerson'].lower().strip().startswith(key.lower()):
+                        beneficiary['clean_name_person'] = normalize_only_company_name(beneficiary['namePerson'][len(key):])
+                        company = True
+                    if beneficiary['namePerson'].lower().strip().startswith(value.lower() + ' '):
+                        beneficiary['clean_name_person'] = normalize_only_company_name(beneficiary['namePerson'][len(value):])
+                        company = True
+            if not company:
+                beneficiary['last_name'] = beneficiary['namePerson'].split(' ')[0]
+        result.append(beneficiary)
     return result
 
 
-def is_same_person(name1 , name2):
+def is_same_person(name1, name2):
     match1 = re.search(full_name_pattern, name1)
     match2 = re.search(full_name_pattern, name2)
     if match1 is not None and match2 is not None:
@@ -600,60 +751,214 @@ def get_reason(affiliate, contract_date):
     return None
 
 
-def check_interest(contract, audit, affiliates, beneficiaries):
-    result = []
-    contract_attrs = get_attrs(contract)
+def contains_same_name(result, name):
+    for elem in result:
+        if elem['text'] == name:
+            return True
+    return False
 
-    contract_date = None
-    if contract_attrs.get('date') is not None:
-        contract_date = contract_attrs['date'].get('value')
-    amount_netto = get_amount_netto(contract_attrs.get('price'))
-    if amount_netto['currency'] != 'RUB':
-        amount_netto = convert_to_currency(amount_netto, 'RUB')
-    if amount_netto['value'] >= 1000000000:#need interest check
-        if contract_attrs.get('people') is not None:
-            for i, person in enumerate(contract_attrs['people']):
-                person_last_name = person.get('lastName')
-                notes = []
-                name = None
-                reason = None
-                if i == 0:
-                    if person.get('value') is not None and person_last_name is not None:
-                        for beneficiary in beneficiaries:
-                            if textdistance.jaro_winkler.normalized_distance(person_last_name['value'], beneficiary['last_name']) < 0.1:
-                                if is_same_person(person.get('value'), beneficiary['namePerson']) and name is None:
-                                    name = beneficiary['namePerson']
-                                else:
-                                    notes.append(beneficiary['namePerson'])
-                        if name is not None or len(notes) > 0:
-                            result.append({'type': 'InterestControl', 'text': name, 'reason': 'Бенефициар', 'notes': notes})
-                else:
-                    for affiliate in affiliates:
-                        if textdistance.jaro_winkler.normalized_distance(person_last_name['value'], affiliate['last_name']) < 0.1:
-                            r = get_reason(affiliate, contract_date)
-                            if is_same_person(person.get('value'), affiliate['name']) and name is None:
-                                if r is not None:
-                                    name = affiliate['name']
-                                    reason = r['text']
-                            else:
-                                if r is not None:
-                                    notes.append(affiliate['name'])
-                    if name is not None or len(notes) > 0:
-                        result.append({'type': 'InterestControl', 'text': name, 'reason': reason, 'notes': notes})
+
+def get_persons_from_chain(beneficiaries, name):
+    result = []
+    found_names = [name]
+    while True:
+        new_names = []
+        for beneficiary in beneficiaries:
+            for found_name in found_names:
+                if beneficiary['name'] == found_name:
+                    if beneficiary.get('last_name') is not None:
+                        result.append(beneficiary)
+                    else:
+                        new_names.append(beneficiary['namePerson'])
+        found_names = new_names
+        if len(found_names) == 0:
+            if len(result) == 0:
+                return None
+            return result
+        if name in found_names:
+            return None
+
+
+def find_contract_amount_netto(contract, additional_docs):
+    contract_attrs = get_attrs(contract)
+    result = get_amount_netto(contract_attrs.get('price'))
+    if result is None:
+        for additional_doc in additional_docs:
+            doc_attrs = get_attrs(additional_doc)
+            result = get_amount_netto(doc_attrs.get('price'))
+            if result is not None:
+                return result
     return result
 
 
-def check_contract_project(document, audit, affiliates, beneficiaries):
+def is_already_added(result, beneficiary):
+    for elem in result:
+        if elem['name'] == beneficiary['name'] and elem['namePerson'] == beneficiary['namePerson']:
+            return True
+    return False
+
+
+def build_chain(name, beneficiaries):
+    result = []
+    links = deque()
+    participants = []
+    for beneficiary in beneficiaries:
+        if beneficiary.get('clean_name') == name and not is_already_added(result, beneficiary):
+            if (beneficiary.get('last_name') is None and beneficiary.get('share') is not None and beneficiary['share'] > 50) or beneficiary.get('last_name') is not None:
+                links.append(beneficiary)
+                result.append(beneficiary)
+            if beneficiary.get('share') is None and ('участник' in beneficiary['roles'] or 'акционер' in beneficiary['roles']):
+                participants.append(beneficiary)
+    if len(participants) == 1 and not is_already_added(result, participants[0]):
+        links.append(participants[0])
+        result.append(participants[0])
+
+    while len(links) > 0:
+        beneficiary_link = links.popleft()
+        participants = []
+        for beneficiary in beneficiaries:
+            if beneficiary_link['namePerson'] == beneficiary['name'] and not is_already_added(result, beneficiary):
+                beneficiary['parent'] = beneficiary_link
+                if (beneficiary.get('last_name') is None and beneficiary.get('share') is not None and beneficiary['share'] > 50) or beneficiary.get('last_name') is not None:
+                    links.append(beneficiary)
+                    result.append(beneficiary)
+                if beneficiary.get('share') is None and ('участник' in beneficiary['roles'] or 'акционер' in beneficiary['roles']):
+                    participants.append(beneficiary)
+        if len(participants) == 1 and not is_already_added(result, participants[0]):
+            links.append(participants[0])
+            result.append(participants[0])
+    return result
+
+
+def find_org_interest(result, name, interests):
+    for key, value in list(reversed(sorted(interests.items()))):
+        if value is not None:
+            for org in value['organizations']:
+                if compare_ignore_case(org.get('clean_name'), name) or compare_ignore_case(org.get('clean_short_name'), name):
+                    share = 100
+                    if len(org['shareChain']) > 0:
+                        share = org["shareChain"][-1]['percents']
+                    control_type = 'прямой контроль'
+                    if org.get('control_type') is not None:
+                        control_type = org['control_type']
+                    control_chain = ''
+                    for controlled_org in org['shareChain']:
+                        control_chain += '<br>' + controlled_org['text']
+                    reason_text = f'Контролируемая доля {companies.get(key)} в уставном капитале контрагента {share}%<br>{control_type} эмитента: {control_chain}'
+                    result.append({'type': 'InterestControl', 'text': companies.get(key), 'reason': reason_text, 'notes': []})
+                    return True
+    return False
+
+
+def find_person_interest(result, beneficiary, interests):
+    last_name = beneficiary['last_name']
+    full_name = None
+    reason_text = ''
+    notes = []
+    for key, value in list(reversed(sorted(interests.items()))):
+        if value is not None:
+            for person in value['stakeholders']:
+                if textdistance.jaro_winkler.normalized_distance(last_name, person['last_name']) < 0.1:
+                    if full_name is None and is_same_person(beneficiary['namePerson'], person['name']):
+                        full_name = person['name']
+                        gp_roles = ''
+                        contragent_roles = ','.join(beneficiary['roles'])
+                        for reason in person['reasons']:
+                            if reason.get('endDate') is None:
+                                gp_roles += '<br>' + reason['organization'] + ', ' + reason['text']
+                        reason_text = f'Должности занимаемые в структурах ГП и ГПН: {gp_roles} <br>Должности в структуре контрагента: {contragent_roles}'
+                    else:
+                        notes.append(person['name'])
+    if full_name is not None or len(notes) > 0:
+        result.append({'type': 'InterestControl', 'text': full_name, 'reason': reason_text, 'notes': notes})
+        return True
+    return False
+
+
+def find_gp_gpn(result, chain):
+    company_names = companies.values()
+    for beneficiary in chain:
+        if beneficiary.get('clean_name_person') is not None:
+            for company_name in company_names:
+                if compare_ignore_case(beneficiary['clean_name_person'], company_name):
+                    share = 100
+                    control_type = 'прямой контроль'
+                    control_chain = ''
+                    count = 0
+                    org = beneficiary
+                    while org is not None:
+                        if count > 0:
+                            control_type = 'косвенный контроль'
+                        org_share = 100
+                        if org.get('share') is not None:
+                            org_share = org['share']
+                        name = org["name"]
+                        if org.get('clean_name') is not None and org.get('legal_entity_type') is not None:
+                            name = org['legal_entity_type'] + ' ' + org['clean_name']
+                        name_person = org["namePerson"]
+                        if org.get('clean_name_person') is not None and org.get('legal_entity_type_name_person') is not None:
+                            name_person = org['legal_entity_type_name_person'] + ' ' + org['clean_name_person']
+                        control_chain += f'<br>доля {name_person} в {name} - {org_share}%'
+                        share = org_share
+                        org = org.get('parent')
+                        count += 1
+                    name_person = beneficiary["namePerson"]
+                    if beneficiary.get('clean_name_person') is not None and beneficiary.get('legal_entity_type_name_person') is not None:
+                        name_person = beneficiary['legal_entity_type_name_person'] + ' ' + beneficiary['clean_name_person']
+                    reason_text = f'Контролируемая доля {name_person} в уставном капитале контрагента {share}%<br>{control_type} эмитента: {control_chain}'
+                    result.append({'type': 'InterestControl', 'text': name_person, 'reason': reason_text, 'notes': []})
+                    return True
+    return False
+
+
+def check_interest(audit, contract, additional_docs, interests, beneficiaries):
+    result = []
+    contract_attrs = get_attrs(contract)
+    if audit.get('additionalFields') is not None and audit['additionalFields'].get('preAuditContractPrice') is not None:
+        amount_netto = audit['additionalFields']['preAuditContractPrice']
+    else:
+        amount_netto = find_contract_amount_netto(contract, additional_docs)
+    if amount_netto is not None:
+        if amount_netto['currency'] != 'RUB':
+            amount_netto = convert_to_currency(amount_netto, 'RUB')
+        if amount_netto['value'] >= 1000000000:  # need interest check
+            if contract_attrs.get('orgs') is not None:
+                for i, org in enumerate(contract_attrs['orgs']):
+                    if i != 0 and org.get('name') is not None:
+                        org_name = normalize_only_company_name(org['name']['value'])
+                        find_org_interest(result, org_name, interests)
+                        chain = build_chain(org_name, beneficiaries)
+                        if len(chain) == 0 and org.get('alt_name') is not None:
+                            org_name = normalize_only_company_name(org['alt_name']['value'])
+                            find_org_interest(result, org_name, interests)
+                            chain = build_chain(org_name, beneficiaries)
+
+                        find_gp_gpn(result, chain)
+                        for beneficiary in chain:
+                            if beneficiary.get('last_name') is not None:
+                                find_person_interest(result, beneficiary, interests)
+                            else:
+                                find_org_interest(result, beneficiary['clean_name_person'], interests)
+    return result
+
+
+def check_contract_project(document, audit, interests, beneficiaries, docs, insiders):
     violations = []
     document_attrs = get_attrs(document)
-    if document.get('documentType') == 'CONTRACT' and 'InterestControl' in audit['checkTypes']:
-        interest_violations = check_interest(document, audit, affiliates, beneficiaries)
-        violations.extend(interest_violations)
+    if document.get('documentType') in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
+        additional_docs = list(filter(lambda x: x['_id'] != document['_id'], docs))
+        if 'InterestControl' in audit['checkTypes']:
+            interest_violations = check_interest(audit, document, additional_docs, interests, beneficiaries)
+            violations.extend(interest_violations)
 
-    if 'InsiderControl' in audit['checkTypes']:
-        violation = check_inside(document)
-        if violation is not None:
-            violations.append(violation)
+        if 'InsiderControl' in audit['checkTypes']:
+            inside_violations = check_inside(document, additional_docs, insiders)
+            if len(inside_violations) == 0:
+                for add_doc in additional_docs:
+                    inside_violations = check_inside(add_doc, [], insiders)
+                    violations.extend(inside_violations)
+            else:
+                violations.extend(inside_violations)
     if len(violations) > 0:
         orgs = []
         if document_attrs.get('orgs') is not None and len(document_attrs['orgs']) > 1:
@@ -694,23 +999,164 @@ def exclude_same_charters(charters):
     return result
 
 
+def prepare_interests(interest):
+    if interest is not None:
+        for org in interest['organizations']:
+            for key, value in legal_entity_types.items():
+                if org.get('name') is not None and org['name'].lower().strip().startswith(key.lower()):
+                    org['clean_name'] = normalize_only_company_name(org['name'][len(key):])
+                    org['legal_entity_type'] = key
+                if org.get('shortName') is not None and org['shortName'].lower().strip().startswith(value.lower() + ' '):
+                    org['clean_short_name'] = normalize_only_company_name(org['shortName'][len(value):])
+        for person in interest['stakeholders']:
+            person['last_name'] = person['name'].split(' ')[0]
+
+
+def prepare_insiders(insiders):
+    result = []
+    if insiders is not None:
+        for insider in insiders:
+            for key, value in legal_entity_types.items():
+                if insider.get('name') is not None:
+                    if insider['isIndividual']:
+                        insider['last_name'] = insider['name'].split(' ')[0]
+                    else:
+                        if insider['name'].lower().strip().startswith(key.lower()):
+                            insider['clean_name'] = normalize_only_company_name(insider['name'][len(key):])
+                            insider['legal_entity_type'] = key
+                        if insider['name'].lower().strip().startswith(value.lower() + ' '):
+                            insider['clean_name'] = normalize_only_company_name(insider['name'][len(value):])
+                            insider['legal_entity_type'] = key
+            if insider.get('clean_name') is None:
+                insider['clean_name'] = insider['name']
+            result.append(insider)
+    return result
+
+
+def get_latest_interest():
+    result = {}
+    db = get_mongodb_connection()
+    reports = db['quarterlyReport']
+    result['gp'] = reports.find_one({'company': 'gp'}, sort=[('uploadDate', pymongo.DESCENDING)])
+    prepare_interests(result.get('gp'))
+    result['gpn'] = reports.find_one({'company': 'gpn'}, sort=[('uploadDate', pymongo.DESCENDING)])
+    prepare_interests(result.get('gpn'))
+    return result
+
+
+def get_latest_gpn_book_value():
+    db = get_mongodb_connection()
+    coll = db['bookvalues']
+    return coll.find_one({}, sort=[('date', pymongo.DESCENDING)])
+
+
+def get_insiders():
+    db = get_mongodb_connection()
+    insiders = db['insiderlists'].find({})
+    result = prepare_insiders(insiders)
+    return result
+
+
+def save_email_sending_result(result, audit):
+    db = get_mongodb_connection()
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"email_sent": result}})
+
+
+def save_email_classification(result, audit):
+    db = get_mongodb_connection()
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"additionalFields.email_sent": result}})
+
+
+def save_check_types(audit):
+    db = get_mongodb_connection()
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"checkTypes": audit['checkTypes']}})
+
+
+def send_notifications():
+    db = get_mongodb_connection()
+    audit_collection = db['audits']
+    audits = audit_collection.find({'additionalFields.email_sent': False, 'pre-check': True, 'additionalFields.external_source': 'email'})
+
+    for audit in audits:
+        if audit.get('checkTypes') is not None and \
+                (len(audit['checkTypes']) == 0 or 'Classification' in audit.get('checkTypes')) and \
+                audit.get('additionalFields') is not None:
+            additional_fields = audit['additionalFields']
+            if additional_fields.get('classification_result_user'):
+                class_id = audit['additionalFields']['classification_result_user']['id']
+                top_result = next(filter(lambda x: x['_id'] == class_id, all_labels), None)
+                attachments = []
+                fs = gridfs.GridFS(db)
+                for file_id in audit['additionalFields'].get('file_ids') or []:
+                    attachments.append(fs.get(file_id))
+                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
+            elif audit['additionalFields'].get('email_sent') == False and audit.get('classification_result') is not None:
+                logging.info('Retry send email message')
+                top_classification_result = audit['classification_result'][0]
+                attachments = []
+                top_result = next(filter(lambda x: x['_id'] == top_classification_result['id'], all_labels), None)
+                fs = gridfs.GridFS(db)
+                for file_id in audit['additionalFields'].get('file_ids') or []:
+                    attachments.append(fs.get(file_id))
+                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
+            elif audit.get('errors') and len(audit['errors']):
+                attachments = []
+                fs = gridfs.GridFS(db)
+                for file_id in audit['additionalFields'].get('file_ids') or []:
+                    attachments.append(fs.get(file_id))
+                save_email_classification(send_classifier_error_email(audit, attachments), audit)
+
+
 def finalize():
     audits = get_audits()
+    interests = None
+    insiders = None
     for audit in audits:
         if audit.get('pre-check'):
             logger.info(f'.....finalizing pre-audit {audit["_id"]}')
-            prepared_affiliates = None
+            documents = get_docs_by_audit_id(audit["_id"], 15, without_large_fields=False)
             prepared_beneficiaries = None
-            if 'InterestControl' in audit['checkTypes']:
-                if prepared_affiliates is None:
-                    prepared_affiliates = prepare_affiliates(legal_entity_types)
-                prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
-            document_ids = get_docs_by_audit_id(audit["_id"], 15, id_only=True)
             violations = []
-            for document_id in document_ids:
+
+            if 'InterestControl' in audit['checkTypes']:
+                if interests is None:
+                    interests = get_latest_interest()
+                prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
+
+            if 'InsiderControl' in audit['checkTypes']:
+                if insiders is None:
+                    insiders = get_insiders()
+
+            if 'Classification' in audit['checkTypes']:
+                if audit.get('beneficiary_chain'):
+                    if interests is None:
+                        if 'InterestControl' not in audit['checkTypes']:
+                            audit['checkTypes'].append('InterestControl')
+                            save_check_types(audit)
+                        interests = get_latest_interest()
+                    prepared_beneficiaries = prepare_beneficiary_chain(audit, legal_entity_types)
+                for doc in documents:
+                    if doc.get('documentType') == 'CONTRACT':
+                        attrs_from_analysis = get_attrs(doc)
+                        orgs = attrs_from_analysis.get('orgs')
+                        if orgs:
+                            for org in orgs:
+                                type = org.get('type')
+                                if type:
+                                    type = type.get('value')
+                                name = org.get('name')
+                                if name:
+                                    name = name.get('value')
+                                if type == 'Публичное акционерное общество' and re.search(r'(Газпром[\s\-]нефть)', name):
+                                    if insiders is None:
+                                        if 'InsiderControl' not in audit['checkTypes']:
+                                            audit['checkTypes'].append('InsiderControl')
+                                            save_check_types(audit)
+                                        insiders = get_insiders()
+            for document_id in documents:
                 try:
                     document = get_doc_by_id(document_id["_id"])
-                    violation = check_contract_project(document, audit, prepared_affiliates, prepared_beneficiaries)
+                    violation = check_contract_project(document, audit, interests, prepared_beneficiaries, documents, insiders)
                     if violation is not None:
                         violations.append(violation)
                 except Exception as err:
@@ -724,6 +1170,7 @@ def finalize():
             continue
         logger.info(f'.....finalizing audit {audit["_id"]}')
         violations = []
+        links = []
         contract_ids = get_docs_by_audit_id(audit["_id"], 15, "CONTRACT", id_only=True)
         charters = []
         if audit.get("charters") is not None:
@@ -741,14 +1188,20 @@ def finalize():
                 contract = get_doc_by_id(document_id["_id"])
                 if get_attrs(contract).get('date') is None:
                     continue
-                violations.extend(check_contract(contract, charters, protocols, audit, supplementary_agreements))
+                new_violations, new_links = check_contract(contract, charters, protocols, audit, supplementary_agreements)
+                violations.extend(new_violations)
+                links.extend(new_links)
             except Exception as err:
                 logger.exception(f'cant finalize contract {document_id["_id"]}')
-
+        update_links(audit, links)
         save_violations(audit, violations)
         logger.info(f'.....audit {audit["_id"]} is waiting for approval')
+        if audit.get('email_sent') is None or not audit['email_sent']:
+            result = mail.send_end_audit_email(audit)
+            save_email_sending_result(result, audit)
+
+    send_notifications()
 
 
 if __name__ == '__main__':
     finalize()
-

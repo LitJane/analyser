@@ -446,6 +446,8 @@ def convert_one(db, doc: dict):
     "protocol": convert_protocol_db_attributes_to_tree,
     "charter": convert_charter_db_attributes_to_tree,
     "contract": convert_contract_db_attributes_to_tree,
+    'annex': convert_contract_db_attributes_to_tree,
+    'supplementary_agreement': convert_contract_db_attributes_to_tree,
   }
 
   if kind in kind2method:

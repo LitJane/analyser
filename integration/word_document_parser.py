@@ -54,7 +54,7 @@ class WordDocParser(DirDocProvider):
 def create_doc_by_type(t: str, doc_id, filename) -> CharterDocument or ContractDocument or ProtocolDocument:
   # TODO: check type of res
 
-  if t in ('CONTRACT', 'ANNEX', 'SUPPLEMENTARY_AGREEMENT'):
+  if t in ('CONTRACT', 'ANNEX', 'SUPPLEMENTARY_AGREEMENT', 'AGREEMENT'):
     doc = ContractDocument('')
   elif t == 'PROTOCOL':
     doc = ProtocolDocument()

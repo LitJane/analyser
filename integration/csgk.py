@@ -3,7 +3,9 @@ from datetime import datetime
 
 from zeep import Client, helpers
 
+from analyser.finalizer import normalize_only_company_name
 from analyser.log import logger
+from analyser.structures import legal_entity_types
 from gpn.gpn import update_subsidiaries_cache
 from integration.db import get_mongodb_connection
 
@@ -33,12 +35,24 @@ def get_csgk_client():
     return None
 
 
-def _get_legal_entity_type(short_name, legal_entities):
-    candidate = short_name.split(' ', 1)[0].strip()
+def _clean_short_subsidiary_name(short_name, short_legal_entities):
+    split = short_name.split(' ', 1)
+    if len(split) > 1:
+        for legal_entity in short_legal_entities:
+            if legal_entity == split[0].strip():
+                name = normalize_only_company_name(split[1].strip().replace('"', '').replace("'", ''))
+                return legal_entity, name
+    name = normalize_only_company_name(short_name)
+    return '', name
+
+
+def _clean_subsidiary_name(name, legal_entities):
     for legal_entity in legal_entities:
-        if legal_entity == candidate:
-            return legal_entity
-    return ''
+        if name.lower().startswith(legal_entity):
+            result = normalize_only_company_name(name[len(legal_entity):].strip().replace('"', '').replace("'", ''))
+            return result
+    result = normalize_only_company_name(name)
+    return result
 
 
 def get_subsidiary_list():
@@ -54,15 +68,17 @@ def get_subsidiary_list():
             ret_code = result.get('RetCode')
             ret_msg = result.get('RetMsg')
             if ret_code == 0:
-                legal_entity_aliases = []
-                legal_entity_aliases = list(filter(lambda x: len(x) > 0, legal_entity_aliases))
+                legal_entity_aliases = list(filter(lambda x: len(x) > 0, legal_entity_types.values()))
+                lower_legal_entities = list(map(lambda x: x.lower(), legal_entity_types.keys()))
                 for sub_result in result['ExecuteResult']['_value_1']['_value_1']:
                     csgk_sub = sub_result.get('CorpManagement._x0020_Integration_CompanySimple_List')
+                    clean_name = _clean_subsidiary_name(csgk_sub.get('ULName'), lower_legal_entities)
+                    legal_entity_type, clean_short_name = _clean_short_subsidiary_name(csgk_sub.get('ULShortName'), legal_entity_aliases)
                     subsidiary = {
                         'subsidiary_id': csgk_sub.get('IdCompany'),
-                        '_id': csgk_sub.get('ULName'),
-                        'legal_entity_type': _get_legal_entity_type(csgk_sub.get('ULShortName'), legal_entity_aliases),
-                        'aliases': [csgk_sub.get('ULShortName')],
+                        '_id': clean_name,
+                        'legal_entity_type': legal_entity_type,
+                        'aliases': [clean_short_name],
                         'short_name': csgk_sub.get('ULShortName'),
                         'INN': csgk_sub.get('INN'),
                         'KPP': csgk_sub.get('KPP'),
@@ -155,17 +171,17 @@ def sync_csgk_data():
         coll.delete_many({})
         coll.insert_many(subsidiaries)
 
-    stakeholders = []
-    shareholders = get_shareholders()
-    if shareholders is not None:
-        stakeholders.extend(shareholders)
-    board_of_directors = get_board_of_directors()
-    if board_of_directors is not None:
-        stakeholders.extend(board_of_directors)
-    if len(stakeholders) > 0:
-        coll = db['affiliatesList']
-        coll.delete_many({'company': 'gpn'})
-        coll.insert_many(stakeholders)
+    # stakeholders = []
+    # shareholders = get_shareholders()
+    # if shareholders is not None:
+    #     stakeholders.extend(shareholders)
+    # board_of_directors = get_board_of_directors()
+    # if board_of_directors is not None:
+    #     stakeholders.extend(board_of_directors)
+    # if len(stakeholders) > 0:
+    #     coll = db['affiliatesList']
+    #     coll.delete_many({'company': 'gpn'})
+    #     coll.insert_many(stakeholders)
     db['catalog'].insert({'last_csgk_sync_date': datetime.today()})
     logger.info('CSGK synchronization finished.')
 
