@@ -25,11 +25,11 @@ class TestLoadTfModel(unittest.TestCase):
     # just expecting NO failure
     print(e)
 
-  def test_resave_models_h5(self):
-    ctx = KerasTrainingContext()
-    ctx.resave_model_h5(structure_detection_model_001)
-    ctx.resave_model_h5(uber_detection_model_003)
-    ctx.resave_model_h5(uber_detection_model_005_1_1)
+  # def test_resave_models_h5(self):
+  #   ctx = KerasTrainingContext()
+  #   # ctx.resave_model_h5(structure_detection_model_001)
+  #   # ctx.resave_model_h5(uber_detection_model_003)
+  #   ctx.resave_model_h5(uber_detection_model_005_1_1)
 
   def test_load_uber_model_005(self):
     ctx = KerasTrainingContext()
