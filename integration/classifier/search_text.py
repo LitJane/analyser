@@ -3,9 +3,11 @@ import json
 import logging
 import os.path
 import re
-from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
+from pathlib import Path
+
 import tensorflow as tf
 from nltk.tokenize import WhitespaceTokenizer
+from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
 
 all_key = {
     "CONTRACT": [
@@ -24,9 +26,9 @@ all_bad_keys = ['Термины и определения', 'Термин', 'о�
 
 all_good_keys = ['Цели и задачи']
 
-integration_path = 'integration/classifier'
+integration_path =  Path(__file__).parent #.parent/'integration/classifier'
 
-with open(os.path.join(integration_path, 'practices.json'), encoding='utf-8') as practice_json_file:
+with open( integration_path /  'practices.json', encoding='utf-8') as practice_json_file:
     all_labels = json.load(practice_json_file)
 
 labels = list(map(lambda item: item['label'], filter(lambda item: item['auto-classified'], all_labels)))
