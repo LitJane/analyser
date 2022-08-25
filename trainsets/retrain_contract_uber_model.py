@@ -223,7 +223,7 @@ class UberModelTrainsetManager:
       l.trainable = False
 
     model.compile(loss=super_contract_model.losses, optimizer='Nadam', metrics=super_contract_model.metrics)
-    model.summary()
+    # model.summary()
 
     return model, ctx
 
@@ -292,7 +292,7 @@ class UberModelTrainsetManager:
     ######################
     ctx.unfreezeModel(model)
     model.compile(loss=super_contract_model.losses, optimizer='Nadam', metrics=super_contract_model.metrics)
-    model.summary()
+    # model.summary()
 
     ctx.EPOCHS *= 2
     train_gen = generator_factory_method(train_indices + test_indices, batch_size)
