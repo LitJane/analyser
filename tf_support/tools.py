@@ -77,7 +77,7 @@ class KerasTrainingContext:
 
   def resave_model_h5(self, model_factory_fn):
     model = self.init_model(model_factory_fn, load_weights=False)
-    model.summary()
+    # model.summary()
     model_name = model_factory_fn.__name__
     ch_fn_old = os.path.join(self.model_checkpoint_path, f"{model_name}.weights")
     model.load_weights(ch_fn_old)
@@ -94,7 +94,10 @@ class KerasTrainingContext:
 
   def init_model(self, model_factory_fn, model_name_override=None, weights_file_override=None,
                  verbose=0,
-                 trainable=True, trained=False, load_weights=True, weights=None) -> Model:
+                 trainable=True,
+                 trained=False,
+                 load_weights=True,
+                 weights=None) -> Model:
 
     model_name = model_factory_fn.__name__
     if model_name_override is not None:
@@ -117,8 +120,9 @@ class KerasTrainingContext:
         model.load_weights(ch_fn)
         logger.info(f'weights loaded: {ch_fn}')
       except:
-        msg = f'cannot load  {model_name} from  {ch_fn}'
-        warnings.warn(msg)
+        msg = f'cannot load  {model_name} from {ch_fn}'
+        logger.warning(msg)
+        # warnings.warn(msg)
         if trained:
           raise FileExistsError(msg)
 

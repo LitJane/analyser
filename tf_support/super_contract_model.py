@@ -208,7 +208,7 @@ def uber_detection_model_003(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
 
 
 def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
-  base_model, base_model_inputs = get_base_model(uber_detection_model_003, ctx=ctx, load_weights=not trained)
+  base_model, base_model_inputs = get_base_model(uber_detection_model_003, ctx=ctx, load_weights=False)
 
   # ---------------------
 
@@ -269,6 +269,3 @@ def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   return model
 
 
-if __name__ == '__main__':
-  _ctx = KerasTrainingContext()
-  _ctx.init_model(uber_detection_model_005_1_1, verbose=2, trained=False, trainable=False)
