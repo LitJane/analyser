@@ -1,8 +1,10 @@
 import json
+import os
 
 import gridfs
 import pymongo
-from bson import json_util
+import requests
+from bson import json_util, ObjectId
 from jsonschema import ValidationError, FormatChecker, Draft7Validator
 
 from analyser import finalizer
@@ -25,7 +27,7 @@ schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecke
 CHARTER = 'CHARTER'
 CONTRACT = 'CONTRACT'
 PROTOCOL = 'PROTOCOL'
-
+classifier_url = os.environ.get('GPN_CLASSIFIER_SERVICE_URL')
 
 class Runner:
   default_instance: 'Runner' = None
@@ -281,16 +283,27 @@ def doc_classification(audit):
   try:
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
-    classification_result = wrapper(doc4classification['parse'])
+    if classifier_url is None:
+      classification_result = wrapper(doc4classification['parse'])
+    else:
+      response = requests.post(classifier_url + '/api/classify', json=doc4classification['parse'])
+      if response.status_code != 200:
+        logger.error(f'Classifier returned error code: {response.status_code}, message: {response.json()}')
+        audits = get_mongodb_connection()['audits']
+        update = {'$push': {'errors': {'type': 'classifier_service', 'text': 'Ошибка классификатора'}}}
+        audits.update_one({'_id': ObjectId(audit["_id"])}, update)
+        return
+      classification_result = response.json()
+
     if classification_result:
-      save_audit_practice(audit, classification_result, not main_doc)
-      if audit['additionalFields']['external_source'] == 'email':
-        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
-        attachments = []
-        fs = gridfs.GridFS(get_mongodb_connection())
-        for file_id in audit['additionalFields']['file_ids']:
-          attachments.append(fs.get(file_id))
-        send_classifier_email(audit, top_result, attachments, all_labels)
+        save_audit_practice(audit, classification_result, not main_doc)
+        if audit['additionalFields']['external_source'] == 'email':
+          top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+          attachments = []
+          fs = gridfs.GridFS(get_mongodb_connection())
+          for file_id in audit['additionalFields']['file_ids']:
+            attachments.append(fs.get(file_id))
+          send_classifier_email(audit, top_result, attachments, all_labels)
   except Exception as ex:
     logger.exception(ex)
 
