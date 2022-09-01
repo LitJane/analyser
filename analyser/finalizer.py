@@ -652,6 +652,37 @@ def check_inside(document, additional_docs, insiders) -> []:
     return result
 
 
+def create_check_deal_procedure_violation(restriction):
+    return {'type': 'DealSequenceControl',
+            'text': 'Данная сделка до ее заключения подлежит согласованию с Советом директоров ПАО Газпром нефть',
+            'reason': restriction}
+
+
+def check_deal_procedure(document, deal_procedure_restrictions):
+    result = []
+    doc_attrs = get_attrs(document)
+    if doc_attrs.get('subject', {}).get('value') is not None:
+        subject_value = doc_attrs['subject']['value']
+        for restriction in deal_procedure_restrictions:
+            if subject_value == restriction['subject']:
+                if restriction.get('value') is not None and restriction.get('currency') is not None:
+                    amount_netto = get_amount_netto(doc_attrs.get('price'))
+                    if amount_netto is not None:
+                        if amount_netto['currency'] != 'RUB':
+                            amount_netto = convert_to_currency(amount_netto, 'RUB')
+                        if restriction['currency'] == '%':
+                            gpn_book_value = get_latest_gpn_book_value()
+                            if gpn_book_value is not None:
+                                if amount_netto['value'] > gpn_book_value['value'] * 0.01 * restriction['value']:
+                                    result.append(create_check_deal_procedure_violation(restriction))
+                        else:
+                            if amount_netto['value'] > restriction['value']:
+                                result.append(create_check_deal_procedure_violation(restriction))
+                else:
+                    result.append(create_check_deal_procedure_violation(restriction))
+    return result
+
+
 def prepare_affiliates(legal_entity_types):
     result = []
     coll = get_mongodb_connection().get_collection('affiliatesList')
@@ -942,7 +973,7 @@ def check_interest(audit, contract, additional_docs, interests, beneficiaries):
     return result
 
 
-def check_contract_project(document, audit, interests, beneficiaries, docs, insiders):
+def check_contract_project(document, audit, interests, beneficiaries, docs, insiders, deal_procedure_restrictions):
     violations = []
     document_attrs = get_attrs(document)
     if document.get('documentType') in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
@@ -959,6 +990,11 @@ def check_contract_project(document, audit, interests, beneficiaries, docs, insi
                     violations.extend(inside_violations)
             else:
                 violations.extend(inside_violations)
+
+        if 'DealSequenceControl' in audit['checkTypes']:
+            deal_procedure_violations = check_deal_procedure(document, deal_procedure_restrictions)
+            violations.extend(deal_procedure_violations)
+
     if len(violations) > 0:
         orgs = []
         if document_attrs.get('orgs') is not None and len(document_attrs['orgs']) > 1:
@@ -1057,6 +1093,13 @@ def get_insiders():
     return result
 
 
+def get_deal_procedure_restrictions():
+    db = get_mongodb_connection()
+    restrictions = db['dealsequences'].find({})
+    result = list(restrictions)
+    return result
+
+
 def save_email_sending_result(result, audit):
     db = get_mongodb_connection()
     db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"email_sent": result}})
@@ -1111,6 +1154,7 @@ def finalize():
     audits = get_audits()
     interests = None
     insiders = None
+    deal_procedure_restrictions = None
     for audit in audits:
         if audit.get('pre-check'):
             logger.info(f'.....finalizing pre-audit {audit["_id"]}')
@@ -1126,6 +1170,10 @@ def finalize():
             if 'InsiderControl' in audit['checkTypes']:
                 if insiders is None:
                     insiders = get_insiders()
+
+            if 'DealSequenceControl' in audit['checkTypes']:
+                if deal_procedure_restrictions is None:
+                    deal_procedure_restrictions = get_deal_procedure_restrictions()
 
             if 'Classification' in audit['checkTypes']:
                 if audit.get('beneficiary_chain'):
@@ -1156,7 +1204,13 @@ def finalize():
             for document_id in documents:
                 try:
                     document = get_doc_by_id(document_id["_id"])
-                    violation = check_contract_project(document, audit, interests, prepared_beneficiaries, documents, insiders)
+                    violation = check_contract_project(document,
+                                                       audit,
+                                                       interests,
+                                                       prepared_beneficiaries,
+                                                       documents,
+                                                       insiders,
+                                                       deal_procedure_restrictions)
                     if violation is not None:
                         violations.append(violation)
                 except Exception as err:
