@@ -995,13 +995,7 @@ def check_contract_project(document, audit, interests, beneficiaries, docs, insi
             deal_procedure_violations = check_deal_procedure(document, deal_procedure_restrictions)
             violations.extend(deal_procedure_violations)
 
-    if len(violations) > 0:
-        orgs = []
-        if document_attrs.get('orgs') is not None and len(document_attrs['orgs']) > 1:
-            orgs = document_attrs['orgs'][1:]
-        return {'document_id': document['_id'], 'document_filename': document['filename'], 'orgs': orgs, 'violations': violations, 'userViolation': False, 'id': ObjectId()}
-    else:
-        return None
+    return {'document_id': document['_id'], 'document_filename': document['filename'], 'orgs': document_attrs.get('orgs', []), 'violations': violations, 'userViolation': False, 'id': ObjectId()}
 
 
 def exclude_same_charters(charters):
