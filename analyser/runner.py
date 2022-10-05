@@ -10,7 +10,7 @@ from jsonschema import ValidationError, FormatChecker, Draft7Validator
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser
-from analyser.finalizer import normalize_only_company_name, compare_ignore_case
+from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.parsing import AuditContext
@@ -264,7 +264,7 @@ def get_doc4classification(audit):
     main_doc_type = main_doc['documentType']
     if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
       return main_doc, True
-  document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=None, id_only=True)
+  document_ids = get_docs_by_audit_id(audit["_id"], id_only=True)
   for document_id in document_ids:
     _document = finalizer.get_doc_by_id(document_id)
     if _document['parserResponseCode'] == 200:
@@ -283,6 +283,7 @@ def doc_classification(audit):
   try:
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
+    # compliance = check_compliance(audit, doc4classification)
     if classifier_url is None:
       classification_result = wrapper(doc4classification['parse'])
     else:
@@ -309,10 +310,6 @@ def doc_classification(audit):
 
 
 def audit_phase_1(audit, kind=None):
-  if audit.get('pre-check') and audit.get('checkTypes') is not None and 'Classification' in audit.get('checkTypes'):
-      doc_classification(audit)
-      # return
-
   logger.info(f'.....processing audit {audit["_id"]}')
   if audit.get('subsidiary') is None:
     ctx = AuditContext()
@@ -367,6 +364,10 @@ def audit_phase_2(audit, kind=None):
         logger.info(f'.....processing  {k} of {len(document_ids)}   {jdoc.documentType} {document_id}')
         processor.process(jdoc, audit, ctx)
 
+  if audit.get('pre-check') and 'Classification' in audit.get('checkTypes', {}):
+    doc_classification(audit)
+    # return
+
   change_audit_status(audit, "Finalizing")  # TODO: check ALL docs in proper state
 
 
@@ -420,6 +421,7 @@ def run(run_pahse_2=True, kind=None):
 
   # -----------------------
   # III
+
   logger.info('-> PHASE III (finalize)...')
   finalizer.finalize()
 
