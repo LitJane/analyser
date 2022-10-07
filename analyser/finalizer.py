@@ -684,6 +684,8 @@ def create_check_deal_procedure_violation(restriction):
 
 
 def is_subsidiary(org) -> bool:
+    if is_gpn(org):
+        return False
     org_name = org.get('name', {}).get('value')
     if org_name is not None:
         all_do_names = list(gpn.gpn.all_do_names())
