@@ -137,6 +137,7 @@ class OrgItem():
 
 class ContractSchema(DocumentSchema, HasOrgs):
   price: ContractPrice = None
+  case_number: SemanticTagBase or None = None
 
   def __init__(self):
     super().__init__()
@@ -150,7 +151,7 @@ class ProtocolSchema(DocumentSchema):
     self.org: OrgItem = OrgItem()
     self.structural_level: SemanticTagBase or None = None
     self.agenda_items: [AgendaItem] = []
-
+    self.case_number: SemanticTagBase or None = None
 
 # class CharterConstraint:
 #   def __init__(self):
@@ -583,6 +584,11 @@ document_schemas = {
         },
 
         "number": {
+          "$ref": "#/definitions/string_tag"
+        },
+
+        "case_number": {
+          "description": "Номер дела",
           "$ref": "#/definitions/string_tag"
         },
 

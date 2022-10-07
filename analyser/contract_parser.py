@@ -6,6 +6,7 @@ from overrides import overrides
 from pandas import DataFrame
 
 from analyser.attributes import to_json
+from analyser.case_numbers import find_case_number
 from analyser.contract_agents import ContractAgent, normalize_contract_agent
 from analyser.doc_dates import find_date
 from analyser.documents import TextMap
@@ -86,8 +87,10 @@ class ContractParser(ParsingContext):
     check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline())  # mutator
 
     # TODO: maybe move contract.tokens_map into text map
+    contract.attributes_tree.case_number = find_case_number(contract)
     contract.attributes_tree.number = nn_get_contract_number(_head.tokens_map, semantic_map)
     contract.attributes_tree.date = nn_get_contract_date(_head.tokens_map, semantic_map)
+
 
     return contract
 

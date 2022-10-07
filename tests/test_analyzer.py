@@ -44,9 +44,9 @@ class AnalyzerTestCase(unittest.TestCase):
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_analyze_contract(self):
     processor: BaseProcessor = document_processors[CONTRACT]
-    doc = get_doc_by_id(ObjectId('612cdb24ea1085618e02ff6c'))
+    doc = get_doc_by_id(ObjectId('61408a6a11c893efc81ddc94'))
     if doc is None:
-      raise RuntimeError("fix unit test please")
+      raise RuntimeError("fix unit test please, doc with given UID is not in test DB")
 
     audit = get_audit_by_id(doc['auditId'])
     # print(audit)
@@ -64,7 +64,7 @@ class AnalyzerTestCase(unittest.TestCase):
     processor: BaseProcessor = document_processors[PROTOCOL]
     doc = get_doc_by_id(ObjectId('5e5de70b01c6c73c19eebd35'))
     if doc is None:
-      raise RuntimeError("fix unit test please")
+      raise RuntimeError("fix unit test please, doc with given UID is not in test DB")
 
     audit = get_audit_by_id(doc['auditId'])
 
@@ -79,7 +79,7 @@ class AnalyzerTestCase(unittest.TestCase):
     processor: BaseProcessor = document_processors[CHARTER]
     doc = get_doc_by_id(ObjectId('60c371b7862b20b4ba55c735'))
     if doc is None:
-      raise RuntimeError("fix unit test please")
+      raise RuntimeError("fix unit test please, doc with given UID is not in test DB")
 
     audit = None #get_audit_by_id(doc['auditId'])
 

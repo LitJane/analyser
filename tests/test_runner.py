@@ -34,7 +34,7 @@ class TestRunner(unittest.TestCase):
   def test_is_valid(self):
     doc = get_doc_by_id(ObjectId('5fb3d79f78df3635f5441d31'))
     if doc is None:
-      raise RuntimeError("fix unit test please, use valid OID")
+      raise RuntimeError("fix unit test please, doc with given UID is not in test DB")
 
     audit = get_audit_by_id(doc['auditId'])
     jdoc = DbJsonDoc(doc)
