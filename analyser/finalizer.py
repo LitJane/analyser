@@ -26,6 +26,18 @@ company_name_pattern = re.compile(r'[«\'"](?P<company_name>.+)[»\'"]')
 companies = {'gp': 'Газпром', 'gpn': 'Газпром нефть'}
 
 
+def get_parent_doc(audit, doc_id):
+    db = get_mongodb_connection()
+    for link in audit['links']:
+        if link['fromId'] == doc_id and link['type'] == 'parser':
+            doc = db['documents'].find_one({'_id': link['toId']})
+            return doc
+        if link['toId'] == doc_id and link['type'] == 'parser':
+            doc = db['documents'].find_one({'_id': link['fromId']})
+            return doc
+    return None
+
+
 def normalize_only_company_name(name: str) -> str:
     result = name.strip().replace('"', '').replace("'", '').replace('«', '').replace('»', '')
     _, result = normalize_company_name(result)

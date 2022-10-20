@@ -127,6 +127,11 @@ class BaseProcessor:
     _audit_subsidiary: str = audit["subsidiary"]["name"]
     org_is_ok = ("* Все ДО" == _audit_subsidiary) or (self._same_org(db_document, _audit_subsidiary))
 
+    if not (org_is_ok and date_is_ok) and db_document.documentType == 'ANNEX':
+      _document = finalizer.get_parent_doc(audit, db_document.get_id())
+      jdoc = DbJsonDoc(_document)
+      return self.is_valid(audit, jdoc)
+
     return org_is_ok and date_is_ok
 
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
