@@ -18,6 +18,7 @@ from analyser.persistence import DbJsonDoc
 from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
+from gpn.gpn import subsidiaries
 from integration.classifier.search_text import wrapper, all_labels
 from integration.db import get_mongodb_connection
 from integration.mail import send_classifier_email
@@ -131,9 +132,14 @@ class BaseProcessor:
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
     org = finalizer.get_org(db_doc.get_attributes_tree())
     if org is not None and org.get('name') is not None:
-      org_name = normalize_only_company_name(org['name'].get('value').strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
+      org_name = normalize_only_company_name(org['name'].get('value'))
       if compare_ignore_case(org_name, subsidiary):
         return True
+      for known_subsidiary in subsidiaries:
+        if compare_ignore_case(known_subsidiary.get('_id'), subsidiary):
+          for alias in known_subsidiary.get('aliases'):
+            if compare_ignore_case(alias, subsidiary):
+              return True
     return False
 
 
