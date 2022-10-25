@@ -91,7 +91,6 @@ class ContractParser(ParsingContext):
     contract.attributes_tree.number = nn_get_contract_number(_head.tokens_map, semantic_map)
     contract.attributes_tree.date = nn_get_contract_date(_head.tokens_map, semantic_map)
 
-
     return contract
 
   def validate(self, document: ContractDocument, ctx: AuditContext):
@@ -297,7 +296,7 @@ def check_org_intersections(contract_agents: [OrgItem]):
   return contract_agents
 
 
-def nn_find_contract_value(textmap:TextMap, tagsmap: DataFrame) -> [ContractPrice]:
+def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPrice]:
   cp = ContractPrice()
 
   parent_tag = nn_get_tag_values('value', textmap, tagsmap, max_tokens=50, threshold=0.02, limit=1, return_single=True)
@@ -416,15 +415,18 @@ def nn_get_contract_date(textmap: TextMap, semantic_map: DataFrame) -> SemanticT
       return tag
 
 
-def nn_get_tag_values(tagname: str, textmap: TextMap, semantic_map: pd.DataFrame, max_tokens, threshold=0.3, limit=1,
+def nn_get_tag_values(tagname: str,
+                      textmap: TextMap,
+                      semantic_map: pd.DataFrame,
+                      max_tokens,
+                      threshold=0.3,
+                      limit=1,
                       return_single=False) -> (SemanticTag or None) or [SemanticTag]:
   starts = semantic_map[tagname + "-begin"].values.copy()
   ends = semantic_map[tagname + "-end"].values.copy()
 
   starts[starts < threshold] = 0
   ends[ends < threshold] = 0
-
-  #   print('ends argmax', ends.argmax())
 
   def top_inices(arr, limit):
     _tops = np.argsort(arr)[-limit:]
@@ -440,11 +442,10 @@ def nn_get_tag_values(tagname: str, textmap: TextMap, semantic_map: pd.DataFrame
     return -1
 
   def find_slices(begins, ends):
-
-    for b in begins:
-      e = next_index_from(b, ends)
-      if e > 0:
-        yield (b, e)
+    for _begin in begins:
+      _end = next_index_from(_begin, ends)
+      if _end > 0:
+        yield (_begin, _end)
 
   def slice_confidence(sl, att):
     for s in sl:
@@ -455,11 +456,8 @@ def nn_get_tag_values(tagname: str, textmap: TextMap, semantic_map: pd.DataFrame
 
   slices = list(find_slices(top_starts, top_ends))
   slices = sorted(slice_confidence(slices, starts + ends), key=lambda x: x[1])[::-1]
+  slices = sorted(slices, key=lambda x: x[0][0])
 
-  #   print('top_starts',top_starts)
-  #   print('top_ends',top_ends)
-  #   print('slices', slices)
-  #   print()
 
   tags = []
   for s in slices:
