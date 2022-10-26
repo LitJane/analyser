@@ -56,7 +56,7 @@ data = [
   (0, 381600.0, 'RUB', False,
    'Общая стоимость Услуг по настоящему Договору составляет 381 600 (Триста восемьдесят одна тысяча  шестьсот ) рублей 00 коп., кроме того НДС (20%) в размере 76 320  (Семьдесят шесть тысяч триста двадцать) рублей 00 коп.'),
 
-  (0, 1000000.0, 'EURO', False,
+  (0, 1000000.0, 'EUR', False,
    'стоимость покупки: 1 000 000 евро '),
 
   (0, 86500.0, 'RUB', False,
@@ -230,7 +230,7 @@ class PriceExtractTestCase(unittest.TestCase):
     doc.parse()
     print(doc.normal_text)
     # =========================================
-    r:[ContractPrice] = find_value_sign_currency(doc)
+    r: [ContractPrice] = find_value_sign_currency(doc)
     # =========================================
 
     # for sum, sign, currency in r:
@@ -247,7 +247,7 @@ class PriceExtractTestCase(unittest.TestCase):
     self.assertEqual('долларов', doc.tokens_map_norm.text_range(r[0].currency.span))  # TODO: keep
 
   def test_find_all_value_sign_currency_d(self):
-    sign_exp, price, currency_exp, text = (0, 1000000.0, 'EURO', 'стоимость покупки: 1 000 000 евро ')
+    sign_exp, price, currency_exp, text = (0, 1000000.0, 'EUR', 'стоимость покупки: 1 000 000 евро ')
 
     doc = ContractDocument(text)
     doc.parse()

@@ -192,6 +192,8 @@ class CharterParser(ParsingContext):
 
     # doc.org_tags = find_charter_org(doc)
     doc.attributes_tree.org = find_charter_org_obj(doc)
+    if doc.attributes_tree.org:
+      doc.attributes_tree.org.alias=None
     doc.attributes_tree.date = find_document_date(doc)
 
     return doc

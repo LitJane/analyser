@@ -6,6 +6,7 @@ from typing import Iterator
 from pyjarowinkler import distance
 
 from analyser.attributes import to_json
+from analyser.case_numbers import find_case_number
 from analyser.contract_agents import complete_re as agents_re, find_org_names, ORG_LEVELS_re, find_org_names_raw, \
   ContractAgent, _rename_org_tags, protocol_caption_complete_re, protocol_caption_complete_re_ignore_case
 from analyser.doc_dates import find_document_date
@@ -178,6 +179,7 @@ class ProtocolParser(ParsingContext):
     doc.org_level = max_confident_tag(list(find_org_structural_level(doc)))
     doc.attributes_tree.org = find_protocol_org_obj(doc)
     doc.date = find_document_date(doc)
+    doc.attributes_tree.case_number=find_case_number(doc)
 
     if doc.attributes_tree.org is not None:
       if doc.attributes_tree.org.name is None:
