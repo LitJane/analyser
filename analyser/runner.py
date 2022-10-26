@@ -294,7 +294,7 @@ def doc_classification(audit):
   try:
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
-    # compliance = check_compliance(audit, doc4classification)
+    violations, errors = check_compliance(audit, doc4classification)
     if classifier_url is None:
       classification_result = wrapper(doc4classification['parse'])
     else:

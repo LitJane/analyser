@@ -1086,9 +1086,10 @@ def check_compliance(audit, document):
             links = []
             user_linked_docs = get_linked_docs(audit, document["_id"])
             check_contract_by_charter(audit, document, charter, [], user_linked_docs, violations, links)
+            return violations, errors
         else:
             errors.append({'type': 'analysis', 'text': 'Не найден подходящий устав'})
-    return False, errors
+    return [], errors
 
 
 def exclude_same_charters(charters):
