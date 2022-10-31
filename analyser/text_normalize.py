@@ -52,8 +52,12 @@ r_name = r_group(_r_name, 'name')
 """Puts name into qotes"""
 r_human_name_part = r_capitalized
 
-r_human_full_name = r_group(r_human_name_part + r'\s*' + r_human_name_part + r'\s*' + r_human_name_part + r'?\w')
-r_human_abbr_name = r_group(r_human_name_part + r'\s*' + r'([А-ЯA-Z][.]\s?){1,2}')
+r_human_name_part_norm = r_group(r'\b[А-ЯA-Z]\B[а-яa-z]{1,25}')
+r_human_name_part_cap = r_group(r'[A-ZА-Я-]{0,25}')
+
+
+r_human_full_name = r_group(r_human_name_part_norm + r'\s*' + r_human_name_part_norm + r'\s*' + r_human_name_part_norm + r'?\w')
+r_human_abbr_name = r_group(r_human_name_part_norm + r'\s*' + r'([А-ЯA-Z][.]\s?){1,2}')
 r_human_name = r_group(r_human_full_name + '|' + r_human_abbr_name, 'human_name')
 
 r_human_name_compilled = re.compile(r'\W' + r_human_name, re.MULTILINE)
