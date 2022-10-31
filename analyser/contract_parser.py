@@ -84,7 +84,7 @@ class ContractParser(ParsingContext):
 
     contract.attributes_tree.orgs = nn_find_org_names(_head.tokens_map, semantic_map,
                                                       audit_ctx=ctx)
-    check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline())  # mutator
+    check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline(), ctx)  # mutator
 
     # TODO: maybe move contract.tokens_map into text map
     contract.attributes_tree.case_number = find_case_number(contract)
@@ -149,7 +149,7 @@ class ContractParser(ParsingContext):
       contract.attributes_tree.orgs = nn_find_org_names(_contract_cut.tokens_map, semantic_map,
                                                         audit_ctx=ctx)
 
-    check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline())  # mutator
+    check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline(), ctx)  # mutator
 
     # -------------------------------subject
     contract.subject = nn_get_subject(_contract_cut.tokens_map, semantic_map, subj_1hot)
@@ -234,12 +234,12 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
   return contract_agents  # _swap_org_tags(cas)
 
 
-def check_orgs_natural_person(contract_agents: [OrgItem], header0: str):
+def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx:AuditContext):
   if not contract_agents:
     return
 
   for contract_agent in contract_agents:
-    check_org_is_natural_person(contract_agent)
+    check_org_is_natural_person(contract_agent, ctx)
 
   logger.info(f'header: {header0}')
 
@@ -250,10 +250,21 @@ def check_orgs_natural_person(contract_agents: [OrgItem], header0: str):
   return contract_agents
 
 
-def check_org_is_natural_person(contract_agent: OrgItem):
+def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx:AuditContext):
+
+
   human_name = False
   if contract_agent.name is not None:
     name = contract_agent.name.value
+
+    if contract_agent.is_known_subsidiary:
+      # known subsidiary may not be natural person
+      return
+
+    if audit_ctx.is_same_org(name):
+      # known subsidiary may not be natural person
+      return
+
     x = r_human_name_compilled.search(name)
     if x is not None:
       human_name = True
