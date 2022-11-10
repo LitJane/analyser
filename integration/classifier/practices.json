@@ -14,5 +14,5 @@
   {"_id": 12, "tessa_id": "c20d1432-2230-4170-8fed-7903f823e126", "label": "Практика правовой поддержки использования и коммерциализации ИС", "email": "", "auto-classified": true},
   {"_id": 13, "tessa_id": "0fde764f-7aa4-4f9d-9e75-991b1c177f46", "label": "Практика судебной защиты", "email": "", "auto-classified": false},
   {"_id": 14, "tessa_id": "5fe00086-8dd2-4726-bce4-c9cc5e6656c5", "label": "Практика правового сопровождения крупных проектов", "email": "", "auto-classified": false},
-  {"_id": 15, "tessa_id": "cc7e8f05-5a3e-4cfd-8338-559983d1b8da", "label": "Практики корпоративного мониторинга и комплаенса", "email": "", "auto-classified": false}
+  {"_id": 15, "tessa_id": "cc7e8f05-5a3e-4cfd-8338-559983d1b8da", "label": "Практики корпоративного мониторинга и комплаенса", "email": "", "auto-classified": false, "compliance":  true}
 ]

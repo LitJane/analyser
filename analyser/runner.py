@@ -19,9 +19,9 @@ from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
 from gpn.gpn import subsidiaries
+from integration import mail
 from integration.classifier.search_text import wrapper, all_labels
 from integration.db import get_mongodb_connection
-from integration.mail import send_classifier_email
 
 schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
 
@@ -294,7 +294,11 @@ def doc_classification(audit):
   try:
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
-    violations, errors = check_compliance(audit, doc4classification)
+    if doc4classification['documentType'] in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
+      violations, errors = check_compliance(audit, doc4classification)
+      if len(errors) > 0:
+        mail.send_compliance_error_email()
+        mail.send_compliance_info_email()
     if classifier_url is None:
       classification_result = wrapper(doc4classification['parse'])
     else:
@@ -315,7 +319,7 @@ def doc_classification(audit):
           fs = gridfs.GridFS(get_mongodb_connection())
           for file_id in audit['additionalFields']['file_ids']:
             attachments.append(fs.get(file_id))
-          send_classifier_email(audit, top_result, attachments, all_labels)
+          mail.send_classifier_email(audit, top_result, attachments, all_labels)
   except Exception as ex:
     logger.exception(ex)
 

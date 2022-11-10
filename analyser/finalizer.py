@@ -1068,27 +1068,26 @@ def check_contract_project(document, audit, interests, beneficiaries, docs, insi
 
 def check_compliance(audit, document):
     errors = []
-    if document['documentType'] in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
-        doc_attrs = get_attrs(document)
-        charter = None
-        if len(doc_attrs.get('orgs', [])) > 0:
-            for doc_org in doc_attrs.get('orgs', []):
-                if doc_org.get('name', {}).get('value') is not None:
-                    charter = get_latest_charter_by_org(doc_org.get('name', {}).get('value'))
-                    if charter is not None:
-                        break
-                else:
-                    errors.append({'type': 'analysis', 'text': 'Имя стороны не определено'})
-        else:
-            errors.append({'type': 'analysis', 'text': 'Не были найдены стороны'})
-        if charter is not None:
-            violations = []
-            links = []
-            user_linked_docs = get_linked_docs(audit, document["_id"])
-            check_contract_by_charter(audit, document, charter, [], user_linked_docs, violations, links)
-            return violations, errors
-        else:
-            errors.append({'type': 'analysis', 'text': 'Не найден подходящий устав'})
+    doc_attrs = get_attrs(document)
+    charter = None
+    if len(doc_attrs.get('orgs', [])) > 0:
+        for doc_org in doc_attrs.get('orgs', []):
+            if doc_org.get('name', {}).get('value') is not None:
+                charter = get_latest_charter_by_org(doc_org.get('name', {}).get('value'))
+                if charter is not None:
+                    break
+            else:
+                errors.append({'type': 'analysis', 'text': 'В договорном документе имя стороны не определено'})
+    else:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не были найдены стороны'})
+    if charter is not None:
+        violations = []
+        links = []
+        user_linked_docs = get_linked_docs(audit, document["_id"])
+        check_contract_by_charter(audit, document, charter, [], user_linked_docs, violations, links)
+        return violations, errors
+    else:
+        errors.append({'type': 'analysis', 'text': 'Не найден подходящий устав'})
     return [], errors
 
 

@@ -213,3 +213,19 @@ def send_classifier_error_email(audit, attachments: []) -> bool:
     except Exception as e:
         logger.exception(e)
     return False
+
+
+def send_compliance_info_email(audit, ) -> bool:
+    return False
+
+
+def send_compliance_error_email() -> bool:
+    return False
+
+
+def send_compliance_result_email() -> bool:
+    return False
+
+
+def send_compliance_protocol_praparation_email() -> bool:
+    return False
