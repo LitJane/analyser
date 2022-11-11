@@ -1,14 +1,16 @@
 import json
+import os
 
 import gridfs
 import pymongo
-from bson import json_util
+import requests
+from bson import json_util, ObjectId
 from jsonschema import ValidationError, FormatChecker, Draft7Validator
 
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser
-from analyser.finalizer import normalize_only_company_name, compare_ignore_case
+from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.parsing import AuditContext
@@ -16,6 +18,7 @@ from analyser.persistence import DbJsonDoc
 from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
+from gpn.gpn import subsidiaries
 from integration.classifier.search_text import wrapper, all_labels
 from integration.db import get_mongodb_connection
 from integration.mail import send_classifier_email
@@ -25,7 +28,7 @@ schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecke
 CHARTER = 'CHARTER'
 CONTRACT = 'CONTRACT'
 PROTOCOL = 'PROTOCOL'
-
+classifier_url = os.environ.get('GPN_CLASSIFIER_SERVICE_URL')
 
 class Runner:
   default_instance: 'Runner' = None
@@ -124,14 +127,24 @@ class BaseProcessor:
     _audit_subsidiary: str = audit["subsidiary"]["name"]
     org_is_ok = ("* Все ДО" == _audit_subsidiary) or (self._same_org(db_document, _audit_subsidiary))
 
+    if not (org_is_ok and date_is_ok) and db_document.documentType == 'ANNEX':
+      _document = finalizer.get_parent_doc(audit, db_document.get_id())
+      jdoc = DbJsonDoc(_document)
+      return self.is_valid(audit, jdoc)
+
     return org_is_ok and date_is_ok
 
   def _same_org(self, db_doc: DbJsonDoc, subsidiary: str) -> bool:
     org = finalizer.get_org(db_doc.get_attributes_tree())
     if org is not None and org.get('name') is not None:
-      org_name = normalize_only_company_name(org['name'].get('value').strip().replace('"', '').replace("'", '').replace('«', '').replace('»', ''))
+      org_name = normalize_only_company_name(org['name'].get('value'))
       if compare_ignore_case(org_name, subsidiary):
         return True
+      for known_subsidiary in subsidiaries:
+        if compare_ignore_case(known_subsidiary.get('_id'), subsidiary):
+          for alias in known_subsidiary.get('aliases'):
+            if compare_ignore_case(alias, subsidiary):
+              return True
     return False
 
 
@@ -262,7 +275,7 @@ def get_doc4classification(audit):
     main_doc_type = main_doc['documentType']
     if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
       return main_doc, True
-  document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=None, id_only=True)
+  document_ids = get_docs_by_audit_id(audit["_id"], id_only=True)
   for document_id in document_ids:
     _document = finalizer.get_doc_by_id(document_id)
     if _document['parserResponseCode'] == 200:
@@ -281,25 +294,33 @@ def doc_classification(audit):
   try:
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
-    classification_result = wrapper(doc4classification['parse'])
+    # compliance = check_compliance(audit, doc4classification)
+    if classifier_url is None:
+      classification_result = wrapper(doc4classification['parse'])
+    else:
+      response = requests.post(classifier_url + '/api/classify', json=doc4classification['parse'])
+      if response.status_code != 200:
+        logger.error(f'Classifier returned error code: {response.status_code}, message: {response.json()}')
+        audits = get_mongodb_connection()['audits']
+        update = {'$push': {'errors': {'type': 'classifier_service', 'text': 'Ошибка классификатора'}}}
+        audits.update_one({'_id': ObjectId(audit["_id"])}, update)
+        return
+      classification_result = response.json()
+
     if classification_result:
-      save_audit_practice(audit, classification_result, not main_doc)
-      if audit['additionalFields']['external_source'] == 'email':
-        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
-        attachments = []
-        fs = gridfs.GridFS(get_mongodb_connection())
-        for file_id in audit['additionalFields']['file_ids']:
-          attachments.append(fs.get(file_id))
-        send_classifier_email(audit, top_result, attachments, all_labels)
+        save_audit_practice(audit, classification_result, not main_doc)
+        if audit['additionalFields']['external_source'] == 'email':
+          top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+          attachments = []
+          fs = gridfs.GridFS(get_mongodb_connection())
+          for file_id in audit['additionalFields']['file_ids']:
+            attachments.append(fs.get(file_id))
+          send_classifier_email(audit, top_result, attachments, all_labels)
   except Exception as ex:
     logger.exception(ex)
 
 
 def audit_phase_1(audit, kind=None):
-  if audit.get('pre-check') and audit.get('checkTypes') is not None and 'Classification' in audit.get('checkTypes'):
-      doc_classification(audit)
-      # return
-
   logger.info(f'.....processing audit {audit["_id"]}')
   if audit.get('subsidiary') is None:
     ctx = AuditContext()
@@ -354,6 +375,10 @@ def audit_phase_2(audit, kind=None):
         logger.info(f'.....processing  {k} of {len(document_ids)}   {jdoc.documentType} {document_id}')
         processor.process(jdoc, audit, ctx)
 
+  if audit.get('pre-check') and 'Classification' in audit.get('checkTypes', {}):
+    doc_classification(audit)
+    # return
+
   change_audit_status(audit, "Finalizing")  # TODO: check ALL docs in proper state
 
 
@@ -407,6 +432,7 @@ def run(run_pahse_2=True, kind=None):
 
   # -----------------------
   # III
+
   logger.info('-> PHASE III (finalize)...')
   finalizer.finalize()
 

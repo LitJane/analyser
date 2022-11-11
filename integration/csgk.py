@@ -61,7 +61,7 @@ def get_subsidiary_list():
         user = _env_var('GPN_CSGK_USER')
         password = _env_var('GPN_CSGK_PASSWORD')
         if client is not None and user is not None and password is not None:
-            subsidiaries = []
+            subsidiaries = {}
             result_raw = client.service.Execute(user, password, 'Get_CompanySimple_List')
             result = helpers.serialize_object(result_raw)
 
@@ -86,8 +86,8 @@ def get_subsidiary_list():
                         'CuratorDO_Name': csgk_sub.get('CuratorDO_Name'),
                         'CuratorDO_Email': csgk_sub.get('CuratorDO_Email')
                     }
-                    subsidiaries.append(subsidiary)
-                return subsidiaries
+                    subsidiaries[subsidiary['_id']] = subsidiary
+                return list(subsidiaries.values())
             else:
                 logger.error(f'CSGK returned {ret_code} code. Error message: {ret_msg}')
     except Exception as e:

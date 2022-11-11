@@ -36,6 +36,10 @@ def send_email(smtp_server, port, login, password, message):
         logger.error('SMTP error occurred: ' + str(e))
 
 
+def escape_email_headers(input: str) -> str:
+    return input.replace('\r', '').replace('\n', '')
+
+
 def send_end_audit_email(audit) -> bool:
     try:
         smtp_server = _env_var('GPN_SMTP_SERVER')
@@ -47,9 +51,9 @@ def send_end_audit_email(audit) -> bool:
 
         if smtp_server is not None and port is not None and sender_email is not None and password is not None and login:
             message = MIMEMultipart("alternative")
-            message["Subject"] = f"Проверка {audit['subsidiary']['name']} завершена"
-            message["From"] = sender_email
-            message["To"] = audit['author']['mail']
+            message["Subject"] = escape_email_headers(f"Проверка {audit['subsidiary']['name']} завершена")
+            message["From"] = escape_email_headers(sender_email)
+            message["To"] = escape_email_headers(audit['author']['mail'])
 
             if web_url is None:
                 text = f"Проверка {audit['subsidiary']['name']} завершена"
@@ -108,10 +112,10 @@ def send_classifier_email(audit, top_classification_result, attachments: [], pra
 
         if smtp_server and port and sender_email and password and login and web_url:
             message = EmailMessage()
-            message["Subject"] = f"{audit['additionalFields']['email_subject']}"
-            message["From"] = sender_email
-            message["To"] = top_classification_result['email']
-            message['Cc'] = audit['additionalFields']['email_from']
+            message["Subject"] = escape_email_headers(f"{audit['additionalFields']['email_subject']}")
+            message["From"] = escape_email_headers(sender_email)
+            message["To"] = escape_email_headers(top_classification_result['email'])
+            message['Cc'] = escape_email_headers(audit['additionalFields']['email_from'])
 
             plain_text = f"""
                 Здравствуйте!
@@ -176,9 +180,9 @@ def send_classifier_error_email(audit, attachments: []) -> bool:
 
         if smtp_server and port and sender_email and password and login and web_url:
             message = EmailMessage()
-            message["Subject"] = f"{audit['additionalFields']['email_subject']}"
-            message["From"] = sender_email
-            message['To'] = audit['additionalFields']['email_from']
+            message["Subject"] = escape_email_headers(f"{audit['additionalFields']['email_subject']}")
+            message["From"] = escape_email_headers(sender_email)
+            message['To'] = escape_email_headers(audit['additionalFields']['email_from'])
 
             plain_text = f"""
                 Здравствуйте!
