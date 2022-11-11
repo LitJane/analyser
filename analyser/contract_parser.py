@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 
 import numpy as np
@@ -15,7 +16,7 @@ from analyser.insides_finder import InsidesFinder
 from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
-from analyser.parsing import ParsingContext, AuditContext, find_value_sign_currency_attention
+from analyser.parsing import ParsingContext, AuditContext
 from analyser.patterns import AV_SOFT, AV_PREFIX
 from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
@@ -255,10 +256,13 @@ def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx:AuditContext)
 
   human_name = False
   if contract_agent.name is not None:
-    name = contract_agent.name.value
+    name:str = contract_agent.name.value
 
     if contract_agent.is_known_subsidiary:
       # known subsidiary may not be natural person
+      return
+
+    if re.search('Газпромнефть', name, re.IGNORECASE): #TODO: hack
       return
 
     if audit_ctx.is_same_org(name):
