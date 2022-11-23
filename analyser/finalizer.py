@@ -101,6 +101,8 @@ def extract_text(span, words, text):
 
 
 def get_nearest_header(headers, position):
+    if len(headers) == 0:
+        return {}
     found_header = headers[0]
     for header in headers:
         if header["span"][0] > position:
@@ -368,6 +370,7 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                                                                   "competence_attr_name": get_charter_span(eligible_charter_attrs, 'ShareholdersGeneralMeeting', 'BigDeal')}}
                     change_contract_primary_subject(contract, 'BigDeal')
             else:
+                found_big_deal_competence = False
                 if charter_subject_map.get('BigDeal') is not None:
                     if charter_subject_map['BigDeal'].get('BoardOfDirectors') is not None:
                         big_deal_subject_charter_competence = charter_subject_map['BigDeal'].get('BoardOfDirectors')
@@ -379,6 +382,7 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                             if contract_value['value'] > limit:
                                 change_contract_primary_subject(contract, 'BigDeal')
                                 competences = {'BoardOfDirectors': big_deal_subject_charter_competence}
+                                found_big_deal_competence = True
                     if charter_subject_map['BigDeal'].get('AllMembers') is not None:
                         big_deal_subject_charter_competence = charter_subject_map['BigDeal'].get('AllMembers')
                         if big_deal_subject_charter_competence.get('min') is not None \
@@ -389,6 +393,12 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                             if contract_value['value'] > limit:
                                 change_contract_primary_subject(contract, 'BigDeal')
                                 competences = {'AllMembers': big_deal_subject_charter_competence}
+                                found_big_deal_competence = True
+                if org is not None and 'общество с ограниченной ответственностью' == org.get('type', {}).get('value', '').lower():
+                    if not found_big_deal_competence and contract_value["value"] > book_value * 0.25:
+                        competences = {'AllMembers': {"min": 25, "currency_min": "Percent", "max": np.inf, "currency_max": "Percent",
+                                                  "competence_attr_name": get_charter_span(eligible_charter_attrs, 'AllMembers', 'BigDeal')}}
+                        change_contract_primary_subject(contract, 'BigDeal')
 
     if competences is not None and contract_value is not None:
         eligible_protocol = None
@@ -435,7 +445,9 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
             if competence_span is not None:
                 text = extract_text(competence_span,
                                     eligible_charter["analysis"]["tokenization_maps"]["words"],
-                                    eligible_charter["analysis"]["normal_text"]) + "(" + get_nearest_header(eligible_charter["analysis"]["headers"], competence_span[0])["value"] + ")"
+                                    eligible_charter["analysis"]["normal_text"])
+                if len(eligible_charter.get("analysis", {}).get("headers", [])) > 0:
+                    text = text + "(" + get_nearest_header(eligible_charter["analysis"]["headers"], competence_span[0])["value"] + ")"
             if competence_constraint["min"] != 0:
                 min_value = {"value": competence_constraint["min"], "currency": competence_constraint["currency_min"]}
             if competence_constraint["max"] != np.inf:
