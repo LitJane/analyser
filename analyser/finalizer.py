@@ -227,6 +227,8 @@ def get_charter_diapasons(charter):
                             if len(constraints) == 0:
                                 min_constraint = 0
                             for constraint in constraints:
+                                if constraint.get('currency') is None or constraint.get('value') is None:
+                                    continue
                                 constraint_currency = constraint['currency']['value']
                                 constraint_amount = constraint['amount']['value']
                                 if constraint_currency != 'Percent':
