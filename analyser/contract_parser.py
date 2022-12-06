@@ -351,9 +351,10 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
 
     if cp.currency is None:
       cp.currency = SemanticTag('currency')
-    cp.currency.span = textmap.token_indices_by_char_range(results.currency_span)
+      cp.currency.span = textmap.token_indices_by_char_range(results.currency_span)
+      cp.currency.offset(cp.span[0])
     cp.currency.value = results.currencly_name
-    cp.currency.offset(cp.span[0])
+
 
   except TypeError as e:
     logger.error(e)
