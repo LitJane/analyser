@@ -179,6 +179,17 @@ def get_audits() -> [dict]:
   return res
 
 
+def get_audits_for_notification() -> [dict]:
+  db = get_mongodb_connection()
+  audits_collection = db['audits']
+
+  cursor = audits_collection.find({'toBeApproved': True, 'additionalFields.external_source': 'email'}).sort([("createDate", pymongo.ASCENDING)])
+  res = []
+  for audit in cursor:
+    res.append(audit)
+  return res
+
+
 def get_all_new_charters():
   # TODO: fetch chartes with unknown satate (might be)
   return get_docs_by_audit_id(id=None, states=[DocumentState.New.value], kind=CHARTER)
@@ -294,22 +305,29 @@ def doc_classification(audit):
   try:
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
+    classification_result = None
     if doc4classification['documentType'] in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
       violations, errors = check_compliance(audit, doc4classification)
+      compliance_mapping = next(filter(lambda x: x['_id'] == 1015, all_labels), None)
       if len(errors) > 0:
-        mail.send_compliance_error_email()
-        mail.send_compliance_info_email()
-    if classifier_url is None:
-      classification_result = wrapper(doc4classification['parse'])
-    else:
-      response = requests.post(classifier_url + '/api/classify', json=doc4classification['parse'])
-      if response.status_code != 200:
-        logger.error(f'Classifier returned error code: {response.status_code}, message: {response.json()}')
-        audits = get_mongodb_connection()['audits']
-        update = {'$push': {'errors': {'type': 'classifier_service', 'text': 'Ошибка классификатора'}}}
-        audits.update_one({'_id': ObjectId(audit["_id"])}, update)
-        return
-      classification_result = response.json()
+        mail.send_compliance_error_email(audit, errors, compliance_mapping['email'])
+        mail.send_compliance_info_email(audit)
+
+      if len(violations) > 0:
+        classification_result = [{'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0}]
+
+    if classification_result is None:
+      if classifier_url is None:
+        classification_result = wrapper(doc4classification['parse'])
+      else:
+        response = requests.post(classifier_url + '/api/classify', json=doc4classification['parse'])
+        if response.status_code != 200:
+          logger.error(f'Classifier returned error code: {response.status_code}, message: {response.json()}')
+          audits = get_mongodb_connection()['audits']
+          update = {'$push': {'errors': {'type': 'classifier_service', 'text': 'Ошибка классификатора'}}}
+          audits.update_one({'_id': ObjectId(audit["_id"])}, update)
+          return
+        classification_result = response.json()
 
     if classification_result:
         save_audit_practice(audit, classification_result, not main_doc)
@@ -440,6 +458,9 @@ def run(run_pahse_2=True, kind=None):
   logger.info('-> PHASE III (finalize)...')
   finalizer.finalize()
 
+  logger.info('-> PHASE IV (notifications)...')
+  for audit in get_audits_for_notification():
+    result = mail.send_compliance_protocol_praparation_email()
 
 if __name__ == '__main__':
   run()

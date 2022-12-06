@@ -92,6 +92,7 @@ def update_db_dictionaries():
     coll = db['audits']
     coll.create_index('email_sent')
     coll.create_index('additionalFields.external_source')
+    coll.create_index('toBeApproved')
 
 
 if __name__ == '__main__':

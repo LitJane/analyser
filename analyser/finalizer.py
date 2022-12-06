@@ -159,7 +159,7 @@ def get_latest_charter_by_org(org_name):
     for charter in cursor:
         attrs = get_attrs(charter)
         if org_name == attrs.get('org', {}).get('name', {}).get('value', '') \
-                and (charter.get("isActive", True)) and charter["state"] == 15:
+                and charter.get("isActive", True) is not False and charter.get("state", 0) == 15:
             charters.append(charter)
     cleaned_charters = exclude_same_charters(charters)
     charters = sorted(cleaned_charters, key=lambda k: get_attrs(k).get('date', {}).get("value"), reverse=True)
@@ -1077,9 +1077,13 @@ def check_compliance(audit, document):
                 if charter is not None:
                     break
             else:
-                errors.append({'type': 'analysis', 'text': 'В договорном документе имя стороны не определено'})
+                errors.append({'type': 'analysis', 'text': 'В договорном документе имя стороны не найдено'})
     else:
         errors.append({'type': 'analysis', 'text': 'В договорном документе не были найдены стороны'})
+    if doc_attrs.get('subject', {}).get('value') is not None:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не найден предмет договора'})
+    if get_amount_netto(doc_attrs.get('price')) is not None:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не найдена сумма'})
     if charter is not None:
         violations = []
         links = []
