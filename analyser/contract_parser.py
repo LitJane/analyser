@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 
 import numpy as np
@@ -15,7 +16,7 @@ from analyser.insides_finder import InsidesFinder
 from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
-from analyser.parsing import ParsingContext, AuditContext, find_value_sign_currency_attention
+from analyser.parsing import ParsingContext, AuditContext
 from analyser.patterns import AV_SOFT, AV_PREFIX
 from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
@@ -124,8 +125,7 @@ class ContractParser(ParsingContext):
     _contract_cut = contract
     if len(contract) > HyperParameters.max_doc_size_tokens:
       contract.warn_trimmed(HyperParameters.max_doc_size_tokens)
-      _contract_cut = contract[
-                      0:HyperParameters.max_doc_size_tokens]  # warning, trimming doc for analysis phase 1
+      _contract_cut = contract[0:HyperParameters.max_doc_size_tokens]  # warning, trimming doc for analysis phase 1
 
     # ------ lazy embedding
     if _contract_cut.embeddings is None:
@@ -234,7 +234,7 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
   return contract_agents  # _swap_org_tags(cas)
 
 
-def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx:AuditContext):
+def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: AuditContext):
   if not contract_agents:
     return
 
@@ -250,15 +250,16 @@ def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx:Audi
   return contract_agents
 
 
-def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx:AuditContext):
-
-
+def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext):
   human_name = False
   if contract_agent.name is not None:
-    name = contract_agent.name.value
+    name: str = contract_agent.name.value
 
     if contract_agent.is_known_subsidiary:
       # known subsidiary may not be natural person
+      return
+
+    if re.search('Газпром', name, re.IGNORECASE):  # TODO: hack
       return
 
     if audit_ctx.is_same_org(name):
@@ -468,7 +469,6 @@ def nn_get_tag_values(tagname: str,
   slices = list(find_slices(top_starts, top_ends))
   slices = sorted(slice_confidence(slices, starts + ends), key=lambda x: x[1])[::-1]
   slices = sorted(slices, key=lambda x: x[0][0])
-
 
   tags = []
   for s in slices:
