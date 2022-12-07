@@ -161,7 +161,7 @@ def get_latest_charter_by_org(org_name):
     for charter in cursor:
         attrs = get_attrs(charter)
         if org_name == attrs.get('org', {}).get('name', {}).get('value', '') \
-                and (charter.get("isActive", True)) and charter["state"] == 15:
+                and charter.get("isActive", True) is not False and charter.get("state", 0) == 15:
             charters.append(charter)
     cleaned_charters = exclude_same_charters(charters)
     charters = sorted(cleaned_charters, key=lambda k: get_attrs(k).get('date', {}).get("value"), reverse=True)
@@ -1082,27 +1082,31 @@ def check_contract_project(document, audit, interests, beneficiaries, docs, insi
 
 def check_compliance(audit, document):
     errors = []
-    if document['documentType'] in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
-        doc_attrs = get_attrs(document)
-        charter = None
-        if len(doc_attrs.get('orgs', [])) > 0:
-            for doc_org in doc_attrs.get('orgs', []):
-                if doc_org.get('name', {}).get('value') is not None:
-                    charter = get_latest_charter_by_org(doc_org.get('name', {}).get('value'))
-                    if charter is not None:
-                        break
-                else:
-                    errors.append({'type': 'analysis', 'text': 'Имя стороны не определено'})
-        else:
-            errors.append({'type': 'analysis', 'text': 'Не были найдены стороны'})
-        if charter is not None:
-            violations = []
-            links = []
-            user_linked_docs = get_linked_docs(audit, document["_id"])
-            check_contract_by_charter(audit, document, charter, [], user_linked_docs, violations, links)
-        else:
-            errors.append({'type': 'analysis', 'text': 'Не найден подходящий устав'})
-    return False, errors
+    doc_attrs = get_attrs(document)
+    charter = None
+    if len(doc_attrs.get('orgs', [])) > 0:
+        for doc_org in doc_attrs.get('orgs', []):
+            if doc_org.get('name', {}).get('value') is not None:
+                charter = get_latest_charter_by_org(doc_org.get('name', {}).get('value'))
+                if charter is not None:
+                    break
+            else:
+                errors.append({'type': 'analysis', 'text': 'В договорном документе имя стороны не найдено'})
+    else:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не были найдены стороны'})
+    if doc_attrs.get('subject', {}).get('value') is not None:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не найден предмет договора'})
+    if get_amount_netto(doc_attrs.get('price')) is not None:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не найдена сумма'})
+    if charter is not None:
+        violations = []
+        links = []
+        user_linked_docs = get_linked_docs(audit, document["_id"])
+        check_contract_by_charter(audit, document, charter, [], user_linked_docs, violations, links)
+        return violations, errors
+    else:
+        errors.append({'type': 'analysis', 'text': 'Не найден подходящий устав'})
+    return [], errors
 
 
 def exclude_same_charters(charters):

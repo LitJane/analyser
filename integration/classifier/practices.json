@@ -12,7 +12,7 @@
   {"_id": 10, "tessa_id": "87da0857-c107-4141-bf08-f3a25ef67898", "label": "Практика поддержки региональных, розничных продаж и клиентского сервиса", "email": "", "auto-classified": true},
   {"_id": 11, "tessa_id": "dfc93061-1525-4a06-b4e4-70971be71057", "label": "Практика правового сопровождения переработки и инфраструктуры", "email": "", "auto-classified": true},
   {"_id": 12, "tessa_id": "c20d1432-2230-4170-8fed-7903f823e126", "label": "Практика правовой поддержки использования и коммерциализации ИС", "email": "", "auto-classified": true},
-  {"_id": 13, "tessa_id": "0fde764f-7aa4-4f9d-9e75-991b1c177f46", "label": "Практика судебной защиты", "email": "", "auto-classified": false},
-  {"_id": 14, "tessa_id": "5fe00086-8dd2-4726-bce4-c9cc5e6656c5", "label": "Практика правового сопровождения крупных проектов", "email": "", "auto-classified": false},
-  {"_id": 15, "tessa_id": "cc7e8f05-5a3e-4cfd-8338-559983d1b8da", "label": "Практики корпоративного мониторинга и комплаенса", "email": "", "auto-classified": false}
+  {"_id": 1013, "tessa_id": "0fde764f-7aa4-4f9d-9e75-991b1c177f46", "label": "Практика судебной защиты", "email": "", "auto-classified": false},
+  {"_id": 1014, "tessa_id": "5fe00086-8dd2-4726-bce4-c9cc5e6656c5", "label": "Практика правового сопровождения крупных проектов", "email": "", "auto-classified": false},
+  {"_id": 1015, "tessa_id": "cc7e8f05-5a3e-4cfd-8338-559983d1b8da", "label": "Практики корпоративного мониторинга и комплаенса", "email": "", "auto-classified": false}
 ]
