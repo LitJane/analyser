@@ -314,7 +314,7 @@ def send_compliance_error_email(audit, errors, to) -> bool:
     return False
 
 
-def send_compliance_protocol_praparation_email(audit, ) -> bool:
+def send_compliance_protocol_preparation_email(audit) -> bool:
     try:
         smtp_server = _env_var('GPN_SMTP_SERVER')
         port = _env_var('GPN_SMTP_PORT')

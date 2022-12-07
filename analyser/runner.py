@@ -183,7 +183,7 @@ def get_audits_for_notification() -> [dict]:
   db = get_mongodb_connection()
   audits_collection = db['audits']
 
-  cursor = audits_collection.find({'toBeApproved': True, 'additionalFields.external_source': 'email'}).sort([("createDate", pymongo.ASCENDING)])
+  cursor = audits_collection.find({'toBeApproved': True, 'additionalFields.external_source': 'email', 'additionalFields.compliance_protocol_praparation_email_sent':{'$ne': True}}).sort([("createDate", pymongo.ASCENDING)])
   res = []
   for audit in cursor:
     res.append(audit)
@@ -459,8 +459,11 @@ def run(run_pahse_2=True, kind=None):
   finalizer.finalize()
 
   logger.info('-> PHASE IV (notifications)...')
+  db = get_mongodb_connection()
   for audit in get_audits_for_notification():
-    result = mail.send_compliance_protocol_praparation_email()
+    result = mail.send_compliance_protocol_preparation_email(audit)
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"additionalFields.compliance_protocol_praparation_email_sent": result}})
+
 
 if __name__ == '__main__':
   run()
