@@ -94,6 +94,9 @@ def update_db_dictionaries():
     coll.create_index('additionalFields.external_source')
     coll.create_index('toBeApproved')
 
+    coll = db['subsidiarybookvalues']
+    coll.create_index('uploadDate')
+
 
 if __name__ == '__main__':
     update_db_dictionaries()

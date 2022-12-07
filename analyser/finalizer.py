@@ -342,7 +342,7 @@ def get_charter_span(charter_atts, org_level, subject):
     return None
 
 
-def check_contract_by_charter(audit, contract, eligible_charter, protocols, user_linked_docs, violations, links):
+def check_contract_by_charter(audit, contract, eligible_charter, protocols, user_linked_docs, violations, links, subsidiary_book_value = None):
     contract_attrs = get_attrs(contract)
     contract_number = contract_attrs.get('number', {}).get('value', '')
     charter_subject_map, min_constraint, charter_currency = get_charter_diapasons(eligible_charter)
@@ -354,7 +354,9 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
         competences = charter_subject_map.get("Deal")
     contract_value = None
     book_value = None
-    if audit.get('bookValues') is not None:
+    if subsidiary_book_value is not None:
+        book_value = convert_to_currency(subsidiary_book_value, 'RUB')['value']
+    elif audit.get('bookValues') is not None:
         book_value = get_book_value(audit, str(contract_attrs["date"]["value"].year - 1))
     contract_value = get_amount_netto(contract_attrs.get('price'))
     if contract_value is not None:
@@ -1080,15 +1082,32 @@ def check_contract_project(document, audit, interests, beneficiaries, docs, insi
     return {'document_id': document['_id'], 'document_filename': document['filename'], 'orgs': document_attrs.get('orgs', []), 'violations': violations, 'userViolation': False, 'id': ObjectId()}
 
 
+def get_latest_subsidiary_book_value(org) -> dict or None:
+    db = get_mongodb_connection()
+    coll = db['subsidiarybookvalues']
+    result = coll.find_one({}, sort=[('uploadDate', pymongo.DESCENDING)])
+    if result is not None:
+        book_values = result.get('bookValues', [])
+        for known_subsidiary in gpn.gpn.subsidiaries:
+            if known_subsidiary['_id'] == org.get('name', {}).get('value'):
+                known_subsidiary_names = known_subsidiary['aliases'] + [known_subsidiary['_id']]
+                for book_value in book_values:
+                    if normalize_only_company_name(book_value['subsidiary']) in known_subsidiary_names:
+                        return book_value
+    return None
+
+
 def check_compliance(audit, document):
     errors = []
     doc_attrs = get_attrs(document)
     charter = None
+    charter_org = None
     if len(doc_attrs.get('orgs', [])) > 0:
         for doc_org in doc_attrs.get('orgs', []):
             if doc_org.get('name', {}).get('value') is not None:
                 charter = get_latest_charter_by_org(doc_org.get('name', {}).get('value'))
                 if charter is not None:
+                    charter_org = doc_org
                     break
             else:
                 errors.append({'type': 'analysis', 'text': 'В договорном документе имя стороны не найдено'})
@@ -1101,8 +1120,13 @@ def check_compliance(audit, document):
     if charter is not None:
         violations = []
         links = []
-        user_linked_docs = get_linked_docs(audit, document["_id"])
-        check_contract_by_charter(audit, document, charter, [], user_linked_docs, violations, links)
+        # user_linked_docs = get_linked_docs(audit, document["_id"])
+        latest_subsidiary_book_value = get_latest_subsidiary_book_value(charter_org)
+        if latest_subsidiary_book_value is None:
+            msg = f'Не найдена балансовая стоимость активов для {charter_org.get("name", {}).get("value")}'
+            errors.append({'type': 'analysis', 'text': msg})
+        else:
+            check_contract_by_charter(audit, document, charter, [], [], violations, links, latest_subsidiary_book_value)
         return violations, errors
     else:
         errors.append({'type': 'analysis', 'text': 'Не найден подходящий устав'})
