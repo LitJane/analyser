@@ -155,8 +155,8 @@ def get_docs_by_audit_id(id: str, state, kind=None, id_only=False, without_large
 
 def get_latest_charter_by_org(org_name):
     documents_collection = get_mongodb_connection()['documents']
-    cursor = documents_collection.find({'$or': [{'analysis.attributes_tree.charter.org.name.value': org_name,
-                                        'user.attributes_tree.charter.org.name.value': org_name}]})
+    cursor = documents_collection.find({'$or': [{'analysis.attributes_tree.charter.org.name.value': org_name},
+                                                 {'user.attributes_tree.charter.org.name.value': org_name}]})
     charters = []
     for charter in cursor:
         attrs = get_attrs(charter)
@@ -1102,7 +1102,11 @@ def check_compliance(audit, document):
     doc_attrs = get_attrs(document)
     charter = None
     charter_org = None
-    if len(doc_attrs.get('orgs', [])) > 0:
+    user_linked_docs = get_linked_docs(audit, document["_id"])
+    linked_charters = list(filter(lambda doc: doc['documentType'] == 'CHARTER', user_linked_docs))
+    if linked_charters:
+        charter = linked_charters[0]
+    elif len(doc_attrs.get('orgs', [])) > 0:
         for doc_org in doc_attrs.get('orgs', []):
             if doc_org.get('name', {}).get('value') is not None:
                 charter = get_latest_charter_by_org(doc_org.get('name', {}).get('value'))
@@ -1119,13 +1123,13 @@ def check_compliance(audit, document):
         errors.append({'type': 'analysis', 'text': 'В договорном документе не найдена сумма'})
     if charter is not None:
         violations = []
-        links = []
-        # user_linked_docs = get_linked_docs(audit, document["_id"])
+        links = [create_link(document['_id'], charter['_id'])]
+        update_links(audit, links)
         latest_subsidiary_book_value = get_latest_subsidiary_book_value(charter_org)
         if latest_subsidiary_book_value is None:
             msg = f'Не найдена балансовая стоимость активов для {charter_org.get("name", {}).get("value")}'
             errors.append({'type': 'analysis', 'text': msg})
-        else:
+        elif len(errors) == 0:
             check_contract_by_charter(audit, document, charter, [], [], violations, links, latest_subsidiary_book_value)
         return violations, errors
     else:

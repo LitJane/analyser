@@ -312,7 +312,10 @@ def doc_classification(audit):
       compliance_mapping = next(filter(lambda x: x['_id'] == 1015, all_labels), None)
       if len(errors) > 0:
         mail.send_compliance_error_email(audit, errors, compliance_mapping['email'])
-        mail.send_compliance_info_email(audit)
+        if not audit.get('additionalFields', {}).get('compliance_info_email_sent', False):
+          result = mail.send_compliance_info_email(audit)
+          db = get_mongodb_connection()
+          db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"additionalFields.compliance_info_email_sent": result}})
 
       if len(violations) > 0:
         classification_result = [{'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0}]
