@@ -306,6 +306,7 @@ def doc_classification(audit):
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
     classification_result = None
+    errors = []
     if doc4classification['documentType'] in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
       violations, errors = check_compliance(audit, doc4classification)
       compliance_mapping = next(filter(lambda x: x['_id'] == 1015, all_labels), None)
@@ -316,7 +317,7 @@ def doc_classification(audit):
       if len(violations) > 0:
         classification_result = [{'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0}]
 
-    if classification_result is None:
+    if classification_result is None and len(errors) == 0:
       if classifier_url is None:
         classification_result = wrapper(doc4classification['parse'])
       else:
