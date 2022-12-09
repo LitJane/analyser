@@ -72,12 +72,13 @@ def get_linked_docs(audit, contract_id):
     db = get_mongodb_connection()
     result = []
     document_collection = db['documents']
-    for link in audit['links']:
-        if link.get('type') is not None and link.get('type') != 'analysis':
-            if link['fromId'] == contract_id:
-                result.append(document_collection.find_one({'_id': link['toId']}))
-            elif link['toId'] == contract_id:
-                result.append(document_collection.find_one({'_id': link['fromId']}))
+    if audit.get('links') is not None:
+        for link in audit['links']:
+            if link.get('type') is not None and link.get('type') != 'analysis':
+                if link['fromId'] == contract_id:
+                    result.append(document_collection.find_one({'_id': link['toId']}))
+                elif link['toId'] == contract_id:
+                    result.append(document_collection.find_one({'_id': link['fromId']}))
 
     return result
 
