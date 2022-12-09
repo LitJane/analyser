@@ -346,6 +346,7 @@ def get_charter_span(charter_atts, org_level, subject):
 def check_contract_by_charter(audit, contract, eligible_charter, protocols, user_linked_docs, violations, links, subsidiary_book_value = None):
     contract_attrs = get_attrs(contract)
     contract_number = contract_attrs.get('number', {}).get('value', '')
+    contract_date = contract_attrs.get('date', {}).get('value')
     charter_subject_map, min_constraint, charter_currency = get_charter_diapasons(eligible_charter)
     eligible_charter_attrs = get_attrs(eligible_charter)
     competences = None
@@ -357,8 +358,8 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
     book_value = None
     if subsidiary_book_value is not None:
         book_value = convert_to_currency(subsidiary_book_value, 'RUB')['value']
-    elif audit.get('bookValues') is not None:
-        book_value = get_book_value(audit, str(contract_attrs["date"]["value"].year - 1))
+    elif audit.get('bookValues') is not None and contract_date is not None:
+        book_value = get_book_value(audit, str(contract_date.year - 1))
     contract_value = get_amount_netto(contract_attrs.get('price'))
     if contract_value is not None:
         contract_value = convert_to_currency(contract_value, charter_currency)
@@ -470,7 +471,7 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
             if eligible_protocol_attrs.get("org_structural_level") is not None:
                 protocol_structural_level = eligible_protocol_attrs["org_structural_level"]["value"]
 
-            if eligible_protocol_attrs["date"]["value"] > contract_attrs["date"]["value"]:
+            if eligible_protocol_attrs["date"]["value"] > contract_date:
                 violations.append(create_violation(
                     {"id": contract["_id"], "number": contract_number,
                      "type": contract["documentType"]},
@@ -478,7 +479,7 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                     {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                     "contract_date_less_than_protocol_date",
                     {"contract": {"number": contract_number,
-                                  "date": contract_attrs["date"]["value"],
+                                  "date": contract_date,
                                   "org_type": contract_org2_type,
                                   "org_name": contract_org2_name},
                      "protocol": {"org_structural_level": protocol_structural_level,
@@ -493,7 +494,7 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                             {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                             "contract_value_great_than_protocol_value",
                             {"contract": {"number": contract_number,
-                                          "date": contract_attrs["date"]["value"],
+                                          "date": contract_date,
                                           "org_type": contract_org2_type,
                                           "org_name": contract_org2_name,
                                           "value": contract_value["original_value"],
@@ -510,7 +511,7 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                             {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                             "contract_value_not_equal_protocol_value",
                             {"contract": {"number": contract_number,
-                                          "date": contract_attrs["date"]["value"],
+                                          "date": contract_date,
                                           "org_type": contract_org2_type,
                                           "org_name": contract_org2_name,
                                           "value": contract_value["original_value"],
@@ -524,11 +525,11 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                             {"id": contract["_id"], "number": contract_number,
                              "type": contract["documentType"]},
                             {"id": eligible_charter["_id"],
-                             "date": eligible_charter_attrs["date"]["value"]},
+                             "date": eligible_charter_attrs.get("date", {}).get("value")},
                             {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
                             "contract_value_less_than_protocol_value",
                             {"contract": {"number": contract_number,
-                                          "date": contract_attrs["date"]["value"],
+                                          "date": contract_date,
                                           "org_type": contract_org2_type,
                                           "org_name": contract_org2_name,
                                           "value": contract_value["original_value"],
@@ -546,13 +547,13 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                      "type": contract["documentType"]},
                     {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
                     {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
-                    {"type": "protocol_not_found", "subject": contract_attrs["subject"]["value"],
+                    {"type": "protocol_not_found", "subject": contract_attrs.get("subject", {}).get("value"),
                      "org_structural_level": org_level,
                      "min": min_value,
                      "max": max_value
                      },
                     {"contract": {"number": contract_number,
-                                  "date": contract_attrs["date"]["value"],
+                                  "date": contract_date,
                                   "org_type": contract_org2_type,
                                   "org_name": contract_org2_name,
                                   "value": contract_value["original_value"],
