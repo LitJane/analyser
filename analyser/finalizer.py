@@ -1160,7 +1160,7 @@ def check_compliance(audit, document):
         errors.append({'type': 'analysis', 'text': 'В договорном документе не были найдены стороны'})
     if doc_attrs.get('subject', {}).get('value') is None:
         errors.append({'type': 'analysis', 'text': 'В договорном документе не найден предмет договора'})
-    if get_amount_netto(doc_attrs.get('price')) is None:
+    if get_amount_netto(doc_attrs.get('price')) is None and doc_attrs.get('subject', {}).get('value', '') not in ['Renting', 'Charity']:
         errors.append({'type': 'analysis', 'text': 'В договорном документе не найдена сумма'})
     if charter is not None:
         violations = []
