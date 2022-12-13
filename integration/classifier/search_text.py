@@ -72,7 +72,12 @@ def wrapper(document):
             model = TFAutoModelForSequenceClassification.from_pretrained(
                 str(path_to_model), num_labels=len(labels), from_pt=False
             )
-            tokenizer = AutoTokenizer.from_pretrained(str(model_checkpoint2))
+            # tokenizer = AutoTokenizer.from_pretrained(str(model_checkpoint2))
+            if Path('./tokenizer').is_dir():
+                tokenizer = AutoTokenizer.from_pretrained(str('./tokenizer/'))
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(str(model_checkpoint2))
+                tokenizer.save_pretrained('./tokenizer/')
         else:
             logging.error('Document classification model is not found. To enable document classification put files config.json and tf_model.h5 in integration/classifier/doc-classification')
     result_from_tokenizer = tokenizer(json_from_text['text'], truncation=True, max_length=512)
