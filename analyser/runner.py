@@ -10,7 +10,7 @@ from jsonschema import ValidationError, FormatChecker, Draft7Validator
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser
-from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance
+from analyser.finalizer import normalize_only_company_name, compare_ignore_case
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.parsing import AuditContext
@@ -19,7 +19,8 @@ from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
 from gpn.gpn import subsidiaries
-from integration.classifier.search_text import wrapper, all_labels
+from integration.classifier.search_text import wrapper, all_labels, label2id
+from integration.classifier.sender import get_sender_judicial_org
 from integration.db import get_mongodb_connection
 from integration.mail import send_classifier_email
 
@@ -306,6 +307,27 @@ def doc_classification(audit):
         audits.update_one({'_id': ObjectId(audit["_id"])}, update)
         return
       classification_result = response.json()
+
+    # detecting judicial organisation in sender (email_from) field
+
+    if audit['additionalFields']['external_source'] == 'email':
+      sender_ = audit['additionalFields']['email_from']
+      sender_judicial_org = get_sender_judicial_org(sender_)
+
+      if sender_judicial_org is not None:
+
+        _l = 'Практика судебной защиты'
+        _result = {
+          'id': label2id[_l],
+          'label': _l,
+          'score': 1,
+          'sender_judicial_org': sender_judicial_org
+        }
+
+        if not classification_result:
+          classification_result = []
+
+        classification_result.insert(0, _result)
 
     if classification_result:
         save_audit_practice(audit, classification_result, not main_doc)
