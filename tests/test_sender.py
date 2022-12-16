@@ -1,6 +1,11 @@
 import unittest
 
-from integration.classifier.sender import  get_sender_judicial_org
+from bson import ObjectId
+
+from analyser import finalizer
+from analyser.runner import get_doc4classification
+from integration.classifier.sender import get_sender_judicial_org
+from integration.db import get_mongodb_connection
 
 
 class ClassifierTestCase(unittest.TestCase):
@@ -35,6 +40,20 @@ class ClassifierTestCase(unittest.TestCase):
     self.assertIsNone(b)
 
   def test_get_sender_judicial_org_6(self):
-    a = "ГЛАВНОЕ УПРАВЛЕНИЕ МИНИСТЕРСТВА ВНУТРЕННИХ ДЕЛ РОССИЙСКОЙ ФЕДЕРАЦИИ ПО ГОРОДУ МОСКВЕ (ГУ МВД России по г. Москве) Дежурная часть"
+    a = "СУ СК России по Ямало- Ненецкому автономному округу Ноябрьский межрайонный следственный отдел <zaborskiy.test@proton.me>"
     b = get_sender_judicial_org(a)
+    self.assertIsNotNone(b)
+
+  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  def test_get_sender_judicial_org_from_header(self):
+    # doc4classification, main_doc = get_doc4classification(audit)
+    document = finalizer.get_doc_by_id(ObjectId("639c64de4b01c8adaa5a4f61"))
+    document = document['parse']
+    print(document)
+
+    headline = document['paragraphs'][0]['paragraphHeader']['text']
+    print(headline)
+    b = get_sender_judicial_org(headline)
+    print(b)
+    
     self.assertIsNotNone(b)
