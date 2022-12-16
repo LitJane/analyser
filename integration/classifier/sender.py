@@ -1,6 +1,5 @@
 # from pyjarowinkler import distance as jaro
 from fuzzywuzzy import fuzz
-from fuzzywuzzy import process
 
 judicial_senders = {
   "Следственный комитет Российской Федерации": [
@@ -23,7 +22,9 @@ judicial_senders = {
     "Городской отдел внутренних дел",
     "ГОВД",
     "Районное управление внутренних дел",
-    "РУВД"
+    "РУВД",
+    "гу мвд россии",
+    "ГЛАВНОЕ УПРАВЛЕНИЕ МИНИСТЕРСТВА ВНУТРЕННИХ ДЕЛ РОССИЙСКОЙ ФЕДЕРАЦИИ"
   ],
   "Федеральная служба безопасности Российской Федерации": [
     "Федеральная служба безопасности Российской Федерации",
@@ -63,23 +64,24 @@ def get_sender_judicial_org(sender: str) -> str or None:
     return None
 
   sender_l = sender.lower()
+  max_similarity_ratio = judicial_patterns_similarity_threshold
+  similar_p = None
   for k in judicial_senders.keys():
     patterns = judicial_senders[k]
     for p in patterns:
       p_l = p.lower()
 
-      # if p_l==sender_l:
-      #   return k
       if sender_l.find(p_l) >= 0:
-        # print("p_l", p)
         return k
       similarity_ratio = fuzz.partial_ratio(sender_l, p_l)
-      print(p_l, ' ||AND|| ', sender_l, similarity_ratio)
-      if similarity_ratio > judicial_patterns_similarity_threshold:
-        # print(sender, jaro_d, p)
-        return k
 
-  return None
+      if similarity_ratio > max_similarity_ratio:
+        print(similarity_ratio, sender_l, ' ||AND|| ', p_l)
+        max_similarity_ratio = similarity_ratio
+        similar_p = k
+        # return k
+
+  return similar_p
 
 
 if __name__ == '__main__':

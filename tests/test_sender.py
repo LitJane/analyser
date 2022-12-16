@@ -1,7 +1,6 @@
 import unittest
 
-from classifier.sender import get_sender_judicial_org
-from integration.classifier.search_text import label2id
+from integration.classifier.sender import  get_sender_judicial_org
 
 
 class ClassifierTestCase(unittest.TestCase):
@@ -15,20 +14,18 @@ class ClassifierTestCase(unittest.TestCase):
     b = get_sender_judicial_org(a)
     self.assertIsNotNone(b)
 
-
-
   def test_get_sender_v_org_2(self):
     a = "Следственный кАмитет РФ"
     b = get_sender_judicial_org(a)
     self.assertIsNotNone(b)
 
   def test_get_sender_judicial_org_3(self):
-    a = "Следственный коммитет РФ"
+    a = "Следственный коммитет РФ <komitet@russia.ru>"
     b = get_sender_judicial_org(a)
     self.assertIsNotNone(b)
 
   def test_get_sender_judicial_org_4(self):
-    a = "ГОВД некого р-на"
+    a = "ГОВД некого р-на <komitet@russia.ru>"
     b = get_sender_judicial_org(a)
     self.assertIsNotNone(b)
 
@@ -36,3 +33,8 @@ class ClassifierTestCase(unittest.TestCase):
     a = "уледственный кАмитет РФ"
     b = get_sender_judicial_org(a)
     self.assertIsNone(b)
+
+  def test_get_sender_judicial_org_6(self):
+    a = "ГЛАВНОЕ УПРАВЛЕНИЕ МИНИСТЕРСТВА ВНУТРЕННИХ ДЕЛ РОССИЙСКОЙ ФЕДЕРАЦИИ ПО ГОРОДУ МОСКВЕ (ГУ МВД России по г. Москве) Дежурная часть"
+    b = get_sender_judicial_org(a)
+    self.assertIsNotNone(b)
