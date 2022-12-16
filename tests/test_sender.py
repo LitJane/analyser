@@ -3,7 +3,7 @@ import unittest
 from bson import ObjectId
 
 from analyser import finalizer
-from analyser.runner import get_doc4classification
+from analyser.runner import apply_judical_practice
 from integration.classifier.sender import get_sender_judicial_org
 from integration.db import get_mongodb_connection
 
@@ -55,5 +55,12 @@ class ClassifierTestCase(unittest.TestCase):
     print(headline)
     b = get_sender_judicial_org(headline)
     print(b)
-    
+
     self.assertIsNotNone(b)
+
+  def test_apply_judical_practice(self):
+    classification_result = None
+    classification_result = apply_judical_practice(classification_result, "sender_judicial_org")
+    print(classification_result)
+    self.assertEquals("sender_judicial_org", classification_result[0]['sender_judicial_org'])
+    self.assertEquals("Практика судебной защиты", classification_result[0]['label'])

@@ -290,6 +290,11 @@ def get_doc4classification(audit):
     if _document['parserResponseCode'] == 200:
         return _document, False
 
+def get_doc_headline_safely(document):
+  try:
+    return document['paragraphs'][0]['paragraphHeader']['text']
+  except:
+    return None
 
 def doc_classification(audit):
   try:
@@ -309,25 +314,18 @@ def doc_classification(audit):
       classification_result = response.json()
 
     # detecting judicial organisation in sender (email_from) field
+    doc_headline = get_doc_headline_safely(doc4classification['parse'])
 
+    sender_judicial_org = None
     if audit['additionalFields']['external_source'] == 'email':
       sender_ = audit['additionalFields']['email_from']
       sender_judicial_org = get_sender_judicial_org(sender_)
 
-      if sender_judicial_org is not None:
+    if (doc_headline is not None) and (sender_judicial_org is None):
+      sender_judicial_org = get_sender_judicial_org(doc_headline)
 
-        _l = 'Практика судебной защиты'
-        _result = {
-          'id': label2id[_l],
-          'label': _l,
-          'score': 1,
-          'sender_judicial_org': sender_judicial_org
-        }
-
-        if not classification_result:
-          classification_result = []
-
-        classification_result.insert(0, _result)
+    if sender_judicial_org is not None:
+      classification_result = apply_judical_practice(classification_result, sender_judicial_org)
 
     if classification_result:
         save_audit_practice(audit, classification_result, not main_doc)
@@ -340,6 +338,24 @@ def doc_classification(audit):
           send_classifier_email(audit, top_result, attachments, all_labels)
   except Exception as ex:
     logger.exception(ex)
+
+
+def apply_judical_practice(classification_result, sender_judicial_org):
+  if sender_judicial_org is not None:
+
+    _l = 'Практика судебной защиты'
+    _result = {
+      'id': label2id[_l],
+      'label': _l,
+      'score': 1,
+      'sender_judicial_org': sender_judicial_org
+    }
+
+    if not classification_result:
+      classification_result = []
+
+    classification_result.insert(0, _result)
+  return classification_result
 
 
 def audit_phase_1(audit, kind=None):
