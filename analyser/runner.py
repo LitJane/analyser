@@ -20,7 +20,8 @@ from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
 from gpn.gpn import subsidiaries
 from integration import mail
-from integration.classifier.search_text import wrapper, all_labels
+from integration.classifier.search_text import wrapper, all_labels, label2id
+from integration.classifier.sender import get_sender_judicial_org
 from integration.db import get_mongodb_connection
 
 schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
@@ -319,6 +320,27 @@ def doc_classification(audit):
 
       if len(violations) > 0:
         classification_result = [{'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0}]
+
+    # detecting judicial organisation in sender (email_from) field
+
+    if audit['additionalFields']['external_source'] == 'email':
+      sender_ = audit['additionalFields']['email_from']
+      sender_judicial_org = get_sender_judicial_org(sender_)
+
+      if sender_judicial_org is not None:
+
+        _l = 'Практика судебной защиты'
+        _result = {
+          'id': label2id[_l],
+          'label': _l,
+          'score': 1,
+          'sender_judicial_org': sender_judicial_org
+        }
+
+        if not classification_result:
+          classification_result = []
+
+        classification_result.insert(0, _result)
 
     if classification_result is None and len(errors) == 0:
       if classifier_url is None:
