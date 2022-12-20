@@ -781,29 +781,29 @@ def need_deal_procedure_check(doc_attrs) -> bool:
 def check_deal_procedure(document, deal_procedure_restrictions):
     result = []
     doc_attrs = get_attrs(document)
-    if need_deal_procedure_check(doc_attrs):
-        if doc_attrs.get('subject', {}).get('value') is not None:
-            subject_value = doc_attrs['subject']['value']
-            for restriction in deal_procedure_restrictions:
-                orgs = doc_attrs.get('orgs')
-                for org in orgs:
-                    if (restriction.get('relatedTo') in ['gpn', 'gpn_subsidiary'] and is_gpn(org)) or (restriction.get('relatedTo') in ['subsidiary', 'gpn_subsidiary'] and is_subsidiary(org)):
-                        if subject_value in restriction['subject']:
-                            if restriction.get('value') is not None and restriction.get('currency') is not None:
-                                amount_netto = get_amount_netto(doc_attrs.get('price'))
-                                if amount_netto is not None:
-                                    if amount_netto['currency'] != 'RUB':
-                                        amount_netto = convert_to_currency(amount_netto, 'RUB')
-                                    if restriction['currency'] == '%':
-                                        gpn_book_value = get_latest_gpn_book_value()
-                                        if gpn_book_value is not None:
-                                            if amount_netto['value'] > gpn_book_value['value'] * 0.01 * restriction['value']:
-                                                result.append(create_check_deal_procedure_violation(restriction))
-                                    else:
-                                        if amount_netto['value'] > restriction['value']:
+    # if need_deal_procedure_check(doc_attrs):
+    if doc_attrs.get('subject', {}).get('value') is not None:
+        subject_value = doc_attrs['subject']['value']
+        for restriction in deal_procedure_restrictions:
+            orgs = doc_attrs.get('orgs')
+            for org in orgs:
+                if (restriction.get('relatedTo') in ['gpn', 'gpn_subsidiary'] and is_gpn(org)) or (restriction.get('relatedTo') in ['subsidiary', 'gpn_subsidiary'] and is_subsidiary(org)):
+                    if subject_value in restriction['subject']:
+                        if restriction.get('value') is not None and restriction.get('currency') is not None:
+                            amount_netto = get_amount_netto(doc_attrs.get('price'))
+                            if amount_netto is not None:
+                                if amount_netto['currency'] != 'RUB':
+                                    amount_netto = convert_to_currency(amount_netto, 'RUB')
+                                if restriction['currency'] == '%':
+                                    gpn_book_value = get_latest_gpn_book_value()
+                                    if gpn_book_value is not None:
+                                        if amount_netto['value'] > gpn_book_value['value'] * 0.01 * restriction['value']:
                                             result.append(create_check_deal_procedure_violation(restriction))
-                            else:
-                                result.append(create_check_deal_procedure_violation(restriction))
+                                else:
+                                    if amount_netto['value'] > restriction['value']:
+                                        result.append(create_check_deal_procedure_violation(restriction))
+                        else:
+                            result.append(create_check_deal_procedure_violation(restriction))
     return result
 
 
