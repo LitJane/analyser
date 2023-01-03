@@ -42,9 +42,33 @@ class AnalyzerTestCase(unittest.TestCase):
     print(jdoc)
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  def test_analyze_generic_doc(self):
+    uid = ObjectId('637229e41a522a418c49c522')
+    processor: BaseProcessor = document_processors["GENERIC"]
+
+    doc = get_doc_by_id(uid)
+    # GPN_DB_HOST=192.168.10.36
+    #
+    if doc is None:
+      raise RuntimeError(f"Please fix unit test, doc with given UID {uid} is not in test DB")
+
+    audit = get_audit_by_id(doc['auditId'])
+    # print(audit)
+
+    jdoc = DbJsonDoc(doc)
+    logger.info(f'......pre-processing {jdoc._id}')
+    ctx = AuditContext()
+    ctx.audit_subsidiary_name = audit.get('subsidiary', {}).get('name')
+
+    processor.preprocess(jdoc, context=ctx)
+    processor.process(jdoc, audit, ctx)
+
+  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_analyze_contract(self):
     processor: BaseProcessor = document_processors[CONTRACT]
-    doc = get_doc_by_id(ObjectId('61408a6a11c893efc81ddc94'))
+    # doc = get_doc_by_id(ObjectId('638f0a81b1363747e929f304'))
+    doc = get_doc_by_id(ObjectId('638085a26a07f3e980b2c609'))
+    #
     if doc is None:
       raise RuntimeError("fix unit test please, doc with given UID is not in test DB")
 

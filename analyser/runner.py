@@ -9,7 +9,7 @@ from jsonschema import ValidationError, FormatChecker, Draft7Validator
 
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
-from analyser.contract_parser import ContractParser
+from analyser.contract_parser import ContractParser, GenericParser
 from analyser.finalizer import normalize_only_company_name, compare_ignore_case
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
@@ -31,6 +31,7 @@ CONTRACT = 'CONTRACT'
 PROTOCOL = 'PROTOCOL'
 classifier_url = os.environ.get('GPN_CLASSIFIER_SERVICE_URL')
 
+
 class Runner:
   default_instance: 'Runner' = None
 
@@ -38,6 +39,7 @@ class Runner:
     self.protocol_parser = ProtocolParser()
     self.contract_parser = ContractParser()
     self.charter_parser = CharterParser()
+    self.generic_parser = GenericParser()
 
   def init_embedders(self):
     pass
@@ -149,6 +151,11 @@ class BaseProcessor:
     return False
 
 
+class GenericProcessor(BaseProcessor):
+  def __init__(self):
+    self.parser = Runner.get_instance().generic_parser
+
+
 class ProtocolProcessor(BaseProcessor):
   def __init__(self):
     self.parser = Runner.get_instance().protocol_parser
@@ -165,8 +172,13 @@ class ContractProcessor(BaseProcessor):
 
 
 contract_processor = ContractProcessor()
-document_processors = {CONTRACT: contract_processor, CHARTER: CharterProcessor(), "PROTOCOL": ProtocolProcessor(),
-                       'ANNEX': contract_processor, 'SUPPLEMENTARY_AGREEMENT': contract_processor, 'AGREEMENT': contract_processor}
+document_processors = {CONTRACT: contract_processor,
+                       CHARTER: CharterProcessor(),
+                       PROTOCOL: ProtocolProcessor(),
+                       'ANNEX': contract_processor,
+                       'SUPPLEMENTARY_AGREEMENT': contract_processor,
+                       'AGREEMENT': contract_processor,
+                       "GENERIC": GenericProcessor()}
 
 
 def get_audits() -> [dict]:
@@ -248,7 +260,8 @@ def save_audit_practice(audit, classification_result, zip_classified):
   if audit['additionalFields']['external_source'] != 'email':
     zip_classified = False
   db = get_mongodb_connection()
-  db['audits'].update_one({'_id': audit['_id']}, {"$set": {'classification_result': classification_result, "additionalFields.zip_classified": zip_classified}})
+  db['audits'].update_one({'_id': audit['_id']}, {
+    "$set": {'classification_result': classification_result, "additionalFields.zip_classified": zip_classified}})
 
 
 def change_doc_state(doc, state):
@@ -260,10 +273,12 @@ def change_audit_status(audit, status):
   db = get_mongodb_connection()
   db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"status": status}})
 
+def is_well_parsed(document: DbJsonDoc) :
+  return document.parserResponseCode == 200
 
 def need_analysis(document: DbJsonDoc) -> bool:
   _is_not_a_charter = document.documentType != "CHARTER"
-  _well_parsed = document.parserResponseCode == 200
+  _well_parsed = is_well_parsed(document)
 
   _need_analysis = _well_parsed and (_is_not_a_charter or document.isActiveCharter())
   return _need_analysis
@@ -274,7 +289,8 @@ def get_doc4classification(audit):
   if audit.get('additionalFields', '').get('main_document_id') is not None:
     main_doc = finalizer.get_doc_by_id(audit['additionalFields']['main_document_id'])
     main_doc_type = main_doc['documentType']
-    if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
+    if main_doc[
+      'parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
       return main_doc, True
   document_ids = get_docs_by_audit_id(audit["_id"], id_only=True)
   for document_id in document_ids:
@@ -288,13 +304,15 @@ def get_doc4classification(audit):
   for document_id in document_ids:
     _document = finalizer.get_doc_by_id(document_id)
     if _document['parserResponseCode'] == 200:
-        return _document, False
+      return _document, False
+
 
 def get_doc_headline_safely(document):
   try:
     return document['paragraphs'][0]['paragraphHeader']['text']
   except:
     return None
+
 
 def doc_classification(audit):
   try:
@@ -328,14 +346,14 @@ def doc_classification(audit):
       classification_result = apply_judical_practice(classification_result, sender_judicial_org)
 
     if classification_result:
-        save_audit_practice(audit, classification_result, not main_doc)
-        if audit['additionalFields']['external_source'] == 'email':
-          top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
-          attachments = []
-          fs = gridfs.GridFS(get_mongodb_connection())
-          for file_id in audit['additionalFields']['file_ids']:
-            attachments.append(fs.get(file_id))
-          send_classifier_email(audit, top_result, attachments, all_labels)
+      save_audit_practice(audit, classification_result, not main_doc)
+      if audit['additionalFields']['external_source'] == 'email':
+        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+        attachments = []
+        fs = gridfs.GridFS(get_mongodb_connection())
+        for file_id in audit['additionalFields']['file_ids']:
+          attachments.append(fs.get(file_id))
+        send_classifier_email(audit, top_result, attachments, all_labels)
   except Exception as ex:
     logger.exception(ex)
 
@@ -373,9 +391,14 @@ def audit_phase_1(audit, kind=None):
     _document = finalizer.get_doc_by_id(document_id)
     jdoc = DbJsonDoc(_document)
 
+    logger.info(f'......pre-pre-processing {k} of {len(document_ids)}  {jdoc.documentType}:{document_id}')
+    if is_well_parsed(jdoc):
+      ##finding common things, like case numbers, etc...
+      document_processors.get('GENERIC').preprocess(jdoc=jdoc, context=ctx)
+
     processor: BaseProcessor = document_processors.get(jdoc.documentType)
     if processor is None:
-      logger.warning(f'unknown/unsupported doc type: {jdoc.documentType}, cannot process {document_id}')
+      logger.warning(f'unknown/unsupported doc type: {jdoc.documentType},  using just generic processor {document_id}')
     else:
       logger.info(f'......pre-processing {k} of {len(document_ids)}  {jdoc.documentType}:{document_id}')
       if need_analysis(jdoc) and jdoc.isNew():

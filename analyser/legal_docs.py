@@ -176,7 +176,9 @@ class LegalDocument:
 
   def to_json_obj(self) -> dict:
     j = DocumentJson(self)
-    return j.__dict__
+    _json_tree = j.__dict__
+    _json_tree['attributes_tree']={}
+    return _json_tree
 
   def to_json(self) -> str:
     j = DocumentJson(self)

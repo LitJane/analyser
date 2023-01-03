@@ -65,7 +65,7 @@ class CharterDocument(LegalDocumentExt):
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
     _attributes_tree_dict, _ = to_json(self.attributes_tree)
-    j['attributes_tree'] = {"charter": _attributes_tree_dict}
+    j['attributes_tree']['charter'] = _attributes_tree_dict
     return j
 
 
