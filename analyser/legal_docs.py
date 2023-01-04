@@ -14,6 +14,7 @@ from bson import json_util
 from overrides import final
 
 import analyser
+from analyser.attributes import to_json
 from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import split_sentences_into_map, TextMap, CaseNormalizer
 from analyser.embedding_tools import AbstractEmbedder
@@ -22,7 +23,7 @@ from analyser.log import logger
 from analyser.ml_tools import SemanticTag, FixedVector, Embeddings, filter_values_by_key_prefix, rectifyed_sum, \
   conditional_p_sum, clean_semantic_tag_copy
 from analyser.patterns import DIST_FUNC, AbstractPatternFactory, make_pattern_attention_vector
-from analyser.schemas import ContractPrice, DocumentSchema
+from analyser.schemas import ContractPrice, DocumentSchema, GenericDocSchema
 from analyser.structures import ContractTags
 from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.text_tools import find_token_before_index
@@ -67,7 +68,7 @@ class LegalDocument:
 
     self._id = None  # TODO
 
-    self.attributes_tree:DocumentSchema or None = DocumentSchema()
+    self.attributes_tree: DocumentSchema or None = DocumentSchema()
     # self.date: SemanticTag or None = None
     # self.number: SemanticTag or None = None
 
@@ -171,13 +172,13 @@ class LegalDocument:
 
   def get_headline(self):
     hh = headers_as_sentences(self)
-    if (hh is not None) and len(hh)>0:
+    if (hh is not None) and len(hh) > 0:
       return hh[0]
 
   def to_json_obj(self) -> dict:
     j = DocumentJson(self)
     _json_tree = j.__dict__
-    _json_tree['attributes_tree']={}
+    _json_tree['attributes_tree'] = {}
     return _json_tree
 
   def to_json(self) -> str:
@@ -281,6 +282,19 @@ class LegalDocument:
 
   def substr(self, tag: SemanticTag) -> str:
     return self.tokens_map.text_range(tag.span)
+
+
+class GenericDocument(LegalDocument):
+
+  def __init__(self, original_text):
+    LegalDocument.__init__(self, original_text)
+    self.attributes_tree = GenericDocSchema()
+
+  def to_json_obj(self) -> dict:
+    j: dict = super().to_json_obj()
+    _attributes_tree_dict, _ = to_json(self.attributes_tree)
+    j['attributes_tree']["generic"] = _attributes_tree_dict
+    return j
 
 
 class LegalDocumentExt(LegalDocument):

@@ -53,6 +53,7 @@ class Runner:
 
 class BaseProcessor:
   parser = None
+  generic_parser = Runner.get_instance().generic_parser
 
   def preprocess(self, jdoc: DbJsonDoc, context: AuditContext) -> DbJsonDoc:
     # phase I
@@ -62,11 +63,16 @@ class BaseProcessor:
       # TODO: update state?
     else:
       legal_doc = jdoc.asLegalDoc()
-      self.parser.find_org_date_number(legal_doc, context)
+      self.generic_parser.find_attributes(legal_doc, context)
+
+      if self.parser is not None:
+        self.parser.find_org_date_number(legal_doc, context)
+
       jdoc = save_analysis(jdoc, legal_doc, state=DocumentState.Preprocessed.value)
+      # print(jdoc.analysis)
     return jdoc
 
-  def process(self, db_document: DbJsonDoc, audit, context: AuditContext) -> LegalDocument:
+  def process(self, db_document: DbJsonDoc, audit, context: AuditContext) -> LegalDocument or None:
     # phase II
     if db_document.retry_number is None:
       db_document.retry_number = 0
@@ -90,7 +96,9 @@ class BaseProcessor:
           change_doc_state(db_document, state=DocumentState.Done.value)
         else:
           # ANALYSING
-          self.parser.find_attributes(legal_doc, context)
+          self.generic_parser.find_attributes(legal_doc, context)
+          if self.parser is not None:
+            self.parser.find_attributes(legal_doc, context)
           save_analysis(db_document, legal_doc, state=DocumentState.Done.value)
           # ANALYSING
 
@@ -153,7 +161,8 @@ class BaseProcessor:
 
 class GenericProcessor(BaseProcessor):
   def __init__(self):
-    self.parser = Runner.get_instance().generic_parser
+    self.parser = None
+    # Runner.get_instance().generic_parser
 
 
 class ProtocolProcessor(BaseProcessor):
@@ -273,8 +282,10 @@ def change_audit_status(audit, status):
   db = get_mongodb_connection()
   db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"status": status}})
 
-def is_well_parsed(document: DbJsonDoc) :
+
+def is_well_parsed(document: DbJsonDoc):
   return document.parserResponseCode == 200
+
 
 def need_analysis(document: DbJsonDoc) -> bool:
   _is_not_a_charter = document.documentType != "CHARTER"
@@ -384,25 +395,30 @@ def audit_phase_1(audit, kind=None):
     ctx = AuditContext(audit["subsidiary"]["name"])
 
   document_ids = get_docs_by_audit_id(audit["_id"], states=[DocumentState.New.value], kind=kind, id_only=True)
+
   _charter_ids = audit.get("charters", [])
   document_ids.extend(_charter_ids)
 
   for k, document_id in enumerate(document_ids):
-    _document = finalizer.get_doc_by_id(document_id)
-    jdoc = DbJsonDoc(_document)
+    audit_phase_1_doc(document_id, ctx, k, len(document_ids))
 
-    logger.info(f'......pre-pre-processing {k} of {len(document_ids)}  {jdoc.documentType}:{document_id}')
+
+def audit_phase_1_doc(document_id, ctx, _k=1, _total=1):
+  _document = finalizer.get_doc_by_id(document_id)
+  jdoc = DbJsonDoc(_document)
+
+  logger.info(f'......pre-pre-processing {_k} of {_total}  {jdoc.documentType}:{document_id}')
+
+  processor: BaseProcessor = document_processors.get(jdoc.documentType)
+  if processor is None:
+    logger.warning(f'unknown/unsupported doc type: {jdoc.documentType},  using just generic processor {document_id}')
     if is_well_parsed(jdoc):
       ##finding common things, like case numbers, etc...
       document_processors.get('GENERIC').preprocess(jdoc=jdoc, context=ctx)
-
-    processor: BaseProcessor = document_processors.get(jdoc.documentType)
-    if processor is None:
-      logger.warning(f'unknown/unsupported doc type: {jdoc.documentType},  using just generic processor {document_id}')
-    else:
-      logger.info(f'......pre-processing {k} of {len(document_ids)}  {jdoc.documentType}:{document_id}')
-      if need_analysis(jdoc) and jdoc.isNew():
-        processor.preprocess(jdoc=jdoc, context=ctx)
+  else:
+    logger.info(f'......pre-processing {_k} of {_total}  {jdoc.documentType}:{document_id}')
+    if need_analysis(jdoc) and jdoc.isNew():
+      processor.preprocess(jdoc=jdoc, context=ctx)
 
 
 def audit_phase_2(audit, kind=None):

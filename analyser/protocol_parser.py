@@ -179,7 +179,7 @@ class ProtocolParser(ParsingContext):
     doc.org_level = max_confident_tag(list(find_org_structural_level(doc)))
     doc.attributes_tree.org = find_protocol_org_obj(doc)
     doc.date = find_document_date(doc)
-    doc.attributes_tree.case_number=find_case_number(doc)
+    # doc.attributes_tree.case_number=find_case_number(doc)
 
     if doc.attributes_tree.org is not None:
       if doc.attributes_tree.org.name is None:

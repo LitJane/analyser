@@ -13,30 +13,17 @@ from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
-from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
+from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign, GenericDocument
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
 from analyser.parsing import ParsingContext, AuditContext
 from analyser.patterns import AV_SOFT, AV_PREFIX
-from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans, GenericDocSchema
+from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import to_float
 from analyser.transaction_values import ValueSpansFinder
 from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, \
   nn_predict
-
-
-class GenericDocument(LegalDocument):
-
-  def __init__(self, original_text):
-    LegalDocument.__init__(self, original_text)
-    self.attributes_tree = GenericDocSchema()
-
-  def to_json_obj(self) -> dict:
-    j: dict = super().to_json_obj()
-    _attributes_tree_dict, _ = to_json(self.attributes_tree)
-    j['attributes_tree']["generic"]: _attributes_tree_dict
-    return j
 
 
 class ContractDocument(LegalDocument):
@@ -85,8 +72,10 @@ class GenericParser(ParsingContext):
     doc.attributes_tree.case_number = find_case_number(doc)
     return doc
 
-  def find_attributes(self, contract: LegalDocument, ctx: AuditContext) -> LegalDocument:
-    pass
+  def find_attributes(self, d: LegalDocument, ctx: AuditContext) -> LegalDocument:
+    self._reset_context()
+    d = self.find_org_date_number(d, ctx)
+    return d
 
 
 
@@ -99,6 +88,7 @@ class ContractParser(GenericParser):
   def find_org_date_number(self, contract: ContractDocument, ctx: AuditContext) -> ContractDocument:
 
     #GenericParser is called an all documents before this
+    # super().find_org_date_number(contract, ctx)
 
     _head = contract[0:300]  # warning, trimming doc for analysis phase 1
     if _head.embeddings is None:
