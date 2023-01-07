@@ -85,6 +85,8 @@ def del_none(d):
       for itm in list(value):
         if isinstance(itm, dict):
           del_none(itm)
+      if len(value)==0:
+        del d[key]
   return d  # For convenience
 
 

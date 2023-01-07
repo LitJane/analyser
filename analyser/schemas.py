@@ -12,10 +12,22 @@ from analyser.structures import OrgStructuralLevel, ContractSubject, InsiderInfo
 
 tag_value_field_name = "value"
 
+def merge_spans(tags: [SemanticTagBase]) -> (int, int):
+  arr = []
+  for attr in tags:
+    if attr is not None:
+      arr.append(attr.get_span()[0])
+      arr.append(attr.get_span()[1])
+  if len(arr) > 0:
+    return min(arr), max(arr)
+
+  return None
+
 
 class DocumentSchema:
   date: SemanticTagBase or None = None
   number: SemanticTagBase or None = None
+  case_number: SemanticTagBase or None = None
 
   def __init__(self):
     super().__init__()
@@ -66,16 +78,7 @@ class ContractPrice(SemanticTagBase):
     return self
 
 
-def merge_spans(tags: [SemanticTagBase]) -> (int, int):
-  arr = []
-  for attr in tags:
-    if attr is not None:
-      arr.append(attr.get_span()[0])
-      arr.append(attr.get_span()[1])
-  if len(arr) > 0:
-    return min(arr), max(arr)
 
-  return None
 
 
 class AgendaItemContract(HasOrgs, SemanticTagBase):
@@ -135,9 +138,14 @@ class OrgItem():
     return False
 
 
+class GenericDocSchema(DocumentSchema):
+  def __init__(self):
+    super().__init__()
+    self.case_number: SemanticTagBase or None = None
+
 class ContractSchema(DocumentSchema, HasOrgs):
   price: ContractPrice = None
-  case_number: SemanticTagBase or None = None
+
 
   def __init__(self):
     super().__init__()
@@ -151,7 +159,8 @@ class ProtocolSchema(DocumentSchema):
     self.org: OrgItem = OrgItem()
     self.structural_level: SemanticTagBase or None = None
     self.agenda_items: [AgendaItem] = []
-    self.case_number: SemanticTagBase or None = None
+
+
 
 # class CharterConstraint:
 #   def __init__(self):
@@ -346,26 +355,26 @@ document_schemas = {
         }],
     },
 
-    "terms":{
+    "terms": {
       "description": "Сроки/периоды договора",
       "allOf": [
         {"$ref": "#/definitions/tag"},
         {
           "properties": {
-            "term":{
-              "description":"Количество периодов. Пример: сроком на **11** (одиннадцать) месяцев",
+            "term": {
+              "description": "Количество периодов. Пример: сроком на **11** (одиннадцать) месяцев",
               "$ref": "#/definitions/numeric_tag"
             },
-            "term_unit":{
-              "description":"Продолжительность периода. Пример: месяцев, лет, дней",
+            "term_unit": {
+              "description": "Продолжительность периода. Пример: месяцев, лет, дней",
               "$ref": "#/definitions/string_tag"
             },
             "date_start": {
-              "description":"Дата вступления договора в силу",
+              "description": "Дата вступления договора в силу",
               "$ref": "#/definitions/date_tag"
             },
             "date_stop": {
-              "description":"Дата окончания сил договора",
+              "description": "Дата окончания сил договора",
               "$ref": "#/definitions/date_tag"
             }
           }
@@ -563,15 +572,24 @@ document_schemas = {
       }
     },
 
+    "generic": {
+      "properties": {
+        "case_number": {
+          "description": "Номер дела",
+          "$ref": "#/definitions/string_tag"
+        }
+      }
+    },
+
     "contract": {
       "properties": {
 
         "price_for_period": {
           "$ref": "#/definitions/currency_value",
-          "description":"Не общая сумма договора, а стоимость за период, например, за месяц аренды",
+          "description": "Не общая сумма договора, а стоимость за период, например, за месяц аренды",
         },
 
-        "terms":{
+        "terms": {
           "$ref": "#/definitions/terms"
         },
 
@@ -584,11 +602,6 @@ document_schemas = {
         },
 
         "number": {
-          "$ref": "#/definitions/string_tag"
-        },
-
-        "case_number": {
-          "description": "Номер дела",
           "$ref": "#/definitions/string_tag"
         },
 
@@ -615,7 +628,6 @@ document_schemas = {
             "$ref": "#/definitions/contract_agent",
           }
         }
-
 
       }
     },

@@ -13,7 +13,7 @@ from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
-from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
+from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign, GenericDocument
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
 from analyser.parsing import ParsingContext, AuditContext
@@ -36,7 +36,7 @@ class ContractDocument(LegalDocument):
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
     _attributes_tree_dict, _ = to_json(self.attributes_tree)
-    j['attributes_tree'] = {"contract": _attributes_tree_dict}
+    j['attributes_tree']['contract'] =  _attributes_tree_dict
     return j
 
   def get_number(self) -> SemanticTagBase:
@@ -64,15 +64,31 @@ class ContractDocument(LegalDocument):
 
 ContractDocument3 = ContractDocument
 
+class GenericParser(ParsingContext):
+  def __init__(self, embedder=None, sentence_embedder=None):
+    ParsingContext.__init__(self, embedder, sentence_embedder)
 
-class ContractParser(ParsingContext):
+  def find_org_date_number(self, doc: LegalDocument, ctx: AuditContext) -> LegalDocument:
+    doc.attributes_tree.case_number = find_case_number(doc)
+    return doc
 
+  def find_attributes(self, d: LegalDocument, ctx: AuditContext) -> LegalDocument:
+    self._reset_context()
+    d = self.find_org_date_number(d, ctx)
+    return d
+
+
+
+class ContractParser(GenericParser):
   def __init__(self, embedder=None, sentence_embedder=None):
     ParsingContext.__init__(self, embedder, sentence_embedder)
     self.subject_prediction_model = load_subject_detection_trained_model()
     self.insides_finder = InsidesFinder()
 
   def find_org_date_number(self, contract: ContractDocument, ctx: AuditContext) -> ContractDocument:
+
+    #GenericParser is called an all documents before this
+    # super().find_org_date_number(contract, ctx)
 
     _head = contract[0:300]  # warning, trimming doc for analysis phase 1
     if _head.embeddings is None:
@@ -88,7 +104,7 @@ class ContractParser(ParsingContext):
     check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline(), ctx)  # mutator
 
     # TODO: maybe move contract.tokens_map into text map
-    contract.attributes_tree.case_number = find_case_number(contract)
+    # contract.attributes_tree.case_number = find_case_number(contract)
     contract.attributes_tree.number = nn_get_contract_number(_head.tokens_map, semantic_map)
     contract.attributes_tree.date = nn_get_contract_date(_head.tokens_map, semantic_map)
 
