@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import re
@@ -187,7 +188,7 @@ def save_violations(audit, violations):
     db = get_mongodb_connection()
     db['audits'].update_one({'_id': audit['_id']}, {'$pull': {'violations': {'userViolation': False}}})
     db["audits"].update_one({'_id': audit["_id"]}, {"$push": {"violations": {'$each': violations}}})
-    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"status": "Done"}})
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"status": "Done", 'completionDate': datetime.datetime.utcnow()}})
 
 
 def create_violation(document_id, founding_document_id, reference, violation_type, violation_reason):
