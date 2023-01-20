@@ -10,7 +10,7 @@ from jsonschema import ValidationError, FormatChecker, Draft7Validator
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser, GenericParser
-from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance
+from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance, save_violations
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.parsing import AuditContext
@@ -284,6 +284,11 @@ def save_audit_practice(audit, classification_result, zip_classified):
     "$set": {'classification_result': classification_result, "additionalFields.zip_classified": zip_classified}})
 
 
+def save_errors(audit, errors):
+  db = get_mongodb_connection()
+  db["audits"].update_one({'_id': audit["_id"]}, {"$push": {"errors": {'$each': errors}}})
+
+
 def change_doc_state(doc, state):
   db = get_mongodb_connection()
   db['documents'].update_one({'_id': doc.get_id()}, {"$set": {"state": state}})
@@ -311,8 +316,7 @@ def get_doc4classification(audit):
   if audit.get('additionalFields', '').get('main_document_id') is not None:
     main_doc = finalizer.get_doc_by_id(audit['additionalFields']['main_document_id'])
     main_doc_type = main_doc['documentType']
-    if main_doc[
-      'parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
+    if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
       return main_doc, True
   document_ids = get_docs_by_audit_id(audit["_id"], id_only=True)
   for document_id in document_ids:
@@ -480,7 +484,11 @@ def audit_phase_2(audit, kind=None):
 
   if audit.get('pre-check') and 'Classification' in audit.get('checkTypes', {}):
     doc_classification(audit)
-    # return
+  if audit.get('pre-check') and 'Compliance' in audit.get('checkTypes', {}):
+    document, _ = get_doc4classification(audit)
+    violations, errors = check_compliance(audit, document)
+    save_errors(audit, errors)
+    save_violations(audit, violations)
 
   change_audit_status(audit, "Finalizing")  # TODO: check ALL docs in proper state
 
