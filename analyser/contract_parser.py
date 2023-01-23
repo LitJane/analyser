@@ -245,7 +245,7 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
     contract_agents = sorted(contract_agents, key=lambda a: _name_val_safe(a))
     contract_agents = sorted(contract_agents, key=lambda a: not a.is_known_subsidiary)
 
-  contract_agents = check_org_intersections(contract_agents)  # mutator
+  check_org_intersections(contract_agents)  # mutator
 
   return contract_agents  # _swap_org_tags(cas)
 
@@ -297,7 +297,7 @@ def _set_natural_person(contract_agent: OrgItem):
   contract_agent.type.value = 'Физическое лицо'
 
 
-def check_org_intersections(contract_agents: [OrgItem]):
+def check_org_intersections(contract_agents: [OrgItem]) -> None:
   '''
   achtung, darling! das ist mutator metoden, ja
   :param contract_agents:
@@ -321,7 +321,7 @@ def check_org_intersections(contract_agents: [OrgItem]):
     else:
       contract_agents[1].alias = None  # Sorry =( You must not conflict
 
-  return contract_agents
+  # return contract_agents
 
 
 def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPrice]:
@@ -477,8 +477,9 @@ def nn_get_tag_values(tagname: str,
         yield (_begin, _end)
 
   def slice_confidence(sl, att):
+    epsilon = 0.000
     for s in sl:
-      yield s, float(0.9 * min(att[s[0]], att[s[1]]) + 0.1 * max(att[s[0]], att[s[1]]))
+      yield s, float((1 - epsilon) * min(att[s[0]], att[s[1]]) + epsilon * max(att[s[0]], att[s[1]]))
 
   top_starts = top_inices(starts, limit)
   top_ends = top_inices(ends, len(top_starts))
