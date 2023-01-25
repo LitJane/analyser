@@ -262,12 +262,18 @@ def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: Aud
   if header0:
     if header0.lower().find('с физическим лицом') >= 0:
       _set_natural_person(contract_agents[-1])
+      # TODO: why setting it to the last array element??
 
   return contract_agents
 
 
 def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext):
   human_name = False
+
+  if contract_agent.type is not None:
+    if len(contract_agent.type) >= 2:
+      return
+
   if contract_agent.name is not None:
     name: str = contract_agent.name.value
 
@@ -283,6 +289,7 @@ def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext
       return
 
     x = r_human_name_compilled.search(name)
+
     if x is not None:
       human_name = True
 
