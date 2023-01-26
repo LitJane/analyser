@@ -63,10 +63,19 @@ def pad_things(xx, maxlen, padding='post'):
 
 class UberModelTrainsetManager:
 
-  def __init__(self, work_dir: str, model_variant_fn=uber_detection_model_005_1_1):
+  def __init__(self, work_dir: str, reports_dir=None, model_variant_fn=uber_detection_model_005_1_1):
+    
+    
     self.model_variant_fn = model_variant_fn
     self.work_dir: str = work_dir
-    self.reports_dir = os.path.join(self.work_dir, 'reports')
+    
+    if reports_dir is None:
+        self.reports_dir = os.path.join(self.work_dir, 'reports')
+    else:
+        self.reports_dir = reports_dir
+    
+    
+    pathlib.Path(self.work_dir).mkdir(parents=True, exist_ok=True)
     pathlib.Path(self.reports_dir).mkdir(parents=True, exist_ok=True)
 
     self.stats: DataFrame = self.load_contract_trainset_meta()
@@ -198,7 +207,7 @@ class UberModelTrainsetManager:
     self.stats.to_csv(os.path.join(self.work_dir, 'contract_trainset_meta.csv'), index=True)
 
   def init_model(self) -> (Model, KerasTrainingContext):
-    ctx = KerasTrainingContext(self.work_dir)
+    ctx = KerasTrainingContext(checkpoints_path=self.reports_dir)
 
     model_name = self.model_variant_fn.__name__
 
@@ -206,7 +215,7 @@ class UberModelTrainsetManager:
     # model.name = model_name
 
     weights_file_old = os.path.join(models_path, model_name + ".weights")
-    weights_file_new = os.path.join(self.work_dir, model_name + ".weights")
+    weights_file_new = os.path.join(self.reports_dir, model_name + ".weights")
 
     try:
       model.load_weights(weights_file_new, by_name=True, skip_mismatch=True)

@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from pandas import DataFrame
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, MaxPooling1D
+from tensorflow.keras.layers import Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, MaxPooling1D, ReLU
 from tensorflow.keras.layers import concatenate
 
 
@@ -120,9 +120,10 @@ def structure_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAI
 
   _out = Dropout(0.15)(_out)
 
-  _out = LSTM(FEATURES * 4, return_sequences=True, activation="sigmoid")(_out)
-  _out = LSTM(FEATURES, return_sequences=True, activation='sigmoid')(_out)
-
+  _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh")(_out)
+  _out = LSTM(FEATURES, return_sequences=True, activation='tanh')(_out)
+  _out = ReLU()(_out)
+    
   model = Model(inputs=[input_text_emb, token_features], outputs=_out, name=name)
 
   model.compile(loss=sigmoid_focal_crossentropy, optimizer='Nadam',
@@ -147,7 +148,7 @@ def uber_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   > 0.0030140 	loss
   > 0.0100294 	O1_tagging_loss
   > 0.0059756 	O2_subject_loss
-  > 0.0309147 	O1_tagging_kullback_leibler_divergence
+
 
   :param name:
   :return:
@@ -156,9 +157,10 @@ def uber_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   base_model, base_model_inputs = get_base_model(structure_detection_model_001, ctx=ctx, load_weights=not trained)
 
   _out_d = Dropout(0.1, name='alzheimer')(base_model)  # small_drops_of_poison
-  _out = LSTM(FEATURES * 4, return_sequences=True, activation="sigmoid", name='paranoia')(_out_d)
-  _out = LSTM(FEATURES, return_sequences=True, activation='sigmoid', name='O1_tagging')(_out)
-
+  _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh", name='paranoia')(_out_d)
+  _out = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
+  _out = ReLU(name='O1_tagging')(_out)
+    
   # OUT 2: subject detection
   #
   pool_size = 2
@@ -184,8 +186,9 @@ def uber_detection_model_003(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   # ---------------------
 
   _out_d = Dropout(0.5, name='alzheimer')(base_model)  # small_drops_of_poison
-  _out = LSTM(FEATURES * 4, return_sequences=True, activation="sigmoid", name='paranoia')(_out_d)
-  _out = LSTM(FEATURES, return_sequences=True, activation='sigmoid', name='O1_tagging')(_out)
+  _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh", name='paranoia')(_out_d)
+  _out = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
+  _out = ReLU(name='O1_tagging')(_out)
 
   # OUT 2: subject detection
   #
@@ -215,7 +218,8 @@ def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN
   _out_d = Dropout(0.35, name='alzheimer')(base_model)  # small_drops_of_poison
   _out = Bidirectional(LSTM(FEATURES * 2, return_sequences=True, name='paranoia'), name='self_reflection_1')(_out_d)
   _out = Dropout(0.5, name='alzheimer_11')(_out)
-  _out = LSTM(FEATURES, return_sequences=True, activation='sigmoid', name='O1_tagging')(_out)
+  _out = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
+  _out = ReLU(name='O1_tagging')(_out)
 
   # OUT 2: subject detection
   pool_size = 2
@@ -231,7 +235,6 @@ def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN
   model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
   model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
   return model
-
 
 def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
   input_text_emb = Input(shape=[None, EMB], dtype='float32', name="input_text_emb")
@@ -251,7 +254,7 @@ def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   _out_d = Dropout(0.15, name='alzheimer')(_out)  # small_drops_of_poison
   _out = Bidirectional(LSTM(FEATURES * 2, return_sequences=True, name='paranoia'), name='self_reflection_1')(_out_d)
   _out = Dropout(0.1, name='alzheimer_11')(_out)
-  _out = LSTM(FEATURES, return_sequences=True, activation='sigmoid', name='O1_tagging')(_out)
+  _out = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging')(_out)
 
   # OUT 2: subject detection
   pool_size = 2
