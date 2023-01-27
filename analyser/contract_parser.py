@@ -13,7 +13,7 @@ from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
-from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
+from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign, GenericDocument
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
 from analyser.parsing import ParsingContext, AuditContext
@@ -36,7 +36,7 @@ class ContractDocument(LegalDocument):
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
     _attributes_tree_dict, _ = to_json(self.attributes_tree)
-    j['attributes_tree'] = {"contract": _attributes_tree_dict}
+    j['attributes_tree']['contract'] = _attributes_tree_dict
     return j
 
   def get_number(self) -> SemanticTagBase:
@@ -65,14 +65,30 @@ class ContractDocument(LegalDocument):
 ContractDocument3 = ContractDocument
 
 
-class ContractParser(ParsingContext):
+class GenericParser(ParsingContext):
+  def __init__(self, embedder=None, sentence_embedder=None):
+    ParsingContext.__init__(self, embedder, sentence_embedder)
 
+  def find_org_date_number(self, doc: LegalDocument, ctx: AuditContext) -> LegalDocument:
+    doc.attributes_tree.case_number = find_case_number(doc)
+    return doc
+
+  def find_attributes(self, d: LegalDocument, ctx: AuditContext) -> LegalDocument:
+    self._reset_context()
+    d = self.find_org_date_number(d, ctx)
+    return d
+
+
+class ContractParser(GenericParser):
   def __init__(self, embedder=None, sentence_embedder=None):
     ParsingContext.__init__(self, embedder, sentence_embedder)
     self.subject_prediction_model = load_subject_detection_trained_model()
     self.insides_finder = InsidesFinder()
 
   def find_org_date_number(self, contract: ContractDocument, ctx: AuditContext) -> ContractDocument:
+
+    # GenericParser is called an all documents before this
+    # super().find_org_date_number(contract, ctx)
 
     _head = contract[0:300]  # warning, trimming doc for analysis phase 1
     if _head.embeddings is None:
@@ -88,7 +104,7 @@ class ContractParser(ParsingContext):
     check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline(), ctx)  # mutator
 
     # TODO: maybe move contract.tokens_map into text map
-    contract.attributes_tree.case_number = find_case_number(contract)
+    # contract.attributes_tree.case_number = find_case_number(contract)
     contract.attributes_tree.number = nn_get_contract_number(_head.tokens_map, semantic_map)
     contract.attributes_tree.date = nn_get_contract_date(_head.tokens_map, semantic_map)
 
@@ -229,7 +245,7 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
     contract_agents = sorted(contract_agents, key=lambda a: _name_val_safe(a))
     contract_agents = sorted(contract_agents, key=lambda a: not a.is_known_subsidiary)
 
-  contract_agents = check_org_intersections(contract_agents)  # mutator
+  check_org_intersections(contract_agents)  # mutator
 
   return contract_agents  # _swap_org_tags(cas)
 
@@ -246,12 +262,18 @@ def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: Aud
   if header0:
     if header0.lower().find('с физическим лицом') >= 0:
       _set_natural_person(contract_agents[-1])
+      # TODO: why setting it to the last array element??
 
   return contract_agents
 
 
 def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext):
   human_name = False
+
+  if contract_agent.type is not None:
+    if len(contract_agent.type) >= 2:
+      return
+
   if contract_agent.name is not None:
     name: str = contract_agent.name.value
 
@@ -267,6 +289,7 @@ def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext
       return
 
     x = r_human_name_compilled.search(name)
+
     if x is not None:
       human_name = True
 
@@ -281,7 +304,7 @@ def _set_natural_person(contract_agent: OrgItem):
   contract_agent.type.value = 'Физическое лицо'
 
 
-def check_org_intersections(contract_agents: [OrgItem]):
+def check_org_intersections(contract_agents: [OrgItem]) -> None:
   '''
   achtung, darling! das ist mutator metoden, ja
   :param contract_agents:
@@ -305,7 +328,7 @@ def check_org_intersections(contract_agents: [OrgItem]):
     else:
       contract_agents[1].alias = None  # Sorry =( You must not conflict
 
-  return contract_agents
+  # return contract_agents
 
 
 def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPrice]:
@@ -461,8 +484,9 @@ def nn_get_tag_values(tagname: str,
         yield (_begin, _end)
 
   def slice_confidence(sl, att):
+    epsilon = 0.000
     for s in sl:
-      yield s, float(min(att[s[0]], att[s[1]]))
+      yield s, float((1 - epsilon) * min(att[s[0]], att[s[1]]) + epsilon * max(att[s[0]], att[s[1]]))
 
   top_starts = top_inices(starts, limit)
   top_ends = top_inices(ends, len(top_starts))

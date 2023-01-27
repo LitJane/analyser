@@ -10,7 +10,6 @@ import re
 from analyser.legal_docs import LegalDocument
 from analyser.ml_tools import SemanticTag
 
- 
 case_number_re = re.compile(
   r'(дело|Дело|по\s*делу|дела)\s*(№|N|номер)\s*(?P<case_num>([А-Я]?\s?[0-9-/]*))', re.MULTILINE)
 
@@ -36,12 +35,12 @@ def find_case_number(doc: LegalDocument, tagname='case_number') -> SemanticTag o
 
 if __name__ == '__main__':
   ex = '18 января 2022 года Дело № А 40-262624/2021-146-2012 45\nРезолютивная часть решения объявлена 13   2022 года'
-  print(find_case_number_spans(ex))
+  print('-', find_case_number_spans(ex))
   ex = '18 января 2022 по делу №40-262624/2021-146-2012 Резолютивная часть решения объявлена 13 января 2022  '
-  print(find_case_number_spans(ex))
+  print('-', find_case_number_spans(ex))
   ex = '18 января 2022 по делу N40-262624/2021-146-2012\nРезолютивная часть решения объявлена 13 января 2022  '
-  print(find_case_number_spans(ex))
+  print('-', find_case_number_spans(ex))
   ex = '18 января 2022 по делу номер 40-262624/2021-146-2012\nРезолютивная часть решения объявлена 13 января 2022 года'
-  print(find_case_number_spans(ex))
+  print('-', find_case_number_spans(ex))
   ex = 'мирового соглашения в рамках дела № А 56-113826/2019 о признании '
-  print(find_case_number_spans(ex))
+  print('-', find_case_number_spans(ex))

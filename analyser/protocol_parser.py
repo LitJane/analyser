@@ -88,7 +88,7 @@ class ProtocolDocument(LegalDocumentExt):
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
     _attributes_tree_dict, _ = to_json(self.attributes_tree)
-    j['attributes_tree'] = {"protocol": _attributes_tree_dict}
+    j['attributes_tree']['protocol'] = _attributes_tree_dict
     return j
 
 
@@ -179,7 +179,7 @@ class ProtocolParser(ParsingContext):
     doc.org_level = max_confident_tag(list(find_org_structural_level(doc)))
     doc.attributes_tree.org = find_protocol_org_obj(doc)
     doc.date = find_document_date(doc)
-    doc.attributes_tree.case_number=find_case_number(doc)
+    # doc.attributes_tree.case_number=find_case_number(doc)
 
     if doc.attributes_tree.org is not None:
       if doc.attributes_tree.org.name is None:
