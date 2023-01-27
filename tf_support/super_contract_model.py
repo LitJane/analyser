@@ -122,7 +122,7 @@ def structure_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAI
 
   _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh")(_out)
   _out = LSTM(FEATURES, return_sequences=True, activation='tanh')(_out)
-  _out = ReLU()(_out)
+#   _out = ReLU()(_out)
     
   model = Model(inputs=[input_text_emb, token_features], outputs=_out, name=name)
 
@@ -218,13 +218,13 @@ def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN
   _out_d = Dropout(0.35, name='alzheimer')(base_model)  # small_drops_of_poison
   _out = Bidirectional(LSTM(FEATURES * 2, return_sequences=True, name='paranoia'), name='self_reflection_1')(_out_d)
   _out = Dropout(0.5, name='alzheimer_11')(_out)
-  _out = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
-  _out = ReLU(name='O1_tagging')(_out)
+  _out_l = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
+  _out = ReLU(name='O1_tagging')(_out_l)
 
   # OUT 2: subject detection
   pool_size = 2
   emotions = MaxPooling1D(pool_size=pool_size, name='emotions')(_out_d)
-  insights = MaxPooling1D(pool_size=pool_size, name='insights')(_out)
+  insights = MaxPooling1D(pool_size=pool_size, name='insights')(_out_l)
   _out2 = concatenate([emotions, insights], axis=-1, name='bipolar_disorder')
   _out2 = Dropout(0.3, name='alzheimer_3')(_out2)
   _out2 = Bidirectional(LSTM(16, return_sequences=False, name='narcissisism'), name='self_reflection_2')(_out2)
