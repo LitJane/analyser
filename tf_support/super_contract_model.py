@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from pandas import DataFrame
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, MaxPooling1D, ReLU
+from tensorflow.keras.layers import LayerNormalization, Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, MaxPooling1D, ReLU, ThresholdedReLU, LeakyReLU, BatchNormalization
 from tensorflow.keras.layers import concatenate
 
 
@@ -112,13 +112,17 @@ def structure_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAI
   input_text_emb = Input(shape=[None, EMB], dtype='float32', name="input_text_emb")
   token_features = Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="input_headlines_att")
 
-  _out = Dropout(0.45, name="drops")(input_text_emb)  # small_drops_of_poison
-  _out = concatenate([_out, token_features], axis=-1)
+  _out = LayerNormalization(epsilon=1e-6, name="ln_1e")(input_text_emb)
+  token_features_n = LayerNormalization(epsilon=1e-6, name="ln_1t")(token_features)
+
+  _out = Dropout(0.45, name="drops")(_out)  # small_drops_of_poison
+  _out = concatenate([_out, token_features_n], axis=-1)
   _out = Conv1D(filters=FEATURES * 4, kernel_size=(2), padding='same', activation=None)(_out)
   _out = Conv1D(filters=FEATURES * 4, kernel_size=(4), padding='same', activation='relu', name='embedding_reduced')(
     _out)
 
   _out = Dropout(0.15)(_out)
+#   _out = BatchNormalization(name="bn_2")(_out)
 
   _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh")(_out)
   _out = LSTM(FEATURES, return_sequences=True, activation='tanh')(_out)
@@ -216,10 +220,10 @@ def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN
   # ---------------------
 
   _out_d = Dropout(0.35, name='alzheimer')(base_model)  # small_drops_of_poison
-  _out = Bidirectional(LSTM(FEATURES * 2, return_sequences=True, name='paranoia'), name='self_reflection_1')(_out_d)
-  _out = Dropout(0.5, name='alzheimer_11')(_out)
+  _out = Bidirectional(LSTM(FEATURES * 4, return_sequences=True, name='paranoia'), name='self_reflection_4')(_out_d)
+  _out = Dropout(0.3, name='alzheimer_11')(_out)
   _out_l = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
-  _out = ReLU(name='O1_tagging')(_out_l)
+  
 
   # OUT 2: subject detection
   pool_size = 2
@@ -227,11 +231,12 @@ def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN
   insights = MaxPooling1D(pool_size=pool_size, name='insights')(_out_l)
   _out2 = concatenate([emotions, insights], axis=-1, name='bipolar_disorder')
   _out2 = Dropout(0.3, name='alzheimer_3')(_out2)
-  _out2 = Bidirectional(LSTM(16, return_sequences=False, name='narcissisism'), name='self_reflection_2')(_out2)
+  _out2 = Bidirectional(LSTM(32, return_sequences=False, name='narcissisism'), name='self_reflection_2')(_out2)
   _out2 = Dropout(0.1, name='alzheimer_1')(_out2)
 
   _out2 = Dense(CLASSES, activation='softmax', name='O2_subject')(_out2)
 
+  _out = LeakyReLU(name='O1_tagging')(_out_l)
   model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
   model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
   return model
