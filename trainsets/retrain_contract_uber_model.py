@@ -9,7 +9,6 @@ import pathlib
 import random
 import warnings
 from datetime import datetime
-from math import log1p
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -24,19 +23,14 @@ from sklearn.metrics import classification_report
 from tensorflow.keras import Model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from analyser.documents import TextMap
 from analyser.finalizer import get_doc_by_id
-from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
 from analyser.hyperparams import work_dir as default_work_dir
-from analyser.legal_docs import embedd_tokens
-from analyser.persistence import DbJsonDoc
 from analyser.structures import ContractSubject
 from colab_support.renderer import plot_cm
 from integration.db import get_mongodb_connection
 from tf_support import super_contract_model
-from tf_support.embedder_elmo import ElmoEmbedder
-from tf_support.super_contract_model import uber_detection_model_005_1_1
+from tf_support.super_contract_model import make_att_model
 from tf_support.tools import KerasTrainingContext
 from trainsets.trainset_tools import split_trainset_evenly
 
@@ -59,30 +53,22 @@ def pad_things(xx, maxlen, padding='post'):
     yield pad_sequences([x], maxlen=maxlen, padding=padding, truncating=padding, value=_v, dtype='float32')[0]
 
 
-
-
 class UberModelTrainsetManager:
 
-  def __init__(self, work_dir: str, reports_dir=None, model_variant_fn=uber_detection_model_005_1_1):
-    
-    
+  def __init__(self, work_dir: str, reports_dir=None, model_variant_fn=make_att_model):
+
     self.model_variant_fn = model_variant_fn
     self.work_dir: str = work_dir
-    
+
     if reports_dir is None:
-        self.reports_dir = os.path.join(self.work_dir, 'reports')
+      self.reports_dir = os.path.join(self.work_dir, 'reports')
     else:
-        self.reports_dir = reports_dir
-    
-    
+      self.reports_dir = reports_dir
+
     pathlib.Path(self.work_dir).mkdir(parents=True, exist_ok=True)
     pathlib.Path(self.reports_dir).mkdir(parents=True, exist_ok=True)
 
     self.stats: DataFrame = self.load_contract_trainset_meta()
-
-
-
-
 
   def get_updated_contracts(self):
     self.lastdate = datetime(1900, 1, 1)
@@ -178,8 +164,6 @@ class UberModelTrainsetManager:
     logger.info(f'TOTAL DATAPOINTS IN TRAINSET: {len(df)}')
     return df
 
-
-
     # export_docs_to_single_json(docs, self.work_dir)
 
   def save_stats(self):
@@ -235,9 +219,6 @@ class UberModelTrainsetManager:
     # model.summary()
 
     return model, ctx
-
-
-
 
   # def validate_trainset(self):
   #   self.stats: DataFrame = self.load_contract_trainset_meta()
@@ -320,8 +301,6 @@ class UberModelTrainsetManager:
     _gen = self.make_generator(self.stats.index, 20)
     plot_subject_confusion_matrix(self.reports_dir, model, steps=20, generator=_gen)
 
-
-
   def export_docs_to_json(self):
     self.stats: DataFrame = self.load_contract_trainset_meta()
 
@@ -330,8 +309,6 @@ class UberModelTrainsetManager:
 
   def _dp_fn(self, doc_id, suffix):
     return os.path.join(self.work_dir, 'datasets', f'{doc_id}-datapoint-{suffix}.npy')
-
-
 
   def augment_datapoint(self, dp):
     maxlen = 128 * random.choice([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
@@ -357,8 +334,6 @@ class UberModelTrainsetManager:
     sm = _padded[2]
 
     return (emb, tok_f), (sm, subj), (sample_weight, subject_weight)
-
-
 
   def prepare_trainst(self):
     '''

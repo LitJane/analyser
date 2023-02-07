@@ -1,16 +1,18 @@
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
 from pandas import DataFrame
+from tensorflow import keras
 from tensorflow.keras import Model
-from tensorflow.keras.layers import LayerNormalization, Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, MaxPooling1D, ReLU, ThresholdedReLU, LeakyReLU, BatchNormalization
+from tensorflow.keras import layers
+from tensorflow.keras.layers import LayerNormalization, Input, Conv1D, Dropout, LSTM, Bidirectional, Dense, \
+  MaxPooling1D, ReLU, LeakyReLU
 from tensorflow.keras.layers import concatenate
-
 
 from analyser.headers_detector import TOKEN_FEATURES
 from analyser.hyperparams import work_dir
-
 from analyser.structures import ContractSubject
 from tf_support.addons import sigmoid_focal_crossentropy
 from tf_support.tools import KerasTrainingContext
@@ -58,8 +60,6 @@ DEFAULT_TRAIN_CTX = KerasTrainingContext()
 CLASSES = 43
 FEATURES = len(semantic_map_keys_contract)
 EMB = 1024
-
-
 
 
 @lru_cache(maxsize=72)
@@ -122,12 +122,12 @@ def structure_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAI
     _out)
 
   _out = Dropout(0.15)(_out)
-#   _out = BatchNormalization(name="bn_2")(_out)
+  #   _out = BatchNormalization(name="bn_2")(_out)
 
   _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh")(_out)
   _out = LSTM(FEATURES, return_sequences=True, activation='tanh')(_out)
-#   _out = ReLU()(_out)
-    
+  #   _out = ReLU()(_out)
+
   model = Model(inputs=[input_text_emb, token_features], outputs=_out, name=name)
 
   model.compile(loss=sigmoid_focal_crossentropy, optimizer='Nadam',
@@ -164,7 +164,7 @@ def uber_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh", name='paranoia')(_out_d)
   _out = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
   _out = ReLU(name='O1_tagging')(_out)
-    
+
   # OUT 2: subject detection
   #
   pool_size = 2
@@ -223,7 +223,6 @@ def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN
   _out = Bidirectional(LSTM(FEATURES * 4, return_sequences=True, name='paranoia'), name='self_reflection_4')(_out_d)
   _out = Dropout(0.3, name='alzheimer_11')(_out)
   _out_l = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
-  
 
   # OUT 2: subject detection
   pool_size = 2
@@ -240,6 +239,7 @@ def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN
   model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
   model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
   return model
+
 
 def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
   input_text_emb = Input(shape=[None, EMB], dtype='float32', name="input_text_emb")
@@ -277,3 +277,110 @@ def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   return model
 
 
+@dataclass
+class Config:
+  # MAX_LEN = 256
+  # BATCH_SIZE = 32
+  LR = 0.001
+
+  EMBED_DIM = EMB
+  NUM_HEAD = 4  # used in bert model
+  FF_DIM = 128  # used in bert model
+  NUM_LAYERS = 1
+
+
+config = Config()
+
+
+def bert_module(query, key, value, i, height):
+  # Multi headed self-attention
+  attention_output = layers.MultiHeadAttention(
+    num_heads=config.NUM_HEAD,
+    key_dim=config.EMBED_DIM // config.NUM_HEAD,
+    name="encoder_{}/multiheadattention".format(i),
+  )(query, key, value)
+  attention_output = layers.Dropout(0.1, name="encoder_{}/att_dropout".format(i))(
+    attention_output
+  )
+  attention_output = layers.LayerNormalization(
+    epsilon=1e-6, name=f"encoder_{i}/att_layernormalization"
+  )(query + attention_output)
+
+  # Feed-forward layer
+  ffn = keras.Sequential(
+    [
+      layers.Dense(config.FF_DIM, activation="relu"),
+      layers.Dense(height),
+    ],
+    name=f"encoder_{i}/ffn",
+  )
+  ffn_output = ffn(attention_output)
+  ffn_output = layers.Dropout(0.1, name=f"encoder_{i}/ffn_dropout")(
+    ffn_output
+  )
+  sequence_output = layers.LayerNormalization(
+    epsilon=1e-6, name=f"encoder_{i}/ffn_layernormalization"
+  )(attention_output + ffn_output)
+  return sequence_output
+
+
+metrics = ['mse', 'binary_crossentropy']
+
+losses = {
+  "O1_tagging": "binary_crossentropy",
+  "O2_subject": "binary_crossentropy",
+}
+
+
+class ThresholdLayer(layers.Layer):
+  def __init__(self, **kwargs):
+    super(ThresholdLayer, self).__init__(**kwargs)
+
+  def build(self, input_shape):
+    self.kernel = self.add_weight(name="threshold", shape=(1,), initializer="uniform",
+                                  trainable=True)
+    super(ThresholdLayer, self).build(input_shape)
+
+  def call(self, x):
+    return keras.backend.sigmoid(100 * (x - self.kernel))
+
+  def compute_output_shape(self, input_shape):
+    return input_shape
+
+
+def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
+  input_text_emb = layers.Input(shape=[None, config.EMBED_DIM], dtype='float32', name="input_text_emb")
+  _out = layers.BatchNormalization(name="bn1")(input_text_emb)
+  _out = layers.Dropout(0.2, name="drops")(_out)  # small_drops_of_poison
+
+  token_features = layers.Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="token_features")
+  token_features_n = layers.BatchNormalization(name="bn2")(token_features)
+
+  _out = layers.concatenate([input_text_emb, token_features_n], axis=-1)
+
+  for i in range(config.NUM_LAYERS):
+    _out = bert_module(_out, _out, _out, i, height=config.EMBED_DIM + TOKEN_FEATURES)
+
+  _out = layers.BatchNormalization(name="bn1")(_out)
+  _out = layers.LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
+  #   _out1 = layers.ReLU(name='O1_tagging')(_out)
+  _out1 = ThresholdLayer(name='O1_tagging')(_out)
+
+  #   _out = Conv1D(filters=FEATURES * 4, kernel_size=(2), padding='same', activation='relu' , name='embedding_reduced')(_out)
+  _out = layers.Bidirectional(layers.LSTM(16, return_sequences=False, name='narcissisism'), name='embedding_reduced')(
+    _out)
+  _out = layers.BatchNormalization(name="bn_bi_2")(_out)
+  _out = layers.Dropout(0.1)(_out)
+
+  _out2 = layers.Dense(CLASSES, activation='softmax', name='O2_subject')(_out)
+
+  base_model_inputs = [input_text_emb, token_features]
+  model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
+  model.compile(loss=losses, optimizer='Adam', metrics=metrics)
+  return model
+
+
+if __name__ == '__main__':
+  # print(FEATURES)
+  model = make_att_model()
+  model.summary()

@@ -11,14 +11,11 @@ from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
 from analyser.ml_tools import FixedVector
 from analyser.structures import ContractSubject
-from tf_support.super_contract_model import uber_detection_model_005_1_1, \
-  semantic_map_keys_contract
+from tf_support.super_contract_model import make_att_model, semantic_map_keys_contract
 from tf_support.tools import KerasTrainingContext
 from trainsets.trainset_tools import SubjectTrainsetManager
 
 VALIDATION_SET_PROPORTION = 0.25
-
-
 
 EMB = 1024  # embedding dimentionality
 
@@ -38,6 +35,7 @@ def nn_predict(umodel, doc):
 
   semantic_map = pd.DataFrame(prediction[0][0], columns=semantic_map_keys_contract)
   return semantic_map, prediction[1][0]
+
 
 predict_subject = nn_predict
 
@@ -115,7 +113,7 @@ def conv_bi_LSTM_dropouts(name="new_model") -> Model:
 def load_subject_detection_trained_model() -> Model:
   ctx = KerasTrainingContext(models_path)
 
-  final_model = ctx.init_model(uber_detection_model_005_1_1, trained=True, trainable=False, verbose=10)
+  final_model = ctx.init_model(make_att_model, trained=True, trainable=False, verbose=10)
 
   # print(final_model.name)
   # final_model.summary()
