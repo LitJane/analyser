@@ -144,7 +144,7 @@ class TextMap:
 
   def sentence_at_index(self, i: int, return_delimiters=True) -> (int, int):
 
-    warnings.warn("use LegalDocument.sentence_at_index", DeprecationWarning)
+    warnings.warn("use LegalDocument.sentence_at_index and sentence map", DeprecationWarning)
 
     sent_spans = self.split_spans('\n', add_delimiter=return_delimiters)
     d_add = 1
@@ -230,7 +230,7 @@ class TextMap:
   def __len__(self):
     return self.get_len()
 
-  def __getitem__(self, key):
+  def __getitem__(self, key)->str:
     if isinstance(key, slice):
       # Get the start, stop, and step from the slice
       return [self[ii] for ii in range(*key.indices(len(self)))]

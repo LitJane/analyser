@@ -380,6 +380,21 @@ class TokenisationTestCase(unittest.TestCase):
 
     self.assertEqual(expected, tm.text_range(ti))
 
+  def test_token_indices_by_char_range_2(self):
+    text = '10. Размер платы за технологическое присоединение определяется в соответствии с ' \
+           'постановлением министерства тарифного регулирования и энергетики Пермского края ' \
+           'и составляет 1000 рублей 00 копеек, в том числе НДС (20%) в размере.'
+    span = [178, 184]
+    expected = text[span[0]:span[1]]
+    print("expected", expected)
+
+    tm = TextMap(text)  # tokenization
+    ti = tm.token_indices_by_char_range(span)
+    # self.assertEqual(0, ti[0])
+    # self.assertEqual(1, ti[1])
+    actual = tm.text_range(ti)
+    self.assertEqual(expected, actual)
+
   def test_token_indices_by_char_range_sliced(self):
     text = 'm йe qwert'
 
