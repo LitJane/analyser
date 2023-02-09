@@ -16,7 +16,7 @@ Tokens = List[str] or ndarray
 
 def to_float(string) -> float:
   try:
-    return float(string.replace(" ", "").replace(",", ".").replace("=", "."))
+    return float(str(string).replace(" ", "").replace(",", ".").replace("=", "."))
   except:
     return np.nan
 

@@ -179,7 +179,7 @@ class ContractParser(GenericParser):
 
     # --------------------------------------insider
     self._logstep("finding insider info")
-    self.insides_finder.find_insides(contract)
+#     self.insides_finder.find_insides(contract)
 
     # --------------------------------------
     self.validate(contract, ctx)
@@ -259,8 +259,6 @@ def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: Aud
 
   for contract_agent in contract_agents:
     check_org_is_natural_person(contract_agent, ctx)
-
-  logger.info(f'header: {header0}')
 
   if header0:
     if header0.lower().find('с физическим лицом') >= 0:
@@ -368,7 +366,7 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     if parent_tag:
       cp.span = merge_spans([cp, parent_tag])
 
-    if span_len(cp.span) > 200 or span_len(cp.span) < 10:
+    if span_len(cp.span) > 200 or span_len(cp.span) < 20:
       sentence_span = textmap.sentence_at_index(sentence_seed_tag.span[0])
       cp.span = sentence_span
 
@@ -391,12 +389,12 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     results = ValueSpansFinder(region)
 
     # if results.including_vat:
-    cp.amount = SemanticTag('amount_brutto')
+    cp.amount = SemanticTag('amount')
     cp.amount.span = region_map.token_indices_by_char_range(results.number_span)
     cp.amount.value = results.original_sum
     cp.amount.offset(cp.span[0])
-
-
+    if results.including_vat == False:
+      cp.amount.value = results.value
 
     if cp.currency is None:
       cp.currency = SemanticTag('currency')
@@ -414,10 +412,11 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     logger.error(e)
     results = None
 
-  try:
-    cp.amount.value = to_float(cp.amount.value)
-  except Exception as e:
-    logger.error(f'amount is {cp.amount}')
+  if cp.amount:
+    try:
+      cp.amount.value = to_float(cp.amount.value)
+    except Exception as e:
+      logger.error(f'amount is {cp.amount}')
     # logger.error(e)
 
   try:
@@ -426,16 +425,18 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     # logger.error(e)
     logger.error(f'vat is {cp.vat}')
 
-  try:
-    cp.amount_netto.value = to_float(cp.amount_netto.value)
-  except Exception as e:
-    # logger.error(e)
-    logger.error(f'amount_netto is {cp.amount_netto}')
+  if cp.amount_netto:
+    try:
+      cp.amount_netto.value = to_float(cp.amount_netto.value)
+    except Exception as e:
+      # logger.error(e)
+      logger.error(f'amount_netto is {cp.amount_netto}')
 
-  try:
-    cp.amount_brutto.value = to_float(cp.amount_brutto.value)
-  except Exception as e:
-    logger.error(f'amount_brutto is {cp.amount_brutto}')
+  if cp.amount_brutto:
+    try:
+      cp.amount_brutto.value = to_float(cp.amount_brutto.value)
+    except Exception as e:
+      logger.error(f'amount_brutto is {cp.amount_brutto}')
 
   if (results is not None):
     if results.including_vat:

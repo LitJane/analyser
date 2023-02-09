@@ -3,7 +3,7 @@ import os
 import warnings
 
 import pandas as pd
-from overrides import overrides
+# from overrides import overrides
 from pandas import DataFrame
 
 from analyser.attributes import to_json
@@ -61,7 +61,7 @@ class CharterDocument(LegalDocumentExt):
   date = property(get_date, set_date)
   number = property(get_number, set_number)
 
-  @overrides
+#   @overrides
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
     _attributes_tree_dict, _ = to_json(self.attributes_tree)
