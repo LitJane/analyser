@@ -13,6 +13,8 @@ from tensorflow.keras.layers import concatenate
 
 from analyser.headers_detector import TOKEN_FEATURES
 from analyser.hyperparams import work_dir
+from analyser.log import logger
+
 from analyser.structures import ContractSubject
 from tf_support.addons import sigmoid_focal_crossentropy
 from tf_support.tools import KerasTrainingContext
@@ -38,18 +40,36 @@ losses = {
 # seq_labels_contract = seq_labels_contract_level_1 + seq_labels_dn + seq_labels_org_1 + seq_labels_org_2 + seq_labels_val
 # seq_labels_contract_swap_orgs = seq_labels_contract_level_1 + seq_labels_dn + seq_labels_org_2 + seq_labels_org_1 + seq_labels_val
 
-semantic_map_keys = [
+# semantic_map_keys = [
+#   'headline',
+#   'subject',
+#   'date',
+#   'number',
+#   'org-name',
+#   'org-alias',
+#   'org-type'
+# ]
+t_semantic_map_keys_common = [
   'headline',
   'subject',
   'date',
   'number',
+]
+t_semantic_map_keys_org = [
   'org-name',
   'org-alias',
-  'org-type'
-]
+  'org-type']
 
-semantic_map_keys += ['amount', 'amount_brutto', 'amount_netto', 'vat', 'sign', 'currency', 'vat_unit', 'value']
+t_semantic_map_keys_price = [
+  'amount',
+  'amount_brutto',
+  'amount_netto',
+  'vat',
+  'sign',
+  'currency',
+  'vat_unit'  ]
 
+semantic_map_keys = t_semantic_map_keys_common + t_semantic_map_keys_org + t_semantic_map_keys_price + ['value']
 semantic_map_keys_contract = []
 for _name in semantic_map_keys:
   semantic_map_keys_contract.append(_name + "-begin")
@@ -378,6 +398,86 @@ def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TR
   model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
   model.compile(loss=losses, optimizer='Adam', metrics=metrics)
   return model
+
+
+def get_amount(attr_tree):
+  _value_tag = attr_tree.get('price')
+  amount = None
+  if _value_tag is not None:
+    amount = _value_tag.get('amount_netto')
+    if amount is None:
+      amount = _value_tag.get('amount_brutto')
+    if amount is None:
+      amount = _value_tag.get('amount')
+  return amount
+
+
+def get_semantic_map_new(doc) -> DataFrame:
+  _len = len(doc)
+  df = DataFrame()
+
+  for sl in semantic_map_keys_contract:
+    df[sl] = np.zeros(_len)
+
+  attr_tree = doc.get_attributes_tree()
+
+  def get_av(name):  # av=attention vector
+    if name not in df:
+      av = np.zeros(_len, np.float)
+      df[name] = av
+
+  def add_span_vectors(_name, span):
+    #         print('add_span_vectors',span)
+    bn = _name + "-begin"
+    en = _name + "-end"
+    get_av(bn)
+    get_av(en)
+    if not span is None:
+      df[bn][span[0]:span[1]] = 1.
+      df[en][span[1]] = 1.
+
+  # Headers
+  headers = doc.analysis['headers']
+  for h in headers:
+    add_span_vectors('headline', h['span'])
+
+  for n in t_semantic_map_keys_common[1:]:  # skip headers
+    span = attr_tree.get(n, {}).get('span')
+    add_span_vectors(n, span)
+
+  # Orgs:
+  for org in attr_tree.get('orgs', []):  # org number (index)
+    for org_part_key in t_semantic_map_keys_org:
+#       _nm = 'unknown'
+#       try:
+
+      org_part = org.get(org_part_key.replace('org-', ''), {})
+      if org_part:
+        span = org_part.get('span', None)
+        add_span_vectors(org_part_key, span)
+#       except Exception as e:
+#         logger.exception(e)
+#         print('ERROR (sp)', e, org_part_key, _nm)
+
+  _value_tag = attr_tree.get('price', {})
+  
+
+  if _value_tag is not None:
+    add_span_vectors("value", _value_tag.get('span'))
+    amount = get_amount(attr_tree)
+    if amount:
+      add_span_vectors('amount', amount.get('span'))
+    
+#     print('_value_tag=', _value_tag)
+#     print('amount=', amount)
+    for n in t_semantic_map_keys_price:
+      _value_tag_part = _value_tag.get(n)
+#       print('n=', n)
+#       print('_value_tag_part=', _value_tag_part)
+      if _value_tag_part:
+        add_span_vectors(n, _value_tag_part.get('span'))
+
+  return df[semantic_map_keys_contract]
 
 
 if __name__ == '__main__':

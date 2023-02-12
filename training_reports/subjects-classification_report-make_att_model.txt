@@ -1,0 +1,22 @@
+                                   precision    recall  f1-score   support
+
+                   AgencyContract      0.973     1.000     0.986        36
+                   BankGuarantees      0.750     0.900     0.818        10
+                          Charity      1.000     1.000     1.000        18
+                             Deal      0.938     0.922     0.930       115
+         DealIntellectualProperty      0.868     0.917     0.892        36
+                  GeneralContract      0.870     0.923     0.896        65
+                        Insurance      1.000     1.000     1.000        22
+                            Loans      0.971     0.957     0.964        69
+                            Other      0.000     0.000     0.000         0
+ParticipationInOtherOrganizations      1.000     0.800     0.889        10
+                PledgeEncumbrance      1.000     1.000     1.000         4
+                       RealEstate      0.909     1.000     0.952        10
+           RealEstateTransactions      1.000     0.875     0.933         8
+                          Renting      0.986     1.000     0.993        73
+           SecuritiesTransactions      0.818     1.000     0.900         9
+                          Service      0.985     0.957     0.971       347
+
+                         accuracy                          0.953       832
+                        macro avg      0.879     0.891     0.883       832
+                     weighted avg      0.959     0.953     0.955       832
