@@ -556,7 +556,7 @@ def get_amount(attr_tree):
       amount = _value_tag.get('amount')
   return amount
 
-
+#--------------------------
 def get_semantic_map_new(doc) -> DataFrame:
   _len = len(doc)
   df = DataFrame()
@@ -567,17 +567,12 @@ def get_semantic_map_new(doc) -> DataFrame:
 
   attr_tree = doc.get_attributes_tree()
 
-  #   def get_av(name):  # av=attention vector
-  #     if name not in df:
-  #       av = np.zeros(_len, np.float)
-  #       df[name] = av
 
   def add_span_vectors(_name, span):
     #         print('add_span_vectors',span)
     bn = _name + "-begin"
     en = _name + "-end"
-    #     get_av(bn)
-    #     get_av(en)
+
     if not span is None:
       df[bn][span[0]:span[1]] = 1.
       df[en][span[1]] = 1.
@@ -594,18 +589,17 @@ def get_semantic_map_new(doc) -> DataFrame:
   # Orgs:
   for org in attr_tree.get('orgs', []):  # org number (index)
     for org_part_key in t_semantic_map_keys_org:
-      #       _nm = 'unknown'
-      #       try:
 
       org_part = org.get(org_part_key.replace('org-', ''), {})
       if org_part:
         span = org_part.get('span', None)
         add_span_vectors(org_part_key, span)
-  #       except Exception as e:
-  #         logger.exception(e)
-  #         print('ERROR (sp)', e, org_part_key, _nm)
+
 
   _value_tag = attr_tree.get('price', {})
+  
+  if _value_tag is None:
+    _value_tag = attr_tree.get('price_for_period', {})
 
   if _value_tag is not None:
     add_span_vectors("value", _value_tag.get('span'))
