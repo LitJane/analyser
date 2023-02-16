@@ -113,6 +113,8 @@ def get_token_features(token: str):
 
 def get_tokens_features(tokens):
   doc_features = []
+
+
   for t in tokens:
     _features = get_token_features(t)
     doc_features.append(_features)
@@ -120,6 +122,10 @@ def get_tokens_features(tokens):
   doc_featuresX_data = pd.DataFrame.from_records(doc_features)
   doc_featuresX_data['_reserved'] = 0.0
   doc_featuresX_data['h'] = 0.0
+
+  position_enc = np.arange(1, 0, -0.0005)
+  position_enc = position_enc[0:len(doc_featuresX_data['h'])]
+  doc_featuresX_data['h'] = position_enc
 
   return doc_featuresX_data
 

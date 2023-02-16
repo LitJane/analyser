@@ -597,7 +597,7 @@ def get_semantic_map_new(doc) -> DataFrame:
 
 
   _value_tag = attr_tree.get('price', {})
-  
+
   if _value_tag is None:
     _value_tag = attr_tree.get('price_for_period', {})
 
