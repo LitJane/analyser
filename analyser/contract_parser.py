@@ -419,11 +419,12 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
       logger.error(f'amount is {cp.amount}')
     # logger.error(e)
 
-  try:
-    cp.vat.value = to_float(cp.vat.value)
-  except Exception as e:
-    # logger.error(e)
-    logger.error(f'vat is {cp.vat}')
+  if cp.vat:
+      try:
+        cp.vat.value = to_float(cp.vat.value)
+      except Exception as e:
+        # logger.error(e)
+        logger.error(f'vat is {cp.vat.value}, cannot cast to float')
 
   if cp.amount_netto:
     try:

@@ -1,8 +1,9 @@
-from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from dataclasses import dataclass
 
 import numpy as np
+import tensorflow as tf
 from pandas import DataFrame
 from tensorflow import keras
 from tensorflow.keras import Model
@@ -13,8 +14,6 @@ from tensorflow.keras.layers import concatenate
 
 from analyser.headers_detector import TOKEN_FEATURES
 from analyser.hyperparams import work_dir
-from analyser.log import logger
-
 from analyser.structures import ContractSubject
 from tf_support.addons import sigmoid_focal_crossentropy
 from tf_support.tools import KerasTrainingContext
@@ -30,25 +29,13 @@ seq_labels_contract_level_1 = [
   '_reserved'
 ]
 
-metrics = ['kullback_leibler_divergence', 'mse', 'binary_crossentropy']
-
 losses = {
   "O1_tagging": "binary_crossentropy",
   "O2_subject": "binary_crossentropy",
 }
 
-# seq_labels_contract = seq_labels_contract_level_1 + seq_labels_dn + seq_labels_org_1 + seq_labels_org_2 + seq_labels_val
-# seq_labels_contract_swap_orgs = seq_labels_contract_level_1 + seq_labels_dn + seq_labels_org_2 + seq_labels_org_1 + seq_labels_val
+metrics = ['mse', 'binary_crossentropy']
 
-# semantic_map_keys = [
-#   'headline',
-#   'subject',
-#   'date',
-#   'number',
-#   'org-name',
-#   'org-alias',
-#   'org-type'
-# ]
 t_semantic_map_keys_common = [
   'headline',
   'subject',
@@ -67,7 +54,7 @@ t_semantic_map_keys_price = [
   'vat',
   'sign',
   'currency',
-  'vat_unit'  ]
+  'vat_unit']
 
 semantic_map_keys = t_semantic_map_keys_common + t_semantic_map_keys_org + t_semantic_map_keys_price + ['value']
 semantic_map_keys_contract = []
@@ -344,14 +331,6 @@ def bert_module(query, key, value, i, height):
   return sequence_output
 
 
-metrics = ['mse', 'binary_crossentropy']
-
-losses = {
-  "O1_tagging": "binary_crossentropy",
-  "O2_subject": "binary_crossentropy",
-}
-
-
 class ThresholdLayer(layers.Layer):
   def __init__(self, **kwargs):
     super(ThresholdLayer, self).__init__(**kwargs)
@@ -361,12 +340,121 @@ class ThresholdLayer(layers.Layer):
                                   trainable=True)
     super(ThresholdLayer, self).build(input_shape)
 
-  def call(self, x):
+  def call(self, x, *args, **kwargs):
     return keras.backend.sigmoid(100 * (x - self.kernel))
 
   def compute_output_shape(self, input_shape):
     return input_shape
 
+
+SEQUENCE_AXIS = -2
+
+
+class PositionEmbedding(layers.Layer):
+
+  def __init__(
+          self,
+          sequence_length,
+          initializer="glorot_uniform",
+          **kwargs,
+  ):
+    super().__init__(**kwargs)
+    if sequence_length is None:
+      raise ValueError(
+        "`sequence_length` must be an Integer, received `None`."
+      )
+    self.sequence_length = int(sequence_length)
+    self.initializer = keras.initializers.get(initializer)
+
+  def get_config(self):
+    config = super().get_config()
+    config.update(
+      {
+        "sequence_length": self.sequence_length,
+        "initializer": keras.initializers.serialize(self.initializer),
+      }
+    )
+    return config
+
+  def build(self, input_shape):
+    feature_size = input_shape[-1]
+    self.position_embeddings = self.add_weight(
+      "embeddings",
+      shape=[self.sequence_length, feature_size],
+      initializer=self.initializer,
+      trainable=True,
+    )
+
+    super().build(input_shape)
+
+  def call(self, inputs, *args, **kwargs):
+    if isinstance(inputs, tf.RaggedTensor):
+      bounding_shape = inputs.bounding_shape()
+      position_embeddings = self._trim_and_broadcast_position_embeddings(
+        bounding_shape,
+      )
+      # then apply row lengths to recreate the same ragged shape as inputs
+      return tf.RaggedTensor.from_tensor(
+        position_embeddings,
+        inputs.nested_row_lengths(),
+      )
+    else:
+      return self._trim_and_broadcast_position_embeddings(
+        tf.shape(inputs),
+      )
+
+  def _trim_and_broadcast_position_embeddings(self, shape):
+    input_length = shape[SEQUENCE_AXIS]
+    # trim to match the length of the input sequence, which might be less
+    # than the sequence_length of the layer.
+    position_embeddings = self.position_embeddings[:input_length, :]
+    # then broadcast to add the missing dimensions to match "shape"
+    return tf.broadcast_to(position_embeddings, shape)
+
+
+class SinePositionEncoding(layers.Layer):
+
+  def __init__(
+          self,
+          max_wavelength=10000,
+          **kwargs,
+  ):
+    super().__init__(**kwargs)
+    self.max_wavelength = max_wavelength
+
+  def call(self, inputs, *args, **kwargs):
+    # TODO(jbischof): replace `hidden_size` with`hidden_dim` for consistency
+    # with other layers.
+    input_shape = tf.shape(inputs)
+    # length of sequence is the second last dimension of the inputs
+    seq_length = input_shape[-2]
+    hidden_size = input_shape[-1]
+    position = tf.cast(tf.range(seq_length), self.compute_dtype)
+    min_freq = tf.cast(1 / self.max_wavelength, dtype=self.compute_dtype)
+    timescales = tf.pow(
+      min_freq,
+      tf.cast(2 * (tf.range(hidden_size) // 2), self.compute_dtype)
+      / tf.cast(hidden_size, self.compute_dtype),
+    )
+    angles = tf.expand_dims(position, 1) * tf.expand_dims(timescales, 0)
+    # even indices are sine, odd are cosine
+    cos_mask = tf.cast(tf.range(hidden_size) % 2, self.compute_dtype)
+    sin_mask = 1 - cos_mask
+    # embedding shape is [seq_length, hidden_size]
+    positional_encodings = (
+            tf.sin(angles) * sin_mask + tf.cos(angles) * cos_mask
+    )
+
+    return tf.broadcast_to(positional_encodings, input_shape)
+
+  def get_config(self):
+    config = super().get_config()
+    config.update(
+      {
+        "max_wavelength": self.max_wavelength,
+      }
+    )
+    return config
 
 def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
   input_text_emb = layers.Input(shape=[None, config.EMBED_DIM], dtype='float32', name="input_text_emb")
@@ -376,7 +464,7 @@ def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TR
   token_features = layers.Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="token_features")
   token_features_n = layers.BatchNormalization(name="bn2")(token_features)
 
-  _out = layers.concatenate([input_text_emb, token_features_n], axis=-1)
+  _out = layers.concatenate([input_text_emb, token_features_n], axis=-1, name='rmb_plus_tokens')
 
   for i in range(config.NUM_LAYERS):
     _out = bert_module(_out, _out, _out, i, height=config.EMBED_DIM + TOKEN_FEATURES)
@@ -390,14 +478,71 @@ def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TR
   _out = layers.Bidirectional(layers.LSTM(16, return_sequences=False, name='narcissisism'), name='embedding_reduced')(
     _out)
   _out = layers.BatchNormalization(name="bn_bi_2")(_out)
-  _out = layers.Dropout(0.1)(_out)
+  _out = layers.Dropout(0.1, name='forgetting')(_out)
 
   _out2 = layers.Dense(CLASSES, activation='softmax', name='O2_subject')(_out)
 
   base_model_inputs = [input_text_emb, token_features]
   model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
   model.compile(loss=losses, optimizer='Adam', metrics=metrics)
+  return model 
+
+
+def make_att_model_02(name='make_att_model_02', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
+  # ---------------------
+  input_text_emb = layers.Input(shape=[None, EMB], dtype='float32', name="input_text_emb")
+  input_text_emb_n = layers.Dropout(0.15, name='alzheimer_001')(input_text_emb)
+  input_text_emb_n = layers.LayerNormalization(epsilon=1e-6, name="ln_1e")(input_text_emb_n)
+
+  token_features = layers.Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="input_token_features")
+
+  token_features_n = layers.LayerNormalization(epsilon=1e-6, name="ln_1t")(token_features)
+  # token_features_n = token_features_n + PositionEmbedding(name='token_pos_emb')(token_features_n)
+
+  # reducing size of embedding
+  _out = layers.concatenate([input_text_emb_n, token_features_n], axis=-1)
+  _out = layers.Conv1D(filters=FEATURES * 4, kernel_size=(2), padding='same', activation=None)(_out)
+  _emb__len = FEATURES * 4
+  embedding_reduced = layers.Conv1D(filters=_emb__len, kernel_size=(4), padding='same', activation='relu',
+                                    name='embedding_reduced')(
+    _out)
+
+  _out = layers.BatchNormalization(name="norm_embedding_reduced")(embedding_reduced)
+  #   _pos_emb = PositionEmbedding(sequence_length=MAX_LEN)(_out)
+  _pos_emb = SinePositionEncoding(name='sine_position')(_out)
+
+  _out = _pos_emb + _out
+  _out = layers.Dropout(0.15, name='alzheimer_002')(_out)
+  #   _out = _out + PositionEmbedding(embed_dim=_emb__len, name='position_emb')(_out)
+
+  for i in range(config.NUM_LAYERS):
+    _out = bert_module(_out, _out, _out, i, height=_emb__len)
+
+  bert_out = _out
+  bert_out = layers.BatchNormalization(name="norm_bert_out")(bert_out)
+
+  if True:
+    # branch 1
+    # _out = layers.LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(bert_out)
+    _out = layers.Bidirectional(layers.LSTM(FEATURES // 2, return_sequences=True, name='narcissisism1'),
+                                name='O1_tagging_tanh')(bert_out)
+    _out1 = ThresholdLayer(name='O1_tagging')(_out)
+
+  if True:
+    _out2 = layers.Bidirectional(layers.LSTM(32, return_sequences=False, name='narcissisism2'),
+                                 name='self_reflection_2')(bert_out)
+    _out2 = layers.Dropout(0.15, name='alzheimer_1')(_out2)
+
+    _out2 = layers.Dense(CLASSES, activation='softmax', name='O2_subject')(_out2)
+
+  base_model_inputs = [input_text_emb, token_features]
+  model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
+  model.compile(loss=losses, optimizer='Adam', metrics=metrics)
+
   return model
+
+
+###-------------------------
 
 
 def get_amount(attr_tree):
@@ -416,22 +561,23 @@ def get_semantic_map_new(doc) -> DataFrame:
   _len = len(doc)
   df = DataFrame()
 
+  # init datatable with zeros
   for sl in semantic_map_keys_contract:
     df[sl] = np.zeros(_len)
 
   attr_tree = doc.get_attributes_tree()
 
-  def get_av(name):  # av=attention vector
-    if name not in df:
-      av = np.zeros(_len, np.float)
-      df[name] = av
+  #   def get_av(name):  # av=attention vector
+  #     if name not in df:
+  #       av = np.zeros(_len, np.float)
+  #       df[name] = av
 
   def add_span_vectors(_name, span):
     #         print('add_span_vectors',span)
     bn = _name + "-begin"
     en = _name + "-end"
-    get_av(bn)
-    get_av(en)
+    #     get_av(bn)
+    #     get_av(en)
     if not span is None:
       df[bn][span[0]:span[1]] = 1.
       df[en][span[1]] = 1.
@@ -448,32 +594,31 @@ def get_semantic_map_new(doc) -> DataFrame:
   # Orgs:
   for org in attr_tree.get('orgs', []):  # org number (index)
     for org_part_key in t_semantic_map_keys_org:
-#       _nm = 'unknown'
-#       try:
+      #       _nm = 'unknown'
+      #       try:
 
       org_part = org.get(org_part_key.replace('org-', ''), {})
       if org_part:
         span = org_part.get('span', None)
         add_span_vectors(org_part_key, span)
-#       except Exception as e:
-#         logger.exception(e)
-#         print('ERROR (sp)', e, org_part_key, _nm)
+  #       except Exception as e:
+  #         logger.exception(e)
+  #         print('ERROR (sp)', e, org_part_key, _nm)
 
   _value_tag = attr_tree.get('price', {})
-  
 
   if _value_tag is not None:
     add_span_vectors("value", _value_tag.get('span'))
     amount = get_amount(attr_tree)
     if amount:
       add_span_vectors('amount', amount.get('span'))
-    
-#     print('_value_tag=', _value_tag)
-#     print('amount=', amount)
+
+    #     print('_value_tag=', _value_tag)
+    #     print('amount=', amount)
     for n in t_semantic_map_keys_price:
       _value_tag_part = _value_tag.get(n)
-#       print('n=', n)
-#       print('_value_tag_part=', _value_tag_part)
+      #       print('n=', n)
+      #       print('_value_tag_part=', _value_tag_part)
       if _value_tag_part:
         add_span_vectors(n, _value_tag_part.get('span'))
 
