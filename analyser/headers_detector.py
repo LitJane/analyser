@@ -124,7 +124,8 @@ def get_tokens_features(tokens):
   doc_featuresX_data['h'] = 0.0
 
   position_enc = np.arange(1, 0, -0.0005)
-  position_enc = position_enc[0:len(doc_featuresX_data['h'])]
+  max_pos = min (len(position_enc), len(doc_featuresX_data['h']))
+  position_enc[0:max_pos] = position_enc[0:max_pos]
   doc_featuresX_data['h'] = position_enc
 
   return doc_featuresX_data
