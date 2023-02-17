@@ -517,10 +517,7 @@ def nn_get_tag_values(tag_name: str,
   attention = tagsmap[tag_name + '-begin'].values.copy()
 
   threshold = max(attention.max() * 0.8, 0.1)
-  # attention[attention<threshold]=0.
-  # attention[attention>=threshold]=1.
 
-  #     print(f'threshold={threshold} attention.max()={attention.max()}')
 
   last_taken = False
   sequences = []
