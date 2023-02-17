@@ -1,22 +1,21 @@
                                    precision    recall  f1-score   support
 
-                   AgencyContract      0.921     0.972     0.946        36
+                   AgencyContract      0.923     1.000     0.960        36
                    BankGuarantees      0.692     1.000     0.818         9
-                          Charity      1.000     1.000     1.000        19
-                             Deal      0.972     0.913     0.942       115
-         DealIntellectualProperty      0.833     0.972     0.897        36
-                  GeneralContract      0.875     0.969     0.920        65
+                          Charity      0.950     1.000     0.974        19
+                             Deal      0.965     0.957     0.961       115
+         DealIntellectualProperty      0.814     0.972     0.886        36
+                  GeneralContract      0.897     0.938     0.917        65
                         Insurance      1.000     1.000     1.000        22
                             Loans      0.985     0.943     0.964        70
-                            Other      0.000     0.000     0.000         0
 ParticipationInOtherOrganizations      1.000     0.900     0.947        10
                 PledgeEncumbrance      1.000     1.000     1.000         4
                        RealEstate      1.000     1.000     1.000        10
            RealEstateTransactions      1.000     1.000     1.000         6
-                          Renting      1.000     1.000     1.000        74
+                          Renting      1.000     1.000     1.000        73
            SecuritiesTransactions      0.889     1.000     0.941         8
-                          Service      0.991     0.954     0.972       348
+                          Service      0.991     0.951     0.971       348
 
-                         accuracy                          0.958       832
-                        macro avg      0.885     0.914     0.897       832
-                     weighted avg      0.966     0.958     0.961       832
+                         accuracy                          0.961       831
+                        macro avg      0.940     0.977     0.956       831
+                     weighted avg      0.965     0.961     0.962       831
