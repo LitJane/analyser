@@ -149,7 +149,7 @@ class BaseProcessor:
     org = finalizer.get_org(db_doc.get_attributes_tree())
     if org is not None and org.get('name') is not None:
       org_name = normalize_only_company_name(org['name'].get('value'))
-      if compare_ignore_case(org_name, subsidiary):
+      if compare_ignore_case(org_name, normalize_only_company_name(subsidiary)):
         return True
       for known_subsidiary in subsidiaries:
         if compare_ignore_case(known_subsidiary.get('_id'), subsidiary):
@@ -318,7 +318,7 @@ def get_doc4classification(audit):
     main_doc_type = main_doc['documentType']
     if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
       return main_doc, True
-  document_ids = get_docs_by_audit_id(audit["_id"], id_only=True)
+  document_ids = get_docs_by_audit_id(audit["_id"], id_only=True, states=[0, 5, 10, 15])
   for document_id in document_ids:
     _document = finalizer.get_doc_by_id(document_id)
     if _document['parserResponseCode'] == 200:
