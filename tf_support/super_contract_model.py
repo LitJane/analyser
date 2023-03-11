@@ -1,6 +1,6 @@
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf
@@ -221,7 +221,8 @@ def uber_detection_model_003(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
   return model
 
 
-def uber_detection_model_005_1_1(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
+def uber_detection_model_005_1_1(name="uber_detection_model_005_1_1", ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX,
+                                 trained=False) -> Model:
   base_model, base_model_inputs = get_base_model(uber_detection_model_003, ctx=ctx, load_weights=False)
 
   # ---------------------
@@ -299,11 +300,11 @@ class Config:
 config = Config()
 
 
-def bert_module(query, key, value, i, height):
+def bert_module(query, key, value, i, height, key_dim_base=config.EMBED_DIM):
   # Multi headed self-attention
   attention_output = layers.MultiHeadAttention(
     num_heads=config.NUM_HEAD,
-    key_dim=config.EMBED_DIM // config.NUM_HEAD,
+    key_dim=key_dim_base // config.NUM_HEAD,
     name="encoder_{}/multiheadattention".format(i),
   )(query, key, value)
   attention_output = layers.Dropout(0.1, name="encoder_{}/att_dropout".format(i))(
@@ -456,6 +457,7 @@ class SinePositionEncoding(layers.Layer):
     )
     return config
 
+
 def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
   input_text_emb = layers.Input(shape=[None, config.EMBED_DIM], dtype='float32', name="input_text_emb")
   _out = layers.BatchNormalization(name="bn1")(input_text_emb)
@@ -485,7 +487,7 @@ def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TR
   base_model_inputs = [input_text_emb, token_features]
   model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
   model.compile(loss=losses, optimizer='Adam', metrics=metrics)
-  return model 
+  return model
 
 
 def make_att_model_02(name='make_att_model_02', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
@@ -524,8 +526,7 @@ def make_att_model_02(name='make_att_model_02', ctx: KerasTrainingContext = DEFA
   if True:
     # branch 1
     # _out = layers.LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(bert_out)
-    _out = layers.Bidirectional(layers.LSTM(FEATURES // 2, return_sequences=True, name='narcissisism1'),
-                                name='O1_tagging_tanh')(bert_out)
+    _out = layers.Bidirectional(layers.LSTM(FEATURES // 2, return_sequences=True, name='narcissisism1', activation='tanh'), name='O1_tagging_tanh')(bert_out)
     _out1 = ThresholdLayer(name='O1_tagging')(_out)
 
   if True:
@@ -542,6 +543,53 @@ def make_att_model_02(name='make_att_model_02', ctx: KerasTrainingContext = DEFA
   return model
 
 
+
+def make_att_model_03(name='make_att_model_03', ctx = None, trained=False):
+  input_text_emb = layers.Input(shape=[None, config.EMBED_DIM], dtype='float32', name="input_text_emb")
+  input_text_emb_n = layers.LayerNormalization(epsilon=1e-6, name="input_text_emb_norm")(input_text_emb)
+  # _out = layers.BatchNormalization(name="bn1")(input_text_emb)
+  # _out = layers.Dropout(0.2, name="drops")(_out)  # small_drops_of_poison
+
+
+  token_features = layers.Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="token_features")
+  token_features_n = layers.LayerNormalization(epsilon=1e-6, name="token_features_norm")(token_features)
+  
+  # token_features_n = layers.BatchNormalization(name="bn2")(token_features)
+
+  _lstm_height = 128
+  _out = layers.concatenate([input_text_emb_n, token_features_n], axis=-1, name='rmb_plus_tokens')
+  _out = layers.Bidirectional(layers.LSTM(_lstm_height, return_sequences=True, name='narcissisism1', activation='tanh'), name='embedding_reduced')(_out)
+  _out = layers.Dropout(0.2, name='amnesia')(_out)
+  _out = layers.BatchNormalization(name="bn1")(_out)
+    
+
+  _bert = _out
+  for i in range(2):
+    _bert = bert_module(_bert, _bert, _bert, i, height=_lstm_height*2, key_dim_base=_lstm_height*2)
+
+  
+  _bert = layers.BatchNormalization(name="bn2")(_bert)
+
+  _out = _bert
+  _out = layers.LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
+  #   _out1 = layers.ReLU(name='O1_tagging')(_out)
+  _out1 = ThresholdLayer(name='O1_tagging')(_out)
+
+  #   _out = Conv1D(filters=FEATURES * 4, kernel_size=(2), padding='same', activation='relu' , name='embedding_reduced')(_out)
+  _out = layers.Bidirectional(layers.LSTM(16, return_sequences=False, name='narcissisism2', activation='tanh'), name='some')(_bert)
+  # _out = layers.BatchNormalization(name="bn_bi_2")(_out)
+  # 
+
+  _out2 = layers.Dense(CLASSES, activation='softmax', name='O2_subject')(_out)
+
+  base_model_inputs = [input_text_emb, token_features]
+  model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
+  model.compile(loss=losses, optimizer='Adam', metrics=metrics)
+  return model
+
+
+
+make_att_model = make_att_model_03
 ###-------------------------
 
 
@@ -556,7 +604,31 @@ def get_amount(attr_tree):
       amount = _value_tag.get('amount')
   return amount
 
-#--------------------------
+
+# --------------------------
+
+def fix_contract_number_span(span: [], textmap):
+  if span is not None:
+    span = [span[0], span[1]]  # //typesafety
+    for i in range(span[0], span[1]):
+      t = textmap[i]
+      t = t.strip('_')
+      t = t.strip().lstrip('№').lstrip().lstrip(':').lstrip('N ').lstrip().rstrip('.')
+      if t == '':
+        span[0] = i + 1
+    for i in range(span[1], span[0]):
+      t = textmap[i]
+      t = t.strip('_')
+      t = t.strip().lstrip('№').lstrip().lstrip(':').lstrip('N ').lstrip().rstrip('.')
+      if t == '':
+        span[1] = i - 1
+
+  #     if span[1]-span[0] == 0:
+  #       return None
+
+  return span
+
+
 def get_semantic_map_new(doc) -> DataFrame:
   _len = len(doc)
   df = DataFrame()
@@ -567,12 +639,9 @@ def get_semantic_map_new(doc) -> DataFrame:
 
   attr_tree = doc.get_attributes_tree()
 
-
   def add_span_vectors(_name, span):
-    #         print('add_span_vectors',span)
     bn = _name + "-begin"
     en = _name + "-end"
-
     if not span is None:
       df[bn][span[0]:span[1]] = 1.
       df[en][span[1]] = 1.
@@ -582,9 +651,17 @@ def get_semantic_map_new(doc) -> DataFrame:
   for h in headers:
     add_span_vectors('headline', h['span'])
 
-  for n in t_semantic_map_keys_common[1:]:  # skip headers
+  for n in t_semantic_map_keys_common[1:]:  # 1: == skip headers
     span = attr_tree.get(n, {}).get('span')
-    add_span_vectors(n, span)
+    if n == 'number':
+      #         print(f'number: {[doc.get_tokens_map_unchaged().text_range(span)]}')
+      span1 = fix_contract_number_span(span, doc.get_tokens_map_unchaged())
+      if span != span1:
+        print(
+          f'fixed number: {[doc.get_tokens_map_unchaged().text_range(span)]} -->  {[doc.get_tokens_map_unchaged().text_range(span1)]}')
+      span = span1
+    if span:
+      add_span_vectors(n, span)
 
   # Orgs:
   for org in attr_tree.get('orgs', []):  # org number (index)
@@ -595,11 +672,7 @@ def get_semantic_map_new(doc) -> DataFrame:
         span = org_part.get('span', None)
         add_span_vectors(org_part_key, span)
 
-
   _value_tag = attr_tree.get('price', {})
-
-  if _value_tag is None:
-    _value_tag = attr_tree.get('price_for_period', {})
 
   if _value_tag is not None:
     add_span_vectors("value", _value_tag.get('span'))

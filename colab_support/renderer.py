@@ -459,11 +459,12 @@ def render_doc(doc, semantic_map, default_color='#eeeeee', palette: [str] or Non
 def plot_embedding(matrix, title=None, width=25, height=6):
   mt = matrix.T
   with sns.axes_style("white"):
-    plt.figure(figsize=(width, height))
+    fig = plt.figure(figsize=(width, height))
     sns.heatmap(mt, square=False, cmap="RdYlBu", center=0)
     if title:
       plt.title(title)
     plt.show()
+    return fig
 
 
 def plot_cm(y_true, y_pred, figsize=(12, 12)):
