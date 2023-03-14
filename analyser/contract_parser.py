@@ -179,7 +179,7 @@ class ContractParser(GenericParser):
 
     # --------------------------------------insider
     self._logstep("finding insider info")
-#     self.insides_finder.find_insides(contract)
+    #     self.insides_finder.find_insides(contract)
 
     # --------------------------------------
     self.validate(contract, ctx)
@@ -416,11 +416,11 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     # logger.error(e)
 
   if cp.vat:
-      try:
-        cp.vat.value = to_float(cp.vat.value)
-      except Exception as e:
-        # logger.error(e)
-        logger.error(f'vat is {cp.vat.value}, cannot cast to float')
+    try:
+      cp.vat.value = to_float(cp.vat.value)
+    except Exception as e:
+      # logger.error(e)
+      logger.error(f'vat is {cp.vat.value}, cannot cast to float')
 
   if cp.amount_netto:
     try:
@@ -493,31 +493,34 @@ def nn_get_contract_number(textmap: TextMap, semantic_map: DataFrame) -> Semanti
   tags = nn_get_tag_values('number', textmap, semantic_map, max_tokens=5, threshold=0.3, limit=1)
   if tags:
     tag = tags[0]
-    tag.value = tag.value.strip().lstrip('№').lstrip().lstrip(':').lstrip('N ').lstrip().rstrip('.').rstrip('_').lstrip('_')
-    if tag.value=='':
-        return None
+    tag.value = tag.value.strip().lstrip('№').lstrip().lstrip(':').lstrip('N ').lstrip().rstrip('.').rstrip('_').lstrip(
+      '_')
+    if tag.value == '':
+      return None
     tag = fix_contract_number(tag, textmap)
     return tag
 
-def nn_get_contract_date(textmap: TextMap, semantic_map: DataFrame) -> SemanticTag:
-      tag_name = 'date'
-      date_index = semantic_map[f'{tag_name}-begin'].argmax()
-      confidence = float(semantic_map[f'{tag_name}-begin'][date_index])
-      sentense_span = textmap.sentence_at_index(date_index)
-      date_sentence = textmap.text_range(sentense_span)
-    
-#       print(f'{date_sentence=}')
 
-      _charspan, dt = find_date(date_sentence)
-      if dt is not None and confidence > 0.01:#TODO:
-        region_map = TextMap(date_sentence)
-        span = region_map.token_indices_by_char_range(_charspan)
-        span = span[0] + sentense_span[0], span[1] + sentense_span[0]
-        tag = SemanticTag(tag_name, dt, span)
-        tag.confidence = confidence
-        return tag
-      return None
-    
+def nn_get_contract_date(textmap: TextMap, semantic_map: DataFrame) -> SemanticTag:
+  tag_name = 'date'
+  date_index = semantic_map[f'{tag_name}-begin'].argmax()
+  confidence = float(semantic_map[f'{tag_name}-begin'][date_index])
+  sentense_span = textmap.sentence_at_index(date_index)
+  date_sentence = textmap.text_range(sentense_span)
+
+  #       print(f'{date_sentence=}')
+
+  _charspan, dt = find_date(date_sentence)
+  if dt is not None and confidence > 0.01:  # TODO:
+    region_map = TextMap(date_sentence)
+    span = region_map.token_indices_by_char_range(_charspan)
+    span = span[0] + sentense_span[0], span[1] + sentense_span[0]
+    tag = SemanticTag(tag_name, dt, span)
+    tag.confidence = confidence
+    return tag
+  return None
+
+
 def nn_get_contract_date_OLD(textmap: TextMap, semantic_map: DataFrame) -> SemanticTag:
   tags = nn_get_tag_values('date', textmap, semantic_map, max_tokens=6, threshold=0.3, limit=1)
   if tags:
@@ -535,13 +538,12 @@ def nn_get_tag_values(tag_name: str,
                       threshold=0.3,  # TODO: what's that
                       limit=1,
                       return_single=False) -> (SemanticTag or None) or [SemanticTag]:
-  if len(textmap)<1:
+  if len(textmap) < 1:
     return None
 
   attention = tagsmap[tag_name + '-begin'][:len(textmap)].values.copy()
 
   threshold = max(attention.max() * 0.8, 0.043)
-
 
   last_taken = False
   sequences = []
@@ -566,13 +568,13 @@ def nn_get_tag_values(tag_name: str,
   for s in sequences:
     span = [min(s), max(s) + 1]
     if span[1] - span[0] > max_tokens:
-      span[1] = min( len(textmap)-1, span[0] + max_tokens )
-    
-    if span[1]-span[0] > 0:
+      span[1] = min(len(textmap) - 1, span[0] + max_tokens)
+
+    if span[1] - span[0] > 0:
       quote = textmap.text_range(span)
       tag = SemanticTag(tag_name, quote, span)
       tag.confidence = float(attention[span[0]:span[1]].mean())
-  
+
       #         print(span, quote, tag)
       tags.append(tag)
 
