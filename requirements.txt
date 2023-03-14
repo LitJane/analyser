@@ -26,4 +26,4 @@ umap-learn==0.5.1
 huggingface-hub==0.0.19
 fuzzywuzzy==0.18.0
 python-Levenshtein==0.20.8
-mlflow==2.2.1
+mlflow
