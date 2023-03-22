@@ -1290,6 +1290,16 @@ def save_check_types(audit):
     db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"checkTypes": audit['checkTypes']}})
 
 
+def convert_to_mapping(classification_results: [dict]) -> [dict]:
+    result = []
+    for classification_result in classification_results:
+        for config_value in all_labels:
+            if config_value['_id'] == classification_result['id']:
+                result.append(config_value)
+                break
+    return result
+
+
 def send_notifications():
     db = get_mongodb_connection()
     audit_collection = db['audits']
@@ -1307,8 +1317,8 @@ def send_notifications():
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
-                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
-            elif audit['additionalFields'].get('email_sent') == False and audit.get('classification_result') is not None:
+                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels, convert_to_mapping(audit.get('additional_classification_results', []))), audit)
+            elif audit.get('classification_result') is not None:
                 logging.info('Retry send email message')
                 top_classification_result = audit['classification_result'][0]
                 attachments = []
@@ -1316,7 +1326,7 @@ def send_notifications():
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
-                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
+                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels, convert_to_mapping(audit.get('additional_classification_results', []))), audit)
             elif audit.get('errors') and len(audit['errors']):
                 attachments = []
                 fs = gridfs.GridFS(db)

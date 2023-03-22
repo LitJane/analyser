@@ -10,7 +10,8 @@ from jsonschema import ValidationError, FormatChecker, Draft7Validator
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser, GenericParser
-from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance, save_violations
+from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance, save_violations, \
+  save_email_classification, convert_to_mapping
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.parsing import AuditContext
@@ -276,12 +277,14 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
   return db_document
 
 
-def save_audit_practice(audit, classification_result, zip_classified):
+def save_audit_practice(audit, classification_result, zip_classified, additional_classification_results):
   if audit['additionalFields']['external_source'] != 'email':
     zip_classified = False
   db = get_mongodb_connection()
   db['audits'].update_one({'_id': audit['_id']}, {
-    "$set": {'classification_result': classification_result, "additionalFields.zip_classified": zip_classified}})
+    "$set": {'classification_result': classification_result,
+             "additionalFields.zip_classified": zip_classified,
+             'additional_classification_results': additional_classification_results}})
 
 
 def save_errors(audit, errors):
@@ -345,19 +348,16 @@ def doc_classification(audit):
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
     classification_result = None
+    additional_classification_results = []
     errors = []
     if doc4classification['documentType'] in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
       violations, errors = check_compliance(audit, doc4classification)
       compliance_mapping = next(filter(lambda x: x['_id'] == 1015, all_labels), None)
       if len(errors) > 0:
         mail.send_compliance_error_email(audit, errors, compliance_mapping['email'])
-        if not audit.get('additionalFields', {}).get('compliance_info_email_sent', False):
-          result = mail.send_compliance_info_email(audit)
-          db = get_mongodb_connection()
-          db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"additionalFields.compliance_info_email_sent": result}})
 
       if len(violations) > 0:
-        classification_result = [{'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0}]
+        additional_classification_results.append({'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0})
 
     # detecting judicial organisation in sender (email_from) field
     doc_headline = get_doc_headline_safely(doc4classification['parse'])
@@ -373,7 +373,7 @@ def doc_classification(audit):
     if sender_judicial_org is not None:
       classification_result = apply_judical_practice(classification_result, sender_judicial_org)
 
-    if classification_result is None and len(errors) == 0:
+    if classification_result is None:
       if classifier_url is None:
         classification_result = wrapper(doc4classification['parse'])
       else:
@@ -387,14 +387,14 @@ def doc_classification(audit):
         classification_result = response.json()
 
     if classification_result:
-        save_audit_practice(audit, classification_result, not main_doc)
+        save_audit_practice(audit, classification_result, not main_doc, additional_classification_results)
         if audit['additionalFields']['external_source'] == 'email':
           top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
           attachments = []
           fs = gridfs.GridFS(get_mongodb_connection())
           for file_id in audit['additionalFields']['file_ids']:
             attachments.append(fs.get(file_id))
-          mail.send_classifier_email(audit, top_result, attachments, all_labels)
+          save_email_classification(mail.send_classifier_email(audit, top_result, attachments, all_labels, convert_to_mapping(additional_classification_results)), audit)
   except Exception as ex:
     logger.exception(ex)
 

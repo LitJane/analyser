@@ -97,11 +97,12 @@ def generate_links(audit, practices: [], web_url) -> str:
     url = urljoin(web_url, 'user-practice')
     result = ""
     for practice in practices:
-        result += f"""<p><a href="{url + '?audit_id=' + str(audit['_id']) + '&practice_id=' + str(practice['_id'])}">{practice['label']}</a></p>"""
+        if practice['_id'] != 1015:
+            result += f"""<p><a href="{url + '?audit_id=' + str(audit['_id']) + '&practice_id=' + str(practice['_id'])}">{practice['label']}</a></p>"""
     return result
 
 
-def send_classifier_email(audit, top_classification_result, attachments: [], practices) -> bool:
+def send_classifier_email(audit, top_classification_result, attachments: [], practices, additional_classification_result) -> bool:
     try:
         smtp_server = _env_var('GPN_SMTP_SERVER')
         port = _env_var('GPN_SMTP_PORT')
@@ -114,15 +115,22 @@ def send_classifier_email(audit, top_classification_result, attachments: [], pra
             message = EmailMessage()
             message["Subject"] = escape_email_headers(f"{audit['additionalFields']['email_subject']}")
             message["From"] = escape_email_headers(sender_email)
-            message["To"] = escape_email_headers(top_classification_result['email'])
+            recipients = [top_classification_result['email']]
+            if additional_classification_result:
+                recipients.extend(x['email'] for x in additional_classification_result)
+            message["To"] = escape_email_headers(', '.join(recipients))
             message['Cc'] = escape_email_headers(audit['additionalFields']['email_from'])
-
+            additional_practice_text = ""
+            if additional_classification_result and len(additional_classification_result) > 0:
+                additional_practice_text = f"Дополнительно согласующая практика: {','.join(x['label'] for x in additional_classification_result)}"
             plain_text = f"""
                 Здравствуйте!
                 
                 Направляем вам результат определения юридической практики для высланного ранее документа.
                 
                 Результат: {top_classification_result['label']}
+                
+                {additional_practice_text}
                 """
 
             html = f"""\
@@ -136,6 +144,9 @@ def send_classifier_email(audit, top_classification_result, attachments: [], pra
                     </p>
                     <p style="font-size: 200%">
                         Результат: {top_classification_result['label']}
+                    </p>
+                    <p style="font-size: 150%">
+                        {additional_practice_text}
                     </p>
                     <p>
                         <b>Если юридическая практика для документа определена неверно, то кликните на верную юридическую практику:</b>
