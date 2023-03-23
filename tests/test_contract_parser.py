@@ -77,7 +77,7 @@ class TestContractParser(unittest.TestCase):
     doc: ContractDocument = ctx.find_attributes(doc, AuditContext())
     # tags: [SemanticTag] = doc.get_tags()
 
-    _tag = doc.contract_values[0].amount  # SemanticTag.find_by_kind(tags, ContractTags.Value.display_string)
+    _tag = doc.contract_values[0].amount_netto  # SemanticTag.find_by_kind(tags, ContractTags.Value.display_string)
     quote = doc.tokens_map.text_range(_tag.span)
     self.assertEqual('80000,00', quote)
 

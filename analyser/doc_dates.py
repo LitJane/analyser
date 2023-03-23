@@ -37,6 +37,7 @@ def find_document_date(doc: LegalDocument, tagname='date') -> SemanticTag or Non
 
 def find_date(text: str) -> ([], datetime.datetime):
   try:
+#     text = text.replace('_', '').replace("«", '').replace('»', '')
     findings = re.finditer(date_regex_c, text)
     if findings:
       finding = next(findings)

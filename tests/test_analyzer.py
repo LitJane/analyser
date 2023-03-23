@@ -76,7 +76,7 @@ class AnalyzerTestCase(unittest.TestCase):
   def test_analyze_contract(self):
     processor: BaseProcessor = document_processors[CONTRACT]
     # doc = get_doc_by_id(ObjectId('638f0a81b1363747e929f304'))
-    doc = get_doc_by_id(ObjectId('633ed91bc35ce0d42fd09050'))
+    doc = get_doc_by_id(ObjectId('63ac1faa862ea92bf713c50d'))
     #
     if doc is None:
       raise RuntimeError("fix unit test please, doc with given UID is not in test DB")

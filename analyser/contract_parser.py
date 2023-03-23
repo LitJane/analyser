@@ -1,7 +1,6 @@
 import re
 from enum import Enum
 
-import numpy as np
 import pandas as pd
 from overrides import overrides
 from pandas import DataFrame
@@ -13,14 +12,14 @@ from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
-from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign, GenericDocument
+from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
 from analyser.parsing import ParsingContext, AuditContext
 from analyser.patterns import AV_SOFT, AV_PREFIX
 from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
-from analyser.text_tools import to_float
+from analyser.text_tools import to_float, span_len
 from analyser.transaction_values import ValueSpansFinder
 from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, \
   nn_predict
@@ -180,7 +179,7 @@ class ContractParser(GenericParser):
 
     # --------------------------------------insider
     self._logstep("finding insider info")
-    self.insides_finder.find_insides(contract)
+    #     self.insides_finder.find_insides(contract)
 
     # --------------------------------------
     self.validate(contract, ctx)
@@ -211,6 +210,7 @@ def _sub_attention_names(subj: Enum):
 
 def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
                       audit_ctx: AuditContext) -> [ContractAgent]:
+  # TODO:SORT ORDER, see 63c506cbe2456d59975e12a6
   contract_agents: [ContractAgent] = []
 
   types = nn_get_tag_values('org-type', textmap, semantic_map, max_tokens=12, threshold=0.5,
@@ -219,6 +219,9 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
                             limit=2)
   aliases = nn_get_tag_values('org-alias', textmap, semantic_map, max_tokens=4, threshold=0.5,
                               limit=2)
+
+  _list = types + names + aliases
+  _list = sorted(_list, key=lambda x: x.span[0])
 
   for o in [0, 1]:
     ca: ContractAgent = ContractAgent()
@@ -257,17 +260,21 @@ def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: Aud
   for contract_agent in contract_agents:
     check_org_is_natural_person(contract_agent, ctx)
 
-  logger.info(f'header: {header0}')
-
   if header0:
     if header0.lower().find('с физическим лицом') >= 0:
       _set_natural_person(contract_agents[-1])
+      # TODO: why setting it to the last array element??
 
   return contract_agents
 
 
 def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext):
   human_name = False
+
+  if contract_agent.type is not None:
+    if len(contract_agent.type) >= 2:
+      return
+
   if contract_agent.name is not None:
     name: str = contract_agent.name.value
 
@@ -283,6 +290,7 @@ def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext
       return
 
     x = r_human_name_compilled.search(name)
+
     if x is not None:
       human_name = True
 
@@ -325,6 +333,8 @@ def check_org_intersections(contract_agents: [OrgItem]) -> None:
 
 
 def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPrice]:
+  # TODO: FIX SENTENCE!
+
   cp = ContractPrice()
 
   parent_tag = nn_get_tag_values('value', textmap, tagsmap, max_tokens=50, threshold=0.02, limit=1, return_single=True)
@@ -338,13 +348,27 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
   cp.amount_netto = nn_get_tag_values('amount_netto', textmap, tagsmap, max_tokens=4, threshold=0.04, limit=1,
                                       return_single=True)
   cp.vat = nn_get_tag_values('vat', textmap, tagsmap, max_tokens=4, threshold=0.02, limit=1, return_single=True)
+  cp.vat_unit = nn_get_tag_values('vat_unit', textmap, tagsmap, max_tokens=3, threshold=0.02, limit=1,
+                                  return_single=True)
 
-  all_none = True
-  for p in cp.list_children():
-    if p is not None:
-      all_none = False
-  if all_none:
+  sentence_seed_tag = None
+  _order = [cp.amount_netto, cp.amount_brutto, cp.amount]
+  for t in _order:
+    if t is not None:
+      sentence_seed_tag = t
+      break
+
+  if not sentence_seed_tag:
     return []
+
+  def fix_parent_span():
+    cp.span = merge_spans(cp.list_children())
+    if parent_tag:
+      cp.span = merge_spans([cp, parent_tag])
+
+    if span_len(cp.span) > 200 or span_len(cp.span) < 20:
+      sentence_span = textmap.sentence_at_index(sentence_seed_tag.span[0])
+      cp.span = sentence_span
 
   #   ///SIGN
 
@@ -357,47 +381,59 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
       cp.sign.span = _sign_span
       cp.sign.offset(_start)
 
-  cp.span = merge_spans(cp.list_children())
-  if parent_tag:
-    cp.span = merge_spans([cp, parent_tag])
+  fix_parent_span()
 
   try:
     region = textmap.text_range(cp.span)
+    region_map = TextMap(region)
     results = ValueSpansFinder(region)
+
+    # if results.including_vat:
+    cp.amount = SemanticTag('amount')
+    cp.amount.span = region_map.token_indices_by_char_range(results.number_span)
+    cp.amount.value = results.original_sum
+    cp.amount.offset(cp.span[0])
+    if results.including_vat == False:
+      cp.amount.value = results.value
 
     if cp.currency is None:
       cp.currency = SemanticTag('currency')
-      cp.currency.span = textmap.token_indices_by_char_range(results.currency_span)
+      cp.currency.span = region_map.token_indices_by_char_range(results.currency_span)
       cp.currency.offset(cp.span[0])
     cp.currency.value = results.currencly_name
 
 
   except TypeError as e:
+    logger.exception(f'smthinf wrong {str(cp)=}')
     logger.error(e)
     results = None
 
-  try:
-    cp.amount.value = to_float(cp.amount.value)
-  except Exception as e:
-    logger.error(f'amount is {cp.amount}')
+  if cp.amount:
+    try:
+      cp.amount.value = to_float(cp.amount.value)
+    except Exception as e:
+      logger.error(f'amount is {cp.amount}')
     # logger.error(e)
 
-  try:
-    cp.vat.value = to_float(cp.vat.value)
-  except Exception as e:
-    # logger.error(e)
-    logger.error(f'vat is {cp.vat}')
+  if cp.vat:
+    try:
+      cp.vat.value = to_float(cp.vat.value)
+    except Exception as e:
+      # logger.error(e)
+      logger.error(f'vat is {cp.vat.value}, cannot cast to float')
 
-  try:
-    cp.amount_netto.value = to_float(cp.amount_netto.value)
-  except Exception as e:
-    # logger.error(e)
-    logger.error(f'amount_netto is {cp.amount_netto}')
+  if cp.amount_netto:
+    try:
+      cp.amount_netto.value = to_float(cp.amount_netto.value)
+    except Exception as e:
+      # logger.error(e)
+      logger.error(f'amount_netto is {cp.amount_netto}')
 
-  try:
-    cp.amount_brutto.value = to_float(cp.amount_brutto.value)
-  except Exception as e:
-    logger.error(f'amount_brutto is {cp.amount_brutto}')
+  if cp.amount_brutto:
+    try:
+      cp.amount_brutto.value = to_float(cp.amount_brutto.value)
+    except Exception as e:
+      logger.error(f'amount_brutto is {cp.amount_brutto}')
 
   if (results is not None):
     if results.including_vat:
@@ -406,11 +442,14 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     else:
       cp.amount_netto = cp.amount
       cp.amount_brutto = None
+    cp.amount = None
 
+  fix_parent_span()
   return [cp]
 
 
 def nn_get_subject(textmap: TextMap, semantic_map: DataFrame, subj_1hot) -> SemanticTag:
+  # TODO: FIX SENTENCE!
   predicted_subj_name, confidence, _ = decode_subj_prediction(subj_1hot)
 
   tags = nn_get_tag_values('subject', textmap, semantic_map, max_tokens=200, threshold=0.02,
@@ -420,7 +459,32 @@ def nn_get_subject(textmap: TextMap, semantic_map: DataFrame, subj_1hot) -> Sema
   if tags:
     tag = tags[0]
     span = tag.span
+    if span_len(span) < 30 or span_len(span) > 150:
+      # TODO: FIX SENTENCE!
+      sentence_span = textmap.sentence_at_index(tag.span[0])
+      span = sentence_span
+
   tag = SemanticTag(None, predicted_subj_name.name, span=span, confidence=confidence)
+
+  return tag
+
+
+def fix_contract_number(tag: SemanticTag, textmap: TextMap) -> SemanticTag or None:
+  if tag:
+    span = [tag.span[0], tag.span[1]]
+    for i in range(tag.span[0], tag.span[1]):
+      if i < 0 or i >= len(textmap):
+        msg = f'{i=} {len(textmap)=} {str(tag)=} {tag.span=}'
+        logger.error(msg)
+        raise ValueError(msg)
+
+      t = textmap[i]
+      t = t.strip().lstrip('№').lstrip().lstrip(':').lstrip('N ').lstrip().rstrip('.').rstrip('_').lstrip('_')
+      if t == '':
+        span[0] = i + 1
+    tag.span = span
+  if span_len(tag.span) == 0:
+    return None
 
   return tag
 
@@ -429,12 +493,35 @@ def nn_get_contract_number(textmap: TextMap, semantic_map: DataFrame) -> Semanti
   tags = nn_get_tag_values('number', textmap, semantic_map, max_tokens=5, threshold=0.3, limit=1)
   if tags:
     tag = tags[0]
-    tag.value = tag.value.strip().lstrip('№').lstrip().lstrip(':').lstrip('N ').lstrip().rstrip('.')
-    nn_fix_span(tag)
+    tag.value = tag.value.strip().lstrip('№').lstrip().lstrip(':').lstrip('N ').lstrip().rstrip('.').rstrip('_').lstrip(
+      '_')
+    if tag.value == '':
+      return None
+    tag = fix_contract_number(tag, textmap)
     return tag
 
 
 def nn_get_contract_date(textmap: TextMap, semantic_map: DataFrame) -> SemanticTag:
+  tag_name = 'date'
+  date_index = semantic_map[f'{tag_name}-begin'].argmax()
+  confidence = float(semantic_map[f'{tag_name}-begin'][date_index])
+  sentense_span = textmap.sentence_at_index(date_index)
+  date_sentence = textmap.text_range(sentense_span)
+
+  #       print(f'{date_sentence=}')
+
+  _charspan, dt = find_date(date_sentence)
+  if dt is not None and confidence > 0.01:  # TODO:
+    region_map = TextMap(date_sentence)
+    span = region_map.token_indices_by_char_range(_charspan)
+    span = span[0] + sentense_span[0], span[1] + sentense_span[0]
+    tag = SemanticTag(tag_name, dt, span)
+    tag.confidence = confidence
+    return tag
+  return None
+
+
+def nn_get_contract_date_OLD(textmap: TextMap, semantic_map: DataFrame) -> SemanticTag:
   tags = nn_get_tag_values('date', textmap, semantic_map, max_tokens=6, threshold=0.3, limit=1)
   if tags:
     tag = tags[0]
@@ -444,59 +531,56 @@ def nn_get_contract_date(textmap: TextMap, semantic_map: DataFrame) -> SemanticT
       return tag
 
 
-def nn_get_tag_values(tagname: str,
+def nn_get_tag_values(tag_name: str,
                       textmap: TextMap,
-                      semantic_map: pd.DataFrame,
-                      max_tokens,
-                      threshold=0.3,
+                      tagsmap: pd.DataFrame,
+                      max_tokens=200,
+                      threshold=0.3,  # TODO: what's that
                       limit=1,
                       return_single=False) -> (SemanticTag or None) or [SemanticTag]:
-  starts = semantic_map[tagname + "-begin"].values.copy()
-  ends = semantic_map[tagname + "-end"].values.copy()
+  if len(textmap) < 1:
+    return None
 
-  starts[starts < threshold] = 0
-  ends[ends < threshold] = 0
+  attention = tagsmap[tag_name + '-begin'][:len(textmap)].values.copy()
 
-  def top_inices(arr, limit):
-    _tops = np.argsort(arr)[-limit:]
-    return sorted(_tops)
+  threshold = max(attention.max() * 0.8, 0.043)
 
-  def next_index_from(b, ends):
-    for e in sorted(ends):
-      if e > b:
-        if e - b > max_tokens:
-          return b + max_tokens
-        else:
-          return e
-    return -1
+  last_taken = False
+  sequences = []
+  seq = None
 
-  def find_slices(begins, ends):
-    for _begin in begins:
-      _end = next_index_from(_begin, ends)
-      if _end > 0:
-        yield (_begin, _end)
+  # collecting hits--------
+  for i, v in enumerate(attention):
+    if v >= threshold:
+      #             print ('---',i,f'{v:.2}', a_doc_from_json.get_tokens_map_unchaged()[i])
+      if seq is None:
+        seq = []
+        sequences.append(seq)
+      seq.append(i)
+      last_taken = True
+    else:
+      if last_taken:
+        seq = None
+        last_taken = False
 
-  def slice_confidence(sl, att):
-    epsilon = 0.000
-    for s in sl:
-      yield s, float((1 - epsilon) * min(att[s[0]], att[s[1]]) + epsilon * max(att[s[0]], att[s[1]]))
-
-  top_starts = top_inices(starts, limit)
-  top_ends = top_inices(ends, len(top_starts))
-
-  slices = list(find_slices(top_starts, top_ends))
-  slices = sorted(slice_confidence(slices, starts + ends), key=lambda x: x[1])[::-1]
-  slices = sorted(slices, key=lambda x: x[0][0])
-
+  # making spans  --------
   tags = []
-  for s in slices:
-    span = s[0]
-    conf = s[1]
-    if conf > 0:
-      value = textmap.text_range(span)
-      tag = SemanticTag(tagname, value, span)
-      tag.confidence = conf  # float(att[slices[0]].mean())
+  for s in sequences:
+    span = [min(s), max(s) + 1]
+    if span[1] - span[0] > max_tokens:
+      span[1] = min(len(textmap) - 1, span[0] + max_tokens)
+
+    if span[1] - span[0] > 0:
+      quote = textmap.text_range(span)
+      tag = SemanticTag(tag_name, quote, span)
+      tag.confidence = float(attention[span[0]:span[1]].mean())
+
+      #         print(span, quote, tag)
       tags.append(tag)
+
+  # sorting spans--------
+  tags = sorted(tags, key=lambda x: -x.confidence)
+  tags = tags[0:limit]
 
   if return_single:
     if len(tags) > 0:
@@ -504,8 +588,11 @@ def nn_get_tag_values(tagname: str,
     else:
       return None
 
+  tags = sorted(tags, key=lambda x: x.span[0])
+
   return tags
 
 
 def nn_fix_span(tag: SemanticTag):
+  # TODO:MAKE IT HAPPEN
   return tag

@@ -12,12 +12,12 @@ from bson.objectid import ObjectId
 from jsonschema import validate, FormatChecker
 
 import analyser
-from analyser.finalizer import get_doc_by_id
 # from analyser.log import logger
 from analyser.ml_tools import SemanticTagBase
 from analyser.schemas import document_schemas, ProtocolSchema, OrgItem, AgendaItem, AgendaItemContract, HasOrgs, \
   ContractPrice, ContractSchema, CharterSchema, CharterStructuralLevel, Competence
 from analyser.structures import OrgStructuralLevel, ContractSubject
+from integration.db import get_doc_by_id
 from integration.db import get_mongodb_connection
 
 migration_logger = logging.getLogger('db_migration')

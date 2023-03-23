@@ -2,6 +2,7 @@ import os
 import urllib.parse
 import warnings
 
+from bson import ObjectId
 from pymongo import MongoClient
 
 _db_client = None
@@ -49,6 +50,11 @@ def get_mongodb_connection():
       return None
 
   return _db_client[db_name]
+
+def get_doc_by_id(doc_id: ObjectId):
+  db = get_mongodb_connection()
+  documents_collection = db['documents']
+  return documents_collection.find_one({'_id': doc_id})
 
 
 def _get_local_mongodb_connection():
