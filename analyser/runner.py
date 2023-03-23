@@ -10,6 +10,7 @@ from jsonschema import ValidationError, FormatChecker, Draft7Validator
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser, GenericParser
+from analyser.dictionaries import all_labels
 from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance, save_violations, \
   save_email_classification, convert_to_mapping
 from analyser.legal_docs import LegalDocument
@@ -21,7 +22,7 @@ from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
 from gpn.gpn import subsidiaries
 from integration import mail
-from integration.classifier.search_text import wrapper, all_labels, label2id
+from integration.classifier.search_text import wrapper, label2id
 from integration.classifier.sender import get_sender_judicial_org
 from integration.db import get_mongodb_connection
 
