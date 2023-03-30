@@ -1,0 +1,1 @@
+papermill  trainsets/deploy.ipynb training_reports/deploy-result.ipynb --log-output  -p RUN_ID $1 
