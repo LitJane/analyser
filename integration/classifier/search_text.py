@@ -4,11 +4,14 @@ import logging
 import os.path
 import re
 
+import mlflow
+import pandas as pd
 import tensorflow as tf
 from nltk.tokenize import WhitespaceTokenizer
 from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
 
 from analyser.dictionaries import integration_path, labels, label2id
+from utilits.utils import _env_var
 
 all_key = {
     "CONTRACT": [
@@ -63,26 +66,37 @@ def wrapper(document):
 
     if tokenizer is None and model is None:
         if os.path.exists(path_to_model) and os.path.exists(os.path.join(path_to_model, 'config.json')) and os.path.exists(os.path.join(path_to_model, 'tf_model.h5')):
-            model = TFAutoModelForSequenceClassification.from_pretrained(
-                str(path_to_model), num_labels=len(labels), from_pt=False
-            )
-            # tokenizer = AutoTokenizer.from_pretrained(str(model_checkpoint2))
-            if Path('./tokenizer').is_dir():
-                tokenizer = AutoTokenizer.from_pretrained(str('./tokenizer/'))
-            else:
-                tokenizer = AutoTokenizer.from_pretrained(str(model_checkpoint2))
-                tokenizer.save_pretrained('./tokenizer/')
-        else:
-            logging.error('Document classification model is not found. To enable document classification put files config.json and tf_model.h5 in integration/classifier/doc-classification')
-    result_from_tokenizer = tokenizer(json_from_text['text'], truncation=True, max_length=512)
-    predictions = model.predict([result_from_tokenizer['input_ids']])['logits']
-    predictions = tf.nn.softmax(predictions, name=None)[0].numpy()
+            # model = TFAutoModelForSequenceClassification.from_pretrained(
+            #     str(path_to_model), num_labels=len(labels), from_pt=False
+            # )
+
+            # os.environ["MLFLOW_HTTP_REQUEST_TIMEOUT"] = "600"
+
+            TRACKING_URI = _env_var('ML_FLOW_TRACKING_URI')
+            mlflow.set_tracking_uri(TRACKING_URI)
+
+            model_name = _env_var('ML_FLOW_MODEL_NAME', "practice-classifier-ruRoberta-large")
+            stage = _env_var('ML_FLOW_STAGE', "Production")
+
+            model = mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}/{stage}")
+
+            # if Path('./tokenizer').is_dir():
+            #     tokenizer = AutoTokenizer.from_pretrained(str('./tokenizer/'))
+            # else:
+            #     tokenizer = AutoTokenizer.from_pretrained(str(model_checkpoint2))
+            #     tokenizer.save_pretrained('./tokenizer/')
+        # else:
+        #     logging.error('Document classification model is not found. To enable document classification put files config.json and tf_model.h5 in integration/classifier/doc-classification')
+    # result_from_tokenizer = tokenizer(json_from_text['text'], truncation=True, max_length=512)
+    # predictions = model.predict([result_from_tokenizer['input_ids']])['logits']
+    # predictions = tf.nn.softmax(predictions, name=None)[0].numpy()
+    df = pd.DataFrame([json_from_text['text']], columns=['text'])
+    predictions = model.predict(df)
     result = []
-    for index, item in enumerate(predictions):
+    for index, row in predictions.iterrows():
         result.append({
-            'id': label2id[labels[index]],
-            'label': labels[index],
-            'score': item.item()
+            'label': row['practice'],
+            'score': row['confidence']
         })
     return sorted(result, key=lambda x: x['score'], reverse=True)
 
