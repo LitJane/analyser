@@ -1,6 +1,6 @@
-import re
-from enum import Enum
 
+from enum import Enum
+import re
 import pandas as pd
 from overrides import overrides
 from pandas import DataFrame
@@ -21,8 +21,7 @@ from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import to_float, span_len
 from analyser.transaction_values import ValueSpansFinder
-from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, \
-  nn_predict
+from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, nn_predict
 
 
 class ContractDocument(LegalDocument):
