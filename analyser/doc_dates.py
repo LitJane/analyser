@@ -44,7 +44,7 @@ def find_date(text: str) -> ([], datetime.datetime):
       _date = parse_date(finding)
       if _date:
         return finding.span(), _date
-  except:
+  except Exception:
     pass
 
   return None, None
@@ -73,7 +73,7 @@ def _get_month_number(m):
   if m.isdigit():
     try:
       return int(m)
-    except:
+    except Exception:
       pass
 
   for p in range(len(months_short)):

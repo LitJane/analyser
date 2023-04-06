@@ -6,15 +6,15 @@ import traceback
 import warnings
 
 import nltk
+import numpy as np
 
 from analyser.hyperparams import models_path
 from analyser.log import logger
-
-nltk.data.path.append(os.path.join(models_path, 'nltk'))
-import numpy as np
-
 from analyser.ml_tools import spans_to_attention, FixedVector
 from analyser.text_tools import Tokens, untokenize, replace_tokens, split_into_sentences
+
+nltk.data.path.append(os.path.join(models_path, 'nltk'))
+
 
 TEXT_PADDING_SYMBOL = ' '
 
@@ -64,7 +64,7 @@ class TextMap:
 
     return self
 
-  def regex_attention(self, regex)-> FixedVector:
+  def regex_attention(self, regex) -> FixedVector:
     matches = list(self.finditer(regex))
     return spans_to_attention(matches, len(self))
 
@@ -231,7 +231,7 @@ class TextMap:
   def __len__(self):
     return self.get_len()
 
-  def __getitem__(self, key)->str:
+  def __getitem__(self, key) -> str:
     if isinstance(key, slice):
       # Get the start, stop, and step from the slice
       return [self[ii] for ii in range(*key.indices(len(self)))]

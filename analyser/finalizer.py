@@ -1216,7 +1216,7 @@ def send_notifications():
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
                 save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
-            elif audit['additionalFields'].get('email_sent') == False and audit.get('classification_result') is not None:
+            elif audit['additionalFields'].get('email_sent') is False and audit.get('classification_result') is not None:
                 logging.info('Retry send email message')
                 top_classification_result = audit['classification_result'][0]
                 attachments = []
@@ -1297,7 +1297,7 @@ def finalize():
                     if violation is not None:
                         violations.append(violation)
                 except Exception as err:
-                    logger.exception(f'cant finalize document {document_id["_id"]}')
+                    logger.exception(f'cant finalize document {document_id["_id"]} {err}')
 
             save_violations(audit, violations)
             logger.info(f'.....pre-audit {audit["_id"]} is waiting for approval')
@@ -1329,7 +1329,7 @@ def finalize():
                 violations.extend(new_violations)
                 links.extend(new_links)
             except Exception as err:
-                logger.exception(f'cant finalize contract {document_id["_id"]}')
+                logger.exception(f'cant finalize contract {document_id["_id"]} {err}')
         update_links(audit, links)
         save_violations(audit, violations)
         logger.info(f'.....audit {audit["_id"]} is waiting for approval')

@@ -222,7 +222,7 @@ class HtmlRenderer(AbstractRenderer):
     return attention_vectors
 
   def sign_to_text(self, sign: int):
-    if sign < 0: 
+    if sign < 0:
       return " &lt; "
     if sign > 0:
       return " &gt; "

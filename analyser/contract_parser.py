@@ -392,7 +392,7 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     cp.amount.span = region_map.token_indices_by_char_range(results.number_span)
     cp.amount.value = results.original_sum
     cp.amount.offset(cp.span[0])
-    if results.including_vat == False:
+    if results.including_vat is False:
       cp.amount.value = results.value
 
     if cp.currency is None:
@@ -410,28 +410,28 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
   if cp.amount:
     try:
       cp.amount.value = to_float(cp.amount.value)
-    except Exception as e:
+    except Exception:
       logger.error(f'amount is {cp.amount}')
     # logger.error(e)
 
   if cp.vat:
     try:
       cp.vat.value = to_float(cp.vat.value)
-    except Exception as e:
+    except Exception:
       # logger.error(e)
       logger.error(f'vat is {cp.vat.value}, cannot cast to float')
 
   if cp.amount_netto:
     try:
       cp.amount_netto.value = to_float(cp.amount_netto.value)
-    except Exception as e:
+    except Exception:
       # logger.error(e)
       logger.error(f'amount_netto is {cp.amount_netto}')
 
   if cp.amount_brutto:
     try:
       cp.amount_brutto.value = to_float(cp.amount_brutto.value)
-    except Exception as e:
+    except Exception:
       logger.error(f'amount_brutto is {cp.amount_brutto}')
 
   if (results is not None):
