@@ -7,7 +7,7 @@ import json
 import unittest
 
 from bson import ObjectId
-from jsonschema import validate, ValidationError, FormatChecker, Draft7Validator
+from jsonschema import ValidationError
 from pymongo import MongoClient
 
 import analyser

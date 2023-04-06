@@ -405,7 +405,8 @@ def calculate_distances_per_pattern(doc: LegalDocument, pattern_factory: Abstrac
   c = 0
   for pat in pattern_factory.patterns:
     if pattern_prefix is None or pat.name[:len(pattern_prefix)] == pattern_prefix:
-      if verbosity > 1: print(f'estimating distances to pattern {pat.name}', pat)
+      if verbosity > 1:
+        print(f'estimating distances to pattern {pat.name}', pat)
 
       dists = make_pattern_attention_vector(pat, doc.embeddings, dist_function)
       distances_per_pattern_dict[pat.name] = dists

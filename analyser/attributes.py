@@ -1,4 +1,3 @@
-import datetime
 import json
 import logging
 import sys
@@ -85,7 +84,7 @@ def del_none(d):
       for itm in list(value):
         if isinstance(itm, dict):
           del_none(itm)
-      if len(value)==0:
+      if len(value) == 0:
         del d[key]
   return d  # For convenience
 
@@ -228,15 +227,13 @@ def convert_constraints(path_s: [str], attr, structural_level_node: CharterStruc
 
 
 def remove_empty_from_list(lst):
-  l = [v for v in lst if v is not None]
-  return l
+  return [v for v in lst if v is not None]
 
 
 def clean_up_tree(tree: CharterSchema):
   for s_node in tree.structural_levels:
     for subj_node in s_node.competences:
-      l = remove_empty_from_list(subj_node.constraints)
-      subj_node.constraints = l
+      subj_node.constraints = remove_empty_from_list(subj_node.constraints)
 
 
 def index_of_key(s: str) -> (str, int):
@@ -245,7 +242,7 @@ def index_of_key(s: str) -> (str, int):
   if len(n_i) > 1:
     try:
       _idx = int(n_i[-1]) - 1
-    except ValueError as e:
+    except ValueError:
       return s, 0
   return n_i[0], _idx
 
@@ -389,8 +386,6 @@ def get_legacy_docs_ids() -> []:
   db = get_mongodb_connection()
   documents_collection = db['documents']
 
-  vv = analyser.__version_ints__  # TODO: check version
-
   _attr_updated_by_user = {
     '$and': [
       {'user.attributes_tree.creation_date': {'$exists': True}},
@@ -472,7 +467,7 @@ def convert_one(db, doc: dict):
 
 def should_i_migrate(ids) -> bool:
   if len(ids) == 0:
-    migration_logger.info(f"Migration: no legacy docs found in DB")
+    migration_logger.info("Migration: no legacy docs found in DB")
     return False
 
   print(f">> {len(ids)} legacy doc(s) found in DB. ")

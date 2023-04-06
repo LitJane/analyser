@@ -89,20 +89,25 @@ def as_offset(txt):
 
 
 def as_currency(v):
-  if v is None: return "any"
+  if v is None:
+    return "any"
   return f'{v.value:20,.0f} {v.currency} '
 
 
 class AbstractRenderer:
 
   def sign_to_text(self, sign: int):
-    if sign < 0: return " < "
-    if sign > 0: return " > "
+    if sign < 0:
+      return " < "
+    if sign > 0:
+      return " > "
     return ' = '
 
   def sign_to_html(self, sign: int):
-    if sign < 0: return " &lt; "
-    if sign > 0: return " &gt; "
+    if sign < 0:
+      return " &lt; "
+    if sign > 0:
+      return " &gt; "
     return ' = '
 
   def value_to_html(self, vc: ValueConstraint):
@@ -217,8 +222,10 @@ class HtmlRenderer(AbstractRenderer):
     return attention_vectors
 
   def sign_to_text(self, sign: int):
-    if sign < 0: return " &lt; "
-    if sign > 0: return " &gt; "
+    if sign < 0: 
+      return " &lt; "
+    if sign > 0:
+      return " &gt; "
     return ' = '
 
   def probable_value_to_html(self, pv):

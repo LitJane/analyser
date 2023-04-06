@@ -1,5 +1,4 @@
 import os
-import warnings
 from pathlib import Path
 
 import pandas as pd

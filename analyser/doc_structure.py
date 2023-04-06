@@ -66,7 +66,8 @@ def remove_similar_indexes_considering_weights(indexes: [int], weights: FixedVec
   hif = []
 
   def is_index_far(i):
-    if i == 0: return True
+    if i == 0:
+      return True
     return indexes[i] - indexes[i - 1] > 1
 
   def is_bigger_confidence(i):

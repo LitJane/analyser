@@ -44,7 +44,8 @@ def dist_cosine_to_point(text_emb, pt):
   for i in range(len(text_emb)):
 
     d = distance.cosine(text_emb[i], pt)
-    if d > 1: d = 1
+    if d > 1:
+      d = 1
     t_distances[i] = d
 
   return t_distances

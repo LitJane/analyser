@@ -84,7 +84,8 @@ class TextMap:
       yield self.token_indices_by_char_range(m.span(0))
 
   def token_index_by_char(self, _char_index: int) -> int:
-    if not self.map: return -1
+    if not self.map:
+      return -1
 
     local_off = self.map[0][0] - self._offset_chars
     """

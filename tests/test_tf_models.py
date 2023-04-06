@@ -10,8 +10,7 @@ from tensorflow.keras import Model
 
 from analyser.ml_tools import Embeddings
 from tf_support.embedder_elmo import ElmoEmbedder
-from tf_support.super_contract_model import uber_detection_model_005_1_1, uber_detection_model_003, \
-  structure_detection_model_001
+from tf_support.super_contract_model import uber_detection_model_005_1_1
 from tf_support.tools import KerasTrainingContext
 
 

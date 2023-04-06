@@ -61,7 +61,7 @@ class CharterDocument(LegalDocumentExt):
   date = property(get_date, set_date)
   number = property(get_number, set_number)
 
-#   @overrides
+  #   @overrides
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
     _attributes_tree_dict, _ = to_json(self.attributes_tree)
@@ -193,7 +193,7 @@ class CharterParser(ParsingContext):
     # doc.org_tags = find_charter_org(doc)
     doc.attributes_tree.org = find_charter_org_obj(doc)
     if doc.attributes_tree.org:
-      doc.attributes_tree.org.alias=None
+      doc.attributes_tree.org.alias = None
     doc.attributes_tree.date = find_document_date(doc)
 
     return doc
@@ -261,9 +261,11 @@ class CharterParser(ParsingContext):
 
     # --------------------
     # offsetting tags to absolute values
-    for value in values: value += subdoc.start
+    for value in values:
+      value += subdoc.start
     # --------------------
-    for competence_tag in structural_level.competences: competence_tag += subdoc.start
+    for competence_tag in structural_level.competences:
+      competence_tag += subdoc.start
 
     # nesting values (assigning parents)
     for competence in structural_level.competences:  # contract subjects
