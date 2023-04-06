@@ -6,6 +6,7 @@ import tensorflow_hub as hub
 
 from analyser.embedding_tools import AbstractEmbedder
 from analyser.hyperparams import work_dir
+from analyser.log import logger
 from analyser.text_tools import Tokens
 
 _e_instance: AbstractEmbedder or None = None
@@ -14,7 +15,7 @@ if "TFHUB_CACHE_DIR" not in os.environ:
   tf_cache = os.path.join(work_dir, 'tf_cache')
   os.environ["TFHUB_CACHE_DIR"] = tf_cache
 
-from analyser.log import logger
+
 
 
 class ElmoEmbedderWrapper(AbstractEmbedder):

@@ -362,8 +362,8 @@ def render_spans(spans, subdoc, attention_v, ht='') -> str:
 
     ht += '<li>'
     t = subdoc.tokens_map.tokens[_s]
-    l = attention_v[_s]
-    ht += to_color_text(t, l, _range=(0, 1.2))
+    att = attention_v[_s]
+    ht += to_color_text(t, att, _range=(0, 1.2))
     ht += '<br><hr>'
     ht += '</li>'
   ht += '</ol>'
@@ -376,8 +376,8 @@ def render_slices(slices, subdoc, attention_v, ht='') -> str:
   for _s in slices:
     ht += '<li>'
     t = subdoc.tokens_map.tokens[_s]
-    l = attention_v[_s]
-    ht += to_color_text(t, l, _range=(0, 1.2))
+    att = attention_v[_s]
+    ht += to_color_text(t, att, _range=(0, 1.2))
     ht += '<br><hr>'
     ht += '</li>'
   ht += '</ol>'

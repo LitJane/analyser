@@ -154,7 +154,7 @@ def remove_header(text: str) -> (str, bool):
     if phrase:
         try:
             return ' '.join(text.split(phrase[0][0])[1:]), True
-        except Exception as e:
+        except Exception:
             print(phrase)
     else:
         number = re.findall(r'(\d\.\d\.)', text)

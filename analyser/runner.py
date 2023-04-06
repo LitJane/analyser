@@ -110,7 +110,7 @@ class BaseProcessor:
         change_doc_state(db_document, state=DocumentState.Excluded.value)
 
     except Exception as err:
-      logger.exception(f'cant process document {db_document.get_id()}')
+      logger.exception(f'cant process document {db_document.get_id()} {err}')
       # TODO: do not save the entire doc here, data loss possible
       save_analysis(db_document, legal_doc, DocumentState.Error.value, db_document.retry_number + 1)
 
@@ -322,7 +322,7 @@ def get_doc4classification(audit):
 def get_doc_headline_safely(document):
   try:
     return document['paragraphs'][0]['paragraphHeader']['text']
-  except:
+  except Exception:
     return None
 
 

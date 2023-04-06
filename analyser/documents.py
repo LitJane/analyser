@@ -209,7 +209,7 @@ class TextMap:
     try:
       start, stop = self.char_range(span)
       return self._full_text[start + self._offset_chars: stop + self._offset_chars]
-    except:
+    except Exception:
       err = f'cannot deal with {span}'
       traceback.print_exc(file=sys.stdout)
       raise RuntimeError(err)

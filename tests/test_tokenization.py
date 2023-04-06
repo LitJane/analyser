@@ -338,7 +338,7 @@ class TokenisationTestCase(unittest.TestCase):
     text = 'этилен мама этилен'
     __doc = LegalDocument(text)
     __doc.parse()
-    tm: TextMap = __doc.tokens_map
+    # tm: TextMap = __doc.tokens_map
     subdoc = __doc.subdoc_slice(slice(0, 1))
     del __doc
 

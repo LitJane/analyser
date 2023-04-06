@@ -17,8 +17,7 @@ class TestContractParser(unittest.TestCase):
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_doc_parser(self):
-    db = get_mongodb_connection()
-
+    get_mongodb_connection()
 
     FILENAME = "/Users/artem/work/nemo/goil/IN/Другие договоры/Договор Формула.docx"
 
@@ -57,15 +56,15 @@ class TestContractParser(unittest.TestCase):
         doc.paragraphs.append(para)
         last = len(doc.tokens_map)
 
-        h_subdoc = doc.subdoc_slice(para.header.as_slice())
-        b_subdoc = doc.subdoc_slice(para.body.as_slice())
+        _ = doc.subdoc_slice(para.header.as_slice())
+        _ = doc.subdoc_slice(para.body.as_slice())
         # self.assertEqual(self.n(header_text), h_subdoc.text)
         # self.assertEqual(self.n(body_text), b_subdoc.text)
 
     print('-' * 100)
     print(doc.text)
 
-    headers = [doc.subdoc_slice(p.header.as_slice()) for p in doc.paragraphs]
+    _ = [doc.subdoc_slice(p.header.as_slice()) for p in doc.paragraphs]
     print('-' * 100)
 
 

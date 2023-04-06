@@ -42,8 +42,8 @@ class KerasTrainingContext:
 
     try:
       stats = pd.read_csv(stats_path, index_col='model_name')
-    except:
-      print(f'🦖🦖🦖cannot read {stats_path}')
+    except Exception as e:
+      print(f'🦖🦖🦖cannot read {stats_path} {e}')
       stats = pd.DataFrame(columns=['model_name', 'epoch', 'val_acc', 'val_loss', 'loss', 'acc']).set_index(
         'model_name')
 
@@ -61,8 +61,8 @@ class KerasTrainingContext:
     try:
       print(f'loading training log from {log_csv}')
       return pd.read_csv(log_csv)
-    except:
-      print(f'log is not available {log_csv}')
+    except Exception as e:
+      print(f'log is not available {log_csv} {e}')
 
   def get_lr_epoch_from_log(self, model_name) -> (float, int):
     _log = self.get_log(model_name)
@@ -118,8 +118,8 @@ class KerasTrainingContext:
       try:
         model.load_weights(ch_fn)
         logger.info(f'weights loaded: {ch_fn}')
-      except:
-        msg = f'cannot load  {model_name} from {ch_fn}'
+      except Exception as e:
+        msg = f'cannot load  {model_name} from {ch_fn}; {e}'
         logger.warning(msg)
         # warnings.warn(msg)
         if trained:
@@ -133,15 +133,15 @@ class KerasTrainingContext:
   @staticmethod
   def freezeModel(model):
     model.trainable = False
-    for l in model.layers:
-      l.trainable = False
+    for layer in model.layers:
+      layer.trainable = False
 
   @staticmethod
   def unfreezeModel(model):
     if not model.trainable:
       model.trainable = True
-    for l in model.layers:
-      l.trainable = True
+    for layer in model.layers:
+      layer.trainable = True
 
   def train_and_evaluate_model(self, model:Model, generator, test_generator, retrain=False, lr=None):
     print(f'model.name == {model.name}')
