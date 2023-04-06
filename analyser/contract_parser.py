@@ -403,7 +403,8 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
 
 
   except TypeError as e:
-    logger.exception(f'smthinf wrong {str(cp)=}')
+    msg = f'smthinf wrong cp={str(cp)}'
+    logger.exception(msg)
     logger.error(e)
     results = None
 
