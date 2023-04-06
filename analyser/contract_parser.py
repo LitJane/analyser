@@ -1,4 +1,3 @@
-import re
 from enum import Enum
 
 import pandas as pd
@@ -21,6 +20,7 @@ from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import to_float, span_len
 from analyser.transaction_values import ValueSpansFinder
+from gpn.gpn import is_gpn_name
 from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, nn_predict
 
 
@@ -281,7 +281,7 @@ def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext
       # known subsidiary may not be natural person
       return
 
-    if re.search('Газпром', name, re.IGNORECASE):  # TODO: hack
+    if is_gpn_name(name):  # TODO: hack
       return
 
     if audit_ctx.is_same_org(name):
