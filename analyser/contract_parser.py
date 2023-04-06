@@ -1,6 +1,6 @@
-
-from enum import Enum
 import re
+from enum import Enum
+
 import pandas as pd
 from overrides import overrides
 from pandas import DataFrame
