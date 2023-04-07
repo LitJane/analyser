@@ -136,7 +136,7 @@ class UberModelTrainsetManager:
       df.index.name = '_id'
 
       logger.info(f'number of samples BEFORE clean-up: {len(df)}')
-      df = df[df['valid'] is True]
+      df = df[df['valid'] == True]
       df = df[df['subject'] != 'BigDeal']
       logger.info(f'number of samples AFTER clean-up: {len(df)}')
 
