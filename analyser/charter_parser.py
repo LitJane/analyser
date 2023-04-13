@@ -177,7 +177,7 @@ class CharterParser(ParsingContext):
 
     ### ⚙️🔮 SENTENCES embedding
 
-    charter.sentences_embeddings = embedd_sentences(charter.sentence_map, self.get_sentence_embedder())
+    charter.sentences_embeddings = embedd_sentences(charter.sentence_map, self.get_sentence_embedder(), log_addon=str(charter.get_id()))
     charter.distances_per_sentence_pattern_dict = calc_distances_per_pattern(charter.sentences_embeddings,
                                                                              self.get_patterns_named_embeddings())
 

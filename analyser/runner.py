@@ -436,6 +436,11 @@ def audit_phase_1(audit, kind=None):
 
 def audit_phase_1_doc(document_id, ctx, _k=1, _total=1):
   _document = finalizer.get_doc_by_id(document_id)
+  if _document is None:
+    msg = f'No doc with id {document_id}'
+    logger.error(msg)
+    return
+
   jdoc = DbJsonDoc(_document)
 
   logger.info(f'......pre-pre-processing {_k} of {_total}  {jdoc.documentType}:{document_id}')
@@ -530,7 +535,7 @@ def run(run_pahse_2=True, kind=None):
   for audit in get_audits():
     # -----------------------
     # I
-    logger.info('-> PHASE I...')
+    logger.info(f'-> PHASE I... {audit["_id"]}')
     audit_phase_1(audit, kind)
 
     # -----------------------
