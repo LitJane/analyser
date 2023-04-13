@@ -435,10 +435,10 @@ def audit_phase_1(audit, kind=None):
 
 
 def audit_phase_1_doc(document_id, ctx, _k=1, _total=1):
+  logger.info(f'......pre-pre-processing {_k} of {_total}  {document_id}')
+
   _document = finalizer.get_doc_by_id(document_id)
   jdoc = DbJsonDoc(_document)
-
-  logger.info(f'......pre-pre-processing {_k} of {_total}  {jdoc.documentType}:{document_id}')
 
   processor: BaseProcessor = document_processors.get(jdoc.documentType)
   if processor is None:
