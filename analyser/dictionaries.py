@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from pymongo import DESCENDING, ASCENDING
+from pymongo import DESCENDING
 
 import analyser
 from analyser.charter_parser import CharterParser
