@@ -3,6 +3,7 @@ import json
 import logging
 import os.path
 import re
+from pathlib import Path
 
 import tensorflow as tf
 from nltk.tokenize import WhitespaceTokenizer
