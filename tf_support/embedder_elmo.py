@@ -66,13 +66,13 @@ class ElmoEmbedderImpl(AbstractEmbedder):
     }
 
     with embedding_graph.as_default():
-      logger.info(f'ELMO: creating embedded_out_elmo')
+      logger.info('ELMO: creating embedded_out_elmo...')
       self.embedded_out_elmo = _elmo(
         inputs=inputs_elmo,
         signature="tokens",
         as_dict=True)['elmo']
 
-      logger.info(f'ELMO: embedded_out_defaut embedded_out_elmo')
+      logger.info('ELMO: embedded_out_defaut embedded_out_elmo')
       self.embedded_out_defaut = _elmo(
         inputs=inputs_default,
         signature="default",

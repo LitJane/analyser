@@ -354,6 +354,7 @@ class UberModelTrainsetManager:
 
     return self.trim_maxlen(dp, cutoff, maxlen)
 
+  @staticmethod
   def trim_maxlen(self, dp, start_from, maxlen):
     (emb, tok_f), (sm, subj), (sample_weight, subject_weight) = dp
 
