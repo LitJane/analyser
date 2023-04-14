@@ -10,8 +10,9 @@ from jsonschema import ValidationError, FormatChecker, Draft7Validator
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser, GenericParser
-from analyser.dictionaries import all_labels, label2id
-from analyser.finalizer import normalize_only_company_name, compare_ignore_case
+from analyser.dictionaries import all_labels
+from analyser.finalizer import normalize_only_company_name, compare_ignore_case, check_compliance, save_violations, \
+  save_email_classification, convert_to_mapping
 from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.parsing import AuditContext
@@ -20,10 +21,10 @@ from analyser.protocol_parser import ProtocolParser
 from analyser.schemas import document_schemas
 from analyser.structures import DocumentState
 from gpn.gpn import subsidiaries
-from integration.classifier.search_text import wrapper
+from integration import mail
+from integration.classifier.search_text import wrapper, label2id
 from integration.classifier.sender import get_sender_judicial_org
 from integration.db import get_mongodb_connection
-from integration.mail import send_classifier_email
 
 schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecker())
 
@@ -150,7 +151,7 @@ class BaseProcessor:
     org = finalizer.get_org(db_doc.get_attributes_tree())
     if org is not None and org.get('name') is not None:
       org_name = normalize_only_company_name(org['name'].get('value'))
-      if compare_ignore_case(org_name, subsidiary):
+      if compare_ignore_case(org_name, normalize_only_company_name(subsidiary)):
         return True
       for known_subsidiary in subsidiaries:
         if compare_ignore_case(known_subsidiary.get('_id'), subsidiary):
@@ -196,6 +197,17 @@ def get_audits() -> [dict]:
   audits_collection = db['audits']
 
   cursor = audits_collection.find({'status': 'InWork'}).sort([("createDate", pymongo.ASCENDING)])
+  res = []
+  for audit in cursor:
+    res.append(audit)
+  return res
+
+
+def get_audits_for_notification() -> [dict]:
+  db = get_mongodb_connection()
+  audits_collection = db['audits']
+
+  cursor = audits_collection.find({'toBeApproved': True, 'additionalFields.external_source': 'email', 'additionalFields.compliance_protocol_praparation_email_sent':{'$ne': True}}).sort([("createDate", pymongo.ASCENDING)])
   res = []
   for audit in cursor:
     res.append(audit)
@@ -266,12 +278,19 @@ def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_
   return db_document
 
 
-def save_audit_practice(audit, classification_result, zip_classified):
+def save_audit_practice(audit, classification_result, zip_classified, additional_classification_results):
   if audit['additionalFields']['external_source'] != 'email':
     zip_classified = False
   db = get_mongodb_connection()
   db['audits'].update_one({'_id': audit['_id']}, {
-    "$set": {'classification_result': classification_result, "additionalFields.zip_classified": zip_classified}})
+    "$set": {'classification_result': classification_result,
+             "additionalFields.zip_classified": zip_classified,
+             'additional_classification_results': additional_classification_results}})
+
+
+def save_errors(audit, errors):
+  db = get_mongodb_connection()
+  db["audits"].update_one({'_id': audit["_id"]}, {"$push": {"errors": {'$each': errors}}})
 
 
 def change_doc_state(doc, state):
@@ -301,10 +320,9 @@ def get_doc4classification(audit):
   if audit.get('additionalFields', '').get('main_document_id') is not None:
     main_doc = finalizer.get_doc_by_id(audit['additionalFields']['main_document_id'])
     main_doc_type = main_doc['documentType']
-    if main_doc[
-      'parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
+    if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
       return main_doc, True
-  document_ids = get_docs_by_audit_id(audit["_id"], id_only=True)
+  document_ids = get_docs_by_audit_id(audit["_id"], id_only=True, states=[0, 5, 10, 15])
   for document_id in document_ids:
     _document = finalizer.get_doc_by_id(document_id)
     if _document['parserResponseCode'] == 200:
@@ -330,18 +348,17 @@ def doc_classification(audit):
   try:
     logger.info(f'.....classifying audit {audit["_id"]}')
     doc4classification, main_doc = get_doc4classification(audit)
-    # compliance = check_compliance(audit, doc4classification)
-    if classifier_url is None:
-      classification_result = wrapper(doc4classification['parse'])
-    else:
-      response = requests.post(classifier_url + '/api/classify', json=doc4classification['parse'])
-      if response.status_code != 200:
-        logger.error(f'Classifier returned error code: {response.status_code}, message: {response.json()}')
-        audits = get_mongodb_connection()['audits']
-        update = {'$push': {'errors': {'type': 'classifier_service', 'text': 'Ошибка классификатора'}}}
-        audits.update_one({'_id': ObjectId(audit["_id"])}, update)
-        return
-      classification_result = response.json()
+    classification_result = None
+    additional_classification_results = []
+    errors = []
+    if doc4classification['documentType'] in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
+      violations, errors = check_compliance(audit, doc4classification)
+      compliance_mapping = next(filter(lambda x: x['_id'] == 1015, all_labels), None)
+      if len(errors) > 0:
+        mail.send_compliance_error_email(audit, errors, compliance_mapping['email'])
+
+      if len(violations) > 0:
+        additional_classification_results.append({'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0})
 
     # detecting judicial organisation in sender (email_from) field
     doc_headline = get_doc_headline_safely(doc4classification['parse'])
@@ -357,15 +374,28 @@ def doc_classification(audit):
     if sender_judicial_org is not None:
       classification_result = apply_judical_practice(classification_result, sender_judicial_org)
 
+    if classification_result is None:
+      if classifier_url is None:
+        classification_result = wrapper(doc4classification['parse'])
+      else:
+        response = requests.post(classifier_url + '/api/classify', json=doc4classification['parse'])
+        if response.status_code != 200:
+          logger.error(f'Classifier returned error code: {response.status_code}, message: {response.json()}')
+          audits = get_mongodb_connection()['audits']
+          update = {'$push': {'errors': {'type': 'classifier_service', 'text': 'Ошибка классификатора'}}}
+          audits.update_one({'_id': ObjectId(audit["_id"])}, update)
+          return
+        classification_result = response.json()
+
     if classification_result:
-      save_audit_practice(audit, classification_result, not main_doc)
-      if audit['additionalFields']['external_source'] == 'email':
-        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
-        attachments = []
-        fs = gridfs.GridFS(get_mongodb_connection())
-        for file_id in audit['additionalFields']['file_ids']:
-          attachments.append(fs.get(file_id))
-        send_classifier_email(audit, top_result, attachments, all_labels)
+        save_audit_practice(audit, classification_result, not main_doc, additional_classification_results)
+        if audit['additionalFields']['external_source'] == 'email':
+          top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+          attachments = []
+          fs = gridfs.GridFS(get_mongodb_connection())
+          for file_id in audit['additionalFields']['file_ids']:
+            attachments.append(fs.get(file_id))
+          save_email_classification(mail.send_classifier_email(audit, top_result, attachments, all_labels, convert_to_mapping(additional_classification_results)), audit)
   except Exception as ex:
     logger.exception(ex)
 
@@ -406,6 +436,11 @@ def audit_phase_1(audit, kind=None):
 
 def audit_phase_1_doc(document_id, ctx, _k=1, _total=1):
   _document = finalizer.get_doc_by_id(document_id)
+  if _document is None:
+    msg = f'No doc with id {document_id}'
+    logger.error(msg)
+    return
+
   jdoc = DbJsonDoc(_document)
 
   logger.info(f'......pre-pre-processing {_k} of {_total}  {jdoc.documentType}:{document_id}')
@@ -455,7 +490,11 @@ def audit_phase_2(audit, kind=None):
 
   if audit.get('pre-check') and 'Classification' in audit.get('checkTypes', {}):
     doc_classification(audit)
-    # return
+  if audit.get('pre-check') and 'Compliance' in audit.get('checkTypes', {}):
+    document, _ = get_doc4classification(audit)
+    violations, errors = check_compliance(audit, document)
+    save_errors(audit, errors)
+    save_violations(audit, violations)
 
   change_audit_status(audit, "Finalizing")  # TODO: check ALL docs in proper state
 
@@ -496,7 +535,7 @@ def run(run_pahse_2=True, kind=None):
   for audit in get_audits():
     # -----------------------
     # I
-    logger.info('-> PHASE I...')
+    logger.info(f'-> PHASE I... {audit["_id"]}')
     audit_phase_1(audit, kind)
 
     # -----------------------
@@ -513,6 +552,12 @@ def run(run_pahse_2=True, kind=None):
 
   logger.info('-> PHASE III (finalize)...')
   finalizer.finalize()
+
+  logger.info('-> PHASE IV (notifications)...')
+  db = get_mongodb_connection()
+  for audit in get_audits_for_notification():
+    result = mail.send_compliance_protocol_preparation_email(audit)
+    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"additionalFields.compliance_protocol_praparation_email_sent": result}})
 
 
 if __name__ == '__main__':

@@ -1,3 +1,5 @@
+import datetime
+import json
 import logging
 import re
 from collections import deque
@@ -71,12 +73,13 @@ def get_linked_docs(audit, contract_id):
     db = get_mongodb_connection()
     result = []
     document_collection = db['documents']
-    for link in audit['links']:
-        if link.get('type') is not None and link.get('type') != 'analysis':
-            if link['fromId'] == contract_id:
-                result.append(document_collection.find_one({'_id': link['toId']}))
-            elif link['toId'] == contract_id:
-                result.append(document_collection.find_one({'_id': link['fromId']}))
+    if audit.get('links') is not None:
+        for link in audit['links']:
+            if link.get('type') != 'analysis':
+                if link['fromId'] == contract_id:
+                    result.append(document_collection.find_one({'_id': link['toId']}))
+                elif link['toId'] == contract_id:
+                    result.append(document_collection.find_one({'_id': link['fromId']}))
 
     return result
 
@@ -100,6 +103,8 @@ def extract_text(span, words, text):
 
 
 def get_nearest_header(headers, position):
+    if len(headers) == 0:
+        return {}
     found_header = headers[0]
     for header in headers:
         if header["span"][0] > position:
@@ -152,13 +157,13 @@ def get_docs_by_audit_id(id: str, state, kind=None, id_only=False, without_large
 
 def get_latest_charter_by_org(org_name):
     documents_collection = get_mongodb_connection()['documents']
-    cursor = documents_collection.find({'$or': [{'analysis.attributes_tree.charter.org.name.value': org_name,
-                                        'user.attributes_tree.charter.org.name.value': org_name}]})
+    cursor = documents_collection.find({'$or': [{'analysis.attributes_tree.charter.org.name.value': org_name},
+                                                 {'user.attributes_tree.charter.org.name.value': org_name}]})
     charters = []
     for charter in cursor:
         attrs = get_attrs(charter)
         if org_name == attrs.get('org', {}).get('name', {}).get('value', '') \
-                and (charter.get("isActive", True)) and charter["state"] == 15:
+                and charter.get("isActive", True) is not False and charter.get("state", 0) == 15:
             charters.append(charter)
     cleaned_charters = exclude_same_charters(charters)
     charters = sorted(cleaned_charters, key=lambda k: get_attrs(k).get('date', {}).get("value"), reverse=True)
@@ -166,9 +171,6 @@ def get_latest_charter_by_org(org_name):
         return charters[0]
     else:
         return None
-
-
-
 
 
 def get_audit_by_id(aid: ObjectId):
@@ -180,7 +182,8 @@ def save_violations(audit, violations):
     db = get_mongodb_connection()
     db['audits'].update_one({'_id': audit['_id']}, {'$pull': {'violations': {'userViolation': False}}})
     db["audits"].update_one({'_id': audit["_id"]}, {"$push": {"violations": {'$each': violations}}})
-    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"status": "Done"}})
+    db['audits'].update_one({'_id': audit["_id"]}, {'$set': {"status": "Done"}})
+    db["audits"].update_one({'_id': audit["_id"], 'completionDate': {'$exists': False}}, {"$set": {'completionDate': datetime.datetime.utcnow()}})
 
 
 def create_violation(document_id, founding_document_id, reference, violation_type, violation_reason):
@@ -221,6 +224,8 @@ def get_charter_diapasons(charter):
                             if len(constraints) == 0:
                                 min_constraint = 0
                             for constraint in constraints:
+                                if constraint.get('currency') is None or constraint.get('value') is None:
+                                    continue
                                 constraint_currency = constraint['currency']['value']
                                 constraint_amount = constraint['amount']['value']
                                 if constraint_currency != 'Percent':
@@ -334,9 +339,10 @@ def get_charter_span(charter_atts, org_level, subject):
     return None
 
 
-def check_contract_by_charter(audit, contract, eligible_charter, protocols, user_linked_docs, violations, links):
+def check_contract_by_charter(audit, contract, eligible_charter, protocols, user_linked_docs, violations, links, subsidiary_book_value = None):
     contract_attrs = get_attrs(contract)
     contract_number = contract_attrs.get('number', {}).get('value', '')
+    contract_date = contract_attrs.get('date', {}).get('value')
     charter_subject_map, min_constraint, charter_currency = get_charter_diapasons(eligible_charter)
     eligible_charter_attrs = get_attrs(eligible_charter)
     competences = None
@@ -346,8 +352,10 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
         competences = charter_subject_map.get("Deal")
     contract_value = None
     book_value = None
-    if audit.get('bookValues') is not None:
-        book_value = get_book_value(audit, str(contract_attrs["date"]["value"].year - 1))
+    if subsidiary_book_value is not None:
+        book_value = convert_to_currency(subsidiary_book_value, 'RUB')['value']
+    elif audit.get('bookValues') is not None and contract_date is not None:
+        book_value = get_book_value(audit, str(contract_date.year - 1))
     contract_value = get_amount_netto(contract_attrs.get('price'))
     if contract_value is not None:
         contract_value = convert_to_currency(contract_value, charter_currency)
@@ -364,6 +372,7 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                                                                   "competence_attr_name": get_charter_span(eligible_charter_attrs, 'ShareholdersGeneralMeeting', 'BigDeal')}}
                     change_contract_primary_subject(contract, 'BigDeal')
             else:
+                found_big_deal_competence = False
                 if charter_subject_map.get('BigDeal') is not None:
                     if charter_subject_map['BigDeal'].get('BoardOfDirectors') is not None:
                         big_deal_subject_charter_competence = charter_subject_map['BigDeal'].get('BoardOfDirectors')
@@ -375,6 +384,7 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                             if contract_value['value'] > limit:
                                 change_contract_primary_subject(contract, 'BigDeal')
                                 competences = {'BoardOfDirectors': big_deal_subject_charter_competence}
+                                found_big_deal_competence = True
                     if charter_subject_map['BigDeal'].get('AllMembers') is not None:
                         big_deal_subject_charter_competence = charter_subject_map['BigDeal'].get('AllMembers')
                         if big_deal_subject_charter_competence.get('min') is not None \
@@ -385,158 +395,204 @@ def check_contract_by_charter(audit, contract, eligible_charter, protocols, user
                             if contract_value['value'] > limit:
                                 change_contract_primary_subject(contract, 'BigDeal')
                                 competences = {'AllMembers': big_deal_subject_charter_competence}
+                                found_big_deal_competence = True
+                if org is not None and 'общество с ограниченной ответственностью' == org.get('type', {}).get('value', '').lower():
+                    if not found_big_deal_competence and contract_value["value"] > book_value * 0.25:
+                        competences = {'AllMembers': {"min": 25, "currency_min": "Percent", "max": np.inf, "currency_max": "Percent",
+                                                  "competence_attr_name": get_charter_span(eligible_charter_attrs, 'AllMembers', 'BigDeal')}}
+                        change_contract_primary_subject(contract, 'BigDeal')
+    if competences is not None:
+        if contract_value is not None:
+            eligible_protocol = None
+            need_protocol_check = False
+            competence_constraint = None
+            org_level = None
+            protocol_value = None
+            sign = None
 
-    if competences is not None and contract_value is not None:
-        eligible_protocol = None
-        need_protocol_check = False
-        competence_constraint = None
-        org_level = None
-        protocol_value = None
-        sign = None
-
-        for competence, constraint in competences.items():
-            constraint_currency_min = constraint.get('currency_min')
-            constraint_currency_max = constraint.get('currency_max')
-            if constraint_currency_min is not None and constraint_currency_min == 'Percent' and book_value is not None:
-                abs_min = constraint['min'] * book_value / 100
-            else:
-                abs_min = constraint['min']
-            if constraint_currency_max is not None and constraint_currency_max == 'Percent' and book_value is not None:
-                abs_max = constraint['max'] * book_value / 100
-            else:
-                abs_max = constraint['max']
-
-            if abs_min <= contract_value["value"] <= abs_max:
-                need_protocol_check = True
-                competence_constraint = constraint
-                linked_protocols = list(filter(lambda doc: doc['documentType'] == 'PROTOCOL', user_linked_docs))
-                if linked_protocols:
-                    eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value)
-                    if eligible_protocol is None:  # force find protocol_value and sign
-                        eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value, check_orgs=False)
+            for competence, constraint in competences.items():
+                constraint_currency_min = constraint.get('currency_min')
+                constraint_currency_max = constraint.get('currency_max')
+                if constraint_currency_min is not None and constraint_currency_min == 'Percent' and book_value is not None:
+                    abs_min = constraint['min'] * book_value / 100
                 else:
-                    eligible_protocol, protocol_value, sign = find_protocol(contract, protocols, competence, contract_value)
-                    if eligible_protocol is not None:
-                        links.append(create_link(contract["_id"], eligible_protocol["_id"]))
-                if eligible_protocol is not None:
-                    org_level = competence
-                    break
+                    abs_min = constraint['min']
+                if constraint_currency_max is not None and constraint_currency_max == 'Percent' and book_value is not None:
+                    abs_max = constraint['max'] * book_value / 100
+                else:
+                    abs_max = constraint['max']
 
-        competence_span = None
-        text = None
-        min_value = None
-        max_value = None
-        if competence_constraint is not None:
+                if abs_min <= contract_value["value"] <= abs_max:
+                    need_protocol_check = True
+                    competence_constraint = constraint
+                    linked_protocols = list(filter(lambda doc: doc['documentType'] == 'PROTOCOL', user_linked_docs))
+                    if linked_protocols:
+                        eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value)
+                        if eligible_protocol is None:  # force find protocol_value and sign
+                            eligible_protocol, protocol_value, sign = find_protocol(contract, linked_protocols, competence, contract_value, check_orgs=False)
+                    else:
+                        eligible_protocol, protocol_value, sign = find_protocol(contract, protocols, competence, contract_value)
+                        if eligible_protocol is not None:
+                            links.append(create_link(contract["_id"], eligible_protocol["_id"]))
+                    if eligible_protocol is not None:
+                        org_level = competence
+                        break
+
+            competence_span = None
+            text = None
+            min_value = None
+            max_value = None
+            if competence_constraint is not None:
+                competence_span = competence_constraint.get("competence_attr_name")
+                if competence_span is not None:
+                    text = extract_text(competence_span,
+                                        eligible_charter["analysis"]["tokenization_maps"]["words"],
+                                        eligible_charter["analysis"]["normal_text"])
+                    if len(eligible_charter.get("analysis", {}).get("headers", [])) > 0:
+                        text = text + "(" + get_nearest_header(eligible_charter["analysis"]["headers"], competence_span[0])["value"] + ")"
+                if competence_constraint["min"] != 0:
+                    min_value = {"value": competence_constraint["min"], "currency": competence_constraint["currency_min"]}
+                if competence_constraint["max"] != np.inf:
+                    max_value = {"value": competence_constraint["max"], "currency": competence_constraint["currency_max"]}
+
+            contract_org2_type = None
+            contract_org2_name = None
+            if contract_attrs.get("orgs") is not None and len(contract_attrs['orgs']) > 1:
+                contract_org2_type = contract_attrs["orgs"][1].get('value')
+                contract_org2_name = contract_attrs["orgs"][1].get("value")
+
+            if eligible_protocol is not None:
+                eligible_protocol_attrs = get_attrs(eligible_protocol)
+                protocol_structural_level = None
+                if eligible_protocol_attrs.get("org_structural_level") is not None:
+                    protocol_structural_level = eligible_protocol_attrs["org_structural_level"]["value"]
+
+                if eligible_protocol_attrs["date"]["value"] > contract_date:
+                    violations.append(create_violation(
+                        {"id": contract["_id"], "number": contract_number,
+                         "type": contract["documentType"]},
+                        {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
+                        {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
+                        "contract_date_less_than_protocol_date",
+                        {"contract": {"number": contract_number,
+                                      "date": contract_date,
+                                      "org_type": contract_org2_type,
+                                      "org_name": contract_org2_name},
+                         "protocol": {"org_structural_level": protocol_structural_level,
+                                      "date": eligible_protocol_attrs["date"]["value"]}}))
+                else:
+                    if protocol_value is not None:
+                        if sign < 0 and min_constraint <= protocol_value["value"] < contract_value["value"]:
+                            violations.append(create_violation(
+                                {"id": contract["_id"], "number": contract_number,
+                                 "type": contract["documentType"]},
+                                {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
+                                {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
+                                "contract_value_great_than_protocol_value",
+                                {"contract": {"number": contract_number,
+                                              "date": contract_date,
+                                              "org_type": contract_org2_type,
+                                              "org_name": contract_org2_name,
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
+                                 "protocol": {
+                                     "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
+                                     "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
+
+                        if sign == 0 and min_constraint <= protocol_value["value"] != contract_value["value"]:
+                            violations.append(create_violation(
+                                {"id": contract["_id"], "number": contract_number,
+                                 "type": contract["documentType"]},
+                                {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
+                                {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
+                                "contract_value_not_equal_protocol_value",
+                                {"contract": {"number": contract_number,
+                                              "date": contract_date,
+                                              "org_type": contract_org2_type,
+                                              "org_name": contract_org2_name,
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
+                                 "protocol": {
+                                     "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
+                                     "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
+
+                        if sign > 0 and min_constraint <= protocol_value["value"] > contract_value["value"]:
+                            violations.append(create_violation(
+                                {"id": contract["_id"], "number": contract_number,
+                                 "type": contract["documentType"]},
+                                {"id": eligible_charter["_id"],
+                                 "date": eligible_charter_attrs.get("date", {}).get("value")},
+                                {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
+                                "contract_value_less_than_protocol_value",
+                                {"contract": {"number": contract_number,
+                                              "date": contract_date,
+                                              "org_type": contract_org2_type,
+                                              "org_name": contract_org2_name,
+                                              "value": contract_value["original_value"],
+                                              "currency": contract_value["original_currency"]},
+                                 "protocol": {
+                                     "org_structural_level": protocol_structural_level,
+                                     "date": eligible_protocol_attrs["date"]["value"],
+                                     "value": protocol_value["original_value"],
+                                     "currency": protocol_value["original_currency"]}}))
+
+            else:
+                if need_protocol_check:
+                    violations.append(create_violation(
+                        {"id": contract["_id"], "number": contract_number,
+                         "type": contract["documentType"]},
+                        {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
+                        {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
+                        {"type": "protocol_not_found", "subject": contract_attrs.get("subject", {}).get("value"),
+                         "org_structural_level": org_level,
+                         "min": min_value,
+                         "max": max_value
+                         },
+                        {"contract": {"number": contract_number,
+                                      "date": contract_date,
+                                      "org_type": contract_org2_type,
+                                      "org_name": contract_org2_name,
+                                      "value": contract_value["original_value"],
+                                      "currency": contract_value["original_currency"]
+                                      }}))
+        if contract_value is None and contract_attrs.get("subject", {}).get("value", '') in ['Renting', 'Charity']:
+            competence, competence_constraint = next(iter(competences.items()))
             competence_span = competence_constraint.get("competence_attr_name")
+            text = None
+            min_value = None
+            max_value = None
             if competence_span is not None:
                 text = extract_text(competence_span,
                                     eligible_charter["analysis"]["tokenization_maps"]["words"],
-                                    eligible_charter["analysis"]["normal_text"]) + "(" + get_nearest_header(eligible_charter["analysis"]["headers"], competence_span[0])["value"] + ")"
+                                    eligible_charter["analysis"]["normal_text"])
+                if len(eligible_charter.get("analysis", {}).get("headers", [])) > 0:
+                    text = text + "(" + get_nearest_header(eligible_charter["analysis"]["headers"], competence_span[0])["value"] + ")"
             if competence_constraint["min"] != 0:
                 min_value = {"value": competence_constraint["min"], "currency": competence_constraint["currency_min"]}
             if competence_constraint["max"] != np.inf:
                 max_value = {"value": competence_constraint["max"], "currency": competence_constraint["currency_max"]}
-
-        contract_org2_type = None
-        contract_org2_name = None
-        if contract_attrs.get("orgs") is not None and len(contract_attrs['orgs']) > 1:
-            contract_org2_type = contract_attrs["orgs"][1].get('value')
-            contract_org2_name = contract_attrs["orgs"][1].get("value")
-
-        if eligible_protocol is not None:
-            eligible_protocol_attrs = get_attrs(eligible_protocol)
-            protocol_structural_level = None
-            if eligible_protocol_attrs.get("org_structural_level") is not None:
-                protocol_structural_level = eligible_protocol_attrs["org_structural_level"]["value"]
-
-            if eligible_protocol_attrs["date"]["value"] > contract_attrs["date"]["value"]:
-                violations.append(create_violation(
-                    {"id": contract["_id"], "number": contract_number,
-                     "type": contract["documentType"]},
-                    {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
-                    {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
-                    "contract_date_less_than_protocol_date",
-                    {"contract": {"number": contract_number,
-                                  "date": contract_attrs["date"]["value"],
-                                  "org_type": contract_org2_type,
-                                  "org_name": contract_org2_name},
-                     "protocol": {"org_structural_level": protocol_structural_level,
-                                  "date": eligible_protocol_attrs["date"]["value"]}}))
-            else:
-                if protocol_value is not None:
-                    if sign < 0 and min_constraint <= protocol_value["value"] < contract_value["value"]:
-                        violations.append(create_violation(
-                            {"id": contract["_id"], "number": contract_number,
-                             "type": contract["documentType"]},
-                            {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
-                            {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
-                            "contract_value_great_than_protocol_value",
-                            {"contract": {"number": contract_number,
-                                          "date": contract_attrs["date"]["value"],
-                                          "org_type": contract_org2_type,
-                                          "org_name": contract_org2_name,
-                                          "value": contract_value["original_value"],
-                                          "currency": contract_value["original_currency"]},
-                             "protocol": {
-                                 "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
-                                 "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
-
-                    if sign == 0 and min_constraint <= protocol_value["value"] != contract_value["value"]:
-                        violations.append(create_violation(
-                            {"id": contract["_id"], "number": contract_number,
-                             "type": contract["documentType"]},
-                            {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
-                            {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
-                            "contract_value_not_equal_protocol_value",
-                            {"contract": {"number": contract_number,
-                                          "date": contract_attrs["date"]["value"],
-                                          "org_type": contract_org2_type,
-                                          "org_name": contract_org2_name,
-                                          "value": contract_value["original_value"],
-                                          "currency": contract_value["original_currency"]},
-                             "protocol": {
-                                 "org_structural_level": protocol_structural_level, "date": eligible_protocol_attrs["date"]["value"],
-                                 "value": protocol_value["original_value"], "currency": protocol_value["original_currency"]}}))
-
-                    if sign > 0 and min_constraint <= protocol_value["value"] > contract_value["value"]:
-                        violations.append(create_violation(
-                            {"id": contract["_id"], "number": contract_number,
-                             "type": contract["documentType"]},
-                            {"id": eligible_charter["_id"],
-                             "date": eligible_charter_attrs["date"]["value"]},
-                            {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
-                            "contract_value_less_than_protocol_value",
-                            {"contract": {"number": contract_number,
-                                          "date": contract_attrs["date"]["value"],
-                                          "org_type": contract_org2_type,
-                                          "org_name": contract_org2_name,
-                                          "value": contract_value["original_value"],
-                                          "currency": contract_value["original_currency"]},
-                             "protocol": {
-                                 "org_structural_level": protocol_structural_level,
-                                 "date": eligible_protocol_attrs["date"]["value"],
-                                 "value": protocol_value["original_value"],
-                                 "currency": protocol_value["original_currency"]}}))
-
-        else:
-            if need_protocol_check:
-                violations.append(create_violation(
-                    {"id": contract["_id"], "number": contract_number,
-                     "type": contract["documentType"]},
-                    {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
-                    {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
-                    {"type": "protocol_not_found", "subject": contract_attrs["subject"]["value"],
-                     "org_structural_level": org_level,
-                     "min": min_value,
-                     "max": max_value
-                     },
-                    {"contract": {"number": contract_number,
-                                  "date": contract_attrs["date"]["value"],
-                                  "org_type": contract_org2_type,
-                                  "org_name": contract_org2_name,
-                                  "value": contract_value["original_value"],
-                                  "currency": contract_value["original_currency"]
-                                  }}))
+            contract_org2_type = None
+            contract_org2_name = None
+            if contract_attrs.get("orgs") is not None and len(contract_attrs['orgs']) > 1:
+                contract_org2_type = contract_attrs["orgs"][1].get('value')
+                contract_org2_name = contract_attrs["orgs"][1].get("value")
+            violations.append(create_violation(
+                {"id": contract["_id"], "number": contract_number,
+                 "type": contract["documentType"]},
+                {"id": eligible_charter["_id"], "date": eligible_charter_attrs["date"]["value"]},
+                {"id": eligible_charter["_id"], "attribute": competence_span, "text": text},
+                {"type": "protocol_not_found", "subject": contract_attrs.get("subject", {}).get("value"),
+                 "org_structural_level": competence,
+                 "min": min_value,
+                 "max": max_value
+                 },
+                {"contract": {"number": contract_number,
+                              "date": contract_date,
+                              "org_type": contract_org2_type,
+                              "org_name": contract_org2_name,
+                              "value": None,
+                              "currency": None
+                              }}))
 
 
 def check_contract(contract, charters, protocols, audit, supplementary_agreements):
@@ -721,29 +777,29 @@ def need_deal_procedure_check(doc_attrs) -> bool:
 def check_deal_procedure(document, deal_procedure_restrictions):
     result = []
     doc_attrs = get_attrs(document)
-    if need_deal_procedure_check(doc_attrs):
-        if doc_attrs.get('subject', {}).get('value') is not None:
-            subject_value = doc_attrs['subject']['value']
-            for restriction in deal_procedure_restrictions:
-                orgs = doc_attrs.get('orgs')
-                for org in orgs:
-                    if (restriction.get('relatedTo') in ['gpn', 'gpn_subsidiary'] and is_gpn(org)) or (restriction.get('relatedTo') in ['subsidiary', 'gpn_subsidiary'] and is_subsidiary(org)):
-                        if subject_value in restriction['subject']:
-                            if restriction.get('value') is not None and restriction.get('currency') is not None:
-                                amount_netto = get_amount_netto(doc_attrs.get('price'))
-                                if amount_netto is not None:
-                                    if amount_netto['currency'] != 'RUB':
-                                        amount_netto = convert_to_currency(amount_netto, 'RUB')
-                                    if restriction['currency'] == '%':
-                                        gpn_book_value = get_latest_gpn_book_value()
-                                        if gpn_book_value is not None:
-                                            if amount_netto['value'] > gpn_book_value['value'] * 0.01 * restriction['value']:
-                                                result.append(create_check_deal_procedure_violation(restriction))
-                                    else:
-                                        if amount_netto['value'] > restriction['value']:
+    # if need_deal_procedure_check(doc_attrs):
+    if doc_attrs.get('subject', {}).get('value') is not None:
+        subject_value = doc_attrs['subject']['value']
+        for restriction in deal_procedure_restrictions:
+            orgs = doc_attrs.get('orgs')
+            for org in orgs:
+                if (restriction.get('relatedTo') in ['gpn', 'gpn_subsidiary'] and is_gpn(org)) or (restriction.get('relatedTo') in ['subsidiary', 'gpn_subsidiary'] and is_subsidiary(org)):
+                    if subject_value in restriction['subject']:
+                        if restriction.get('value') is not None and restriction.get('currency') is not None:
+                            amount_netto = get_amount_netto(doc_attrs.get('price'))
+                            if amount_netto is not None:
+                                if amount_netto['currency'] != 'RUB':
+                                    amount_netto = convert_to_currency(amount_netto, 'RUB')
+                                if restriction['currency'] == '%':
+                                    gpn_book_value = get_latest_gpn_book_value()
+                                    if gpn_book_value is not None:
+                                        if amount_netto['value'] > gpn_book_value['value'] * 0.01 * restriction['value']:
                                             result.append(create_check_deal_procedure_violation(restriction))
-                            else:
-                                result.append(create_check_deal_procedure_violation(restriction))
+                                else:
+                                    if amount_netto['value'] > restriction['value']:
+                                        result.append(create_check_deal_procedure_violation(restriction))
+                        else:
+                            result.append(create_check_deal_procedure_violation(restriction))
     return result
 
 
@@ -1062,29 +1118,60 @@ def check_contract_project(document, audit, interests, beneficiaries, docs, insi
     return {'document_id': document['_id'], 'document_filename': document['filename'], 'orgs': document_attrs.get('orgs', []), 'violations': violations, 'userViolation': False, 'id': ObjectId()}
 
 
+def get_latest_subsidiary_book_value(org) -> dict or None:
+    db = get_mongodb_connection()
+    coll = db['subsidiarybookvalues']
+    result = coll.find_one({}, sort=[('uploadDate', pymongo.DESCENDING)])
+    if result is not None:
+        book_values = result.get('bookValues', [])
+        for known_subsidiary in gpn.gpn.subsidiaries:
+            if known_subsidiary['_id'] == org.get('name', {}).get('value'):
+                known_subsidiary_names = known_subsidiary['aliases'] + [known_subsidiary['_id']]
+                for book_value in book_values:
+                    if normalize_only_company_name(book_value['subsidiary']) in known_subsidiary_names:
+                        return book_value
+    return None
+
+
 def check_compliance(audit, document):
     errors = []
-    if document['documentType'] in ['CONTRACT', 'AGREEMENT', 'SUPPLEMENTARY_AGREEMENT']:
-        doc_attrs = get_attrs(document)
-        charter = None
-        if len(doc_attrs.get('orgs', [])) > 0:
-            for doc_org in doc_attrs.get('orgs', []):
-                if doc_org.get('name', {}).get('value') is not None:
-                    charter = get_latest_charter_by_org(doc_org.get('name', {}).get('value'))
-                    if charter is not None:
-                        break
-                else:
-                    errors.append({'type': 'analysis', 'text': 'Имя стороны не определено'})
-        else:
-            errors.append({'type': 'analysis', 'text': 'Не были найдены стороны'})
-        if charter is not None:
-            violations = []
-            links = []
-            user_linked_docs = get_linked_docs(audit, document["_id"])
-            check_contract_by_charter(audit, document, charter, [], user_linked_docs, violations, links)
-        else:
-            errors.append({'type': 'analysis', 'text': 'Не найден подходящий устав'})
-    return False, errors
+    doc_attrs = get_attrs(document)
+    charter = None
+    charter_org = None
+    user_linked_docs = get_linked_docs(audit, document["_id"])
+    linked_charters = list(filter(lambda doc: doc['documentType'] == 'CHARTER', user_linked_docs))
+    if linked_charters:
+        charter = linked_charters[0]
+        charter_org = get_attrs(charter).get('org', {}).get('name', {}).get('value', '')
+    elif len(doc_attrs.get('orgs', [])) > 0:
+        for doc_org in doc_attrs.get('orgs', []):
+            if doc_org.get('name', {}).get('value') is not None:
+                charter = get_latest_charter_by_org(doc_org.get('name', {}).get('value'))
+                if charter is not None:
+                    charter_org = doc_org
+                    break
+            else:
+                errors.append({'type': 'analysis', 'text': 'В договорном документе имя стороны не найдено'})
+    else:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не были найдены стороны'})
+    if doc_attrs.get('subject', {}).get('value') is None:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не найден предмет договора'})
+    if get_amount_netto(doc_attrs.get('price')) is None and doc_attrs.get('subject', {}).get('value', '') not in ['Renting', 'Charity']:
+        errors.append({'type': 'analysis', 'text': 'В договорном документе не найдена сумма'})
+    if charter is not None:
+        violations = []
+        links = [create_link(document['_id'], charter['_id'])]
+        update_links(audit, links)
+        latest_subsidiary_book_value = get_latest_subsidiary_book_value(charter_org)
+        if latest_subsidiary_book_value is None:
+            msg = f'Не найдена балансовая стоимость активов для {charter_org.get("name", {}).get("value")}'
+            errors.append({'type': 'analysis', 'text': msg})
+        elif len(errors) == 0:
+            check_contract_by_charter(audit, document, charter, [], [], violations, links, latest_subsidiary_book_value)
+        return violations, errors
+    else:
+        errors.append({'type': 'analysis', 'text': 'Не найден подходящий устав'})
+    return [], errors
 
 
 def exclude_same_charters(charters):
@@ -1198,6 +1285,16 @@ def save_check_types(audit):
     db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"checkTypes": audit['checkTypes']}})
 
 
+def convert_to_mapping(classification_results: [dict]) -> [dict]:
+    result = []
+    for classification_result in classification_results:
+        for config_value in all_labels:
+            if config_value['_id'] == classification_result['id']:
+                result.append(config_value)
+                break
+    return result
+
+
 def send_notifications():
     db = get_mongodb_connection()
     audit_collection = db['audits']
@@ -1215,8 +1312,8 @@ def send_notifications():
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
-                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
-            elif audit['additionalFields'].get('email_sent') is False and audit.get('classification_result') is not None:
+                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels, convert_to_mapping(audit.get('additional_classification_results', []))), audit)
+            elif audit.get('classification_result') is not None:
                 logging.info('Retry send email message')
                 top_classification_result = audit['classification_result'][0]
                 attachments = []
@@ -1224,7 +1321,7 @@ def send_notifications():
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
-                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels), audit)
+                save_email_classification(send_classifier_email(audit, top_result, attachments, all_labels, convert_to_mapping(audit.get('additional_classification_results', []))), audit)
             elif audit.get('errors') and len(audit['errors']):
                 attachments = []
                 fs = gridfs.GridFS(db)

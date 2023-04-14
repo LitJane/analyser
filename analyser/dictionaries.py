@@ -92,14 +92,14 @@ def update_db_dictionaries():
   resp = coll.create_index([("analysis.attributes.date.value", DESCENDING)])
   print("index response:", resp)
 
-  coll = db["documents"]
-  sorting = [('analysis.analyze_timestamp', ASCENDING), ('user.updateDate', ASCENDING)]
-  resp = coll.create_index(sorting)
-  print("index response:", resp)
-
   coll = db['audits']
+  coll.create_index('status')
   coll.create_index('email_sent')
   coll.create_index('additionalFields.external_source')
+  coll.create_index('toBeApproved')
+
+  coll = db['subsidiarybookvalues']
+  coll.create_index('uploadDate')
 
 
 if __name__ == '__main__':

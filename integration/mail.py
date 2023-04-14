@@ -97,11 +97,12 @@ def generate_links(audit, practices: [], web_url) -> str:
     url = urljoin(web_url, 'user-practice')
     result = ""
     for practice in practices:
-        result += f"""<p><a href="{url + '?audit_id=' + str(audit['_id']) + '&practice_id=' + str(practice['_id'])}">{practice['label']}</a></p>"""
+        if practice['_id'] != 1015:
+            result += f"""<p><a href="{url + '?audit_id=' + str(audit['_id']) + '&practice_id=' + str(practice['_id'])}">{practice['label']}</a></p>"""
     return result
 
 
-def send_classifier_email(audit, top_classification_result, attachments: [], practices) -> bool:
+def send_classifier_email(audit, top_classification_result, attachments: [], practices, additional_classification_result) -> bool:
     try:
         smtp_server = _env_var('GPN_SMTP_SERVER')
         port = _env_var('GPN_SMTP_PORT')
@@ -114,15 +115,22 @@ def send_classifier_email(audit, top_classification_result, attachments: [], pra
             message = EmailMessage()
             message["Subject"] = escape_email_headers(f"{audit['additionalFields']['email_subject']}")
             message["From"] = escape_email_headers(sender_email)
-            message["To"] = escape_email_headers(top_classification_result['email'])
+            recipients = [top_classification_result['email']]
+            if additional_classification_result:
+                recipients.extend(x['email'] for x in additional_classification_result)
+            message["To"] = escape_email_headers(', '.join(recipients))
             message['Cc'] = escape_email_headers(audit['additionalFields']['email_from'])
-
+            additional_practice_text = ""
+            if additional_classification_result and len(additional_classification_result) > 0:
+                additional_practice_text = f"Дополнительно согласующая практика: {','.join(x['label'] for x in additional_classification_result)}"
             plain_text = f"""
                 Здравствуйте!
                 
                 Направляем вам результат определения юридической практики для высланного ранее документа.
                 
                 Результат: {top_classification_result['label']}
+                
+                {additional_practice_text}
                 """
 
             html = f"""\
@@ -136,6 +144,9 @@ def send_classifier_email(audit, top_classification_result, attachments: [], pra
                     </p>
                     <p style="font-size: 200%">
                         Результат: {top_classification_result['label']}
+                    </p>
+                    <p style="font-size: 150%">
+                        {additional_practice_text}
                     </p>
                     <p>
                         <b>Если юридическая практика для документа определена неверно, то кликните на верную юридическую практику:</b>
@@ -158,13 +169,13 @@ def send_classifier_email(audit, top_classification_result, attachments: [], pra
     return False
 
 
-def generate_errors(audit, html) -> str:
+def generate_errors(errors, html) -> str:
     result = ""
     if html:
-        for error in audit['errors']:
+        for error in errors:
             result += f"""<p>Ошибка: {error['text']}</p>"""
     else:
-        for error in audit['errors']:
+        for error in errors:
             result += f"""Ошибка: {error['text']}"""
     return result
 
@@ -189,7 +200,7 @@ def send_classifier_error_email(audit, attachments: []) -> bool:
                 
                 К сожалению, определить юридическую практику для высланного ранее документа не удалось.
                 
-                {generate_errors(audit, False)}
+                {generate_errors(audit['errors'], False)}
                 """
 
             html = f"""\
@@ -201,7 +212,7 @@ def send_classifier_error_email(audit, attachments: []) -> bool:
                     <p>
                         К сожалению, определить юридическую практику для высланного ранее документа не удалось.
                     </p>
-                    {generate_errors(audit, True)}
+                    {generate_errors(audit['errors'], True)}
                   </body>
                 </html>
                 """
@@ -212,6 +223,144 @@ def send_classifier_error_email(audit, attachments: []) -> bool:
                 maintype, subtype = attachment.ctype.split('/', 1)
                 message.add_attachment(attachment.read(), filename=attachment.filename, maintype=maintype, subtype=subtype)
 
+            send_email(smtp_server, port, login, password, message)
+            return True
+    except Exception as e:
+        logger.exception(e)
+    return False
+
+
+def send_compliance_info_email(audit) -> bool:
+    try:
+        smtp_server = _env_var('GPN_SMTP_SERVER')
+        port = _env_var('GPN_SMTP_PORT')
+        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
+        login = _env_var('GPN_CLASSIFIER_LOGIN')
+        password = _env_var('GPN_CLASSIFIER_PASSWORD')
+        web_url = _env_var('GPN_WEB_URL')
+
+        if smtp_server and port and sender_email and password and login and web_url:
+            message = EmailMessage()
+            message["Subject"] = f"{audit['additionalFields']['email_subject']}"
+            message["From"] = sender_email
+            message['To'] = audit['additionalFields']['email_from']
+
+            plain_text = f"""
+                Здравствуйте!
+                
+                Документ {audit['additionalFields']['main_filename']} находится на рассмотрении экспертов Практики корпоративного мониторинга и комплаенса на предмет необходимости одобрения сделки.
+                """
+
+            html = f"""\
+                <html>
+                  <body>
+                    <p>
+                        Здравствуйте!
+                    </p>
+                    <p>
+                        Документ {audit['additionalFields']['main_filename']} находится на рассмотрении экспертов Практики корпоративного мониторинга и комплаенса на предмет необходимости одобрения сделки.
+                    </p>
+                  </body>
+                </html>
+                """
+
+            message.set_content(plain_text)
+            message.add_alternative(html, subtype='html')
+            send_email(smtp_server, port, login, password, message)
+            return True
+    except Exception as e:
+        logger.exception(e)
+    return False
+
+
+def send_compliance_error_email(audit, errors, to) -> bool:
+    try:
+        smtp_server = _env_var('GPN_SMTP_SERVER')
+        port = _env_var('GPN_SMTP_PORT')
+        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
+        login = _env_var('GPN_CLASSIFIER_LOGIN')
+        password = _env_var('GPN_CLASSIFIER_PASSWORD')
+        web_url = _env_var('GPN_WEB_URL')
+
+        if smtp_server and port and sender_email and password and login and web_url:
+            message = EmailMessage()
+            message["Subject"] = f"{audit['additionalFields']['email_subject']} [Ошибка анализа договорного документа]"
+            message["From"] = sender_email
+            message['To'] = to
+
+            document_url = f"{web_url}/#/classifier/edit/{str(audit['additionalFields']['main_document_id'])}"
+            plain_text = f"""
+                Здравствуйте!
+                
+                В модуль Классификатор для проверки на необходимость одобрения коллегиаль-ным органом загружен договорной документ, при анализе которого обнаружена(-ы) ошибка(-и).
+                
+                Ссылка на документ: {document_url} 
+                
+                {generate_errors(errors, False)}
+                """
+
+            html = f"""\
+                <html>
+                  <body>
+                    <p>
+                        Здравствуйте!
+                    </p>
+                    <p>
+                        В модуль Классификатор для проверки на необходимость одобрения коллегиаль-ным органом загружен договорной документ, при анализе которого обнаружена(-ы) ошибка(-и).
+                    </p>
+                    <p>
+                        Ссылка на документ: {document_url} 
+                    </p>
+                    {generate_errors(errors, True)}
+                  </body>
+                </html>
+                """
+
+            message.set_content(plain_text)
+            message.add_alternative(html, subtype='html')
+            send_email(smtp_server, port, login, password, message)
+            return True
+    except Exception as e:
+        logger.exception(e)
+    return False
+
+
+def send_compliance_protocol_preparation_email(audit) -> bool:
+    try:
+        smtp_server = _env_var('GPN_SMTP_SERVER')
+        port = _env_var('GPN_SMTP_PORT')
+        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
+        login = _env_var('GPN_CLASSIFIER_LOGIN')
+        password = _env_var('GPN_CLASSIFIER_PASSWORD')
+        web_url = _env_var('GPN_WEB_URL')
+
+        if smtp_server and port and sender_email and password and login and web_url:
+            message = EmailMessage()
+            message["Subject"] = f"{audit['additionalFields']['email_subject']}"
+            message["From"] = sender_email
+            message['To'] = audit['additionalFields']['email_from']
+
+            plain_text = f"""
+                Здравствуйте!
+                
+                Сделка согласно договорному документу {audit['additionalFields']['main_filename']} требует одобрения коллегиальным органом. Экспертами Практики корпоративного мониторинга и комплаенса готовится протокол одобрения.
+                """
+
+            html = f"""\
+                <html>
+                  <body>
+                    <p>
+                        Здравствуйте!
+                    </p>
+                    <p>
+                        Сделка согласно договорному документу {audit['additionalFields']['main_filename']} требует одобрения коллегиальным органом. Экспертами Практики корпоративного мониторинга и комплаенса готовится протокол одобрения.
+                    </p>
+                  </body>
+                </html>
+                """
+
+            message.set_content(plain_text)
+            message.add_alternative(html, subtype='html')
             send_email(smtp_server, port, login, password, message)
             return True
     except Exception as e:
