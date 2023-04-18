@@ -355,7 +355,7 @@ class UberModelTrainsetManager:
     return self.trim_maxlen(dp, cutoff, maxlen)
 
   @staticmethod
-  def trim_maxlen(self, dp, start_from, maxlen):
+  def trim_maxlen(dp, start_from, maxlen):
     (emb, tok_f), (sm, subj), (sample_weight, subject_weight) = dp
 
     # if emb is not None:  # paranoia, TODO: fail execution, because trainset mut be verifyed in advance
