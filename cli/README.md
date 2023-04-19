@@ -6,7 +6,7 @@
     
 - использование:
 ```
-  sh export_ts.sh <limit>
+  sh cli/export_ts.sh <limit>
 ```
   где `<limit>` -- максимально количество документов, 
   которое будет взято из базы; по-умолчанию limit=5000 
@@ -23,7 +23,7 @@ MLFLOW_URL
 
 - пример:
 ```
-  sh export_ts.sh 100
+  sh cli/export_ts.sh 100
 ```
 
 
@@ -43,28 +43,28 @@ MLFLOW_URL
   
 - пример:
 ```
-  sh train.sh 150 runs:/89d43de209874227af95fcbeaf048340/model
+  sh cli/train.sh 150 runs:/89d43de209874227af95fcbeaf048340/model
 ```
 
 - пример:
 ```
-  sh train.sh 
+  sh cli/train.sh 
 ```
 
 - пример:
 ```
-  sh train.sh 150
+  sh cli/train.sh 150
 ```
 
 ### `deploy.sh`
 Команда устанавливает версию обученной модели
  - использование:
 ```
-  sh deploy.sh RUN_ID
+  sh cli/deploy.sh RUN_ID
 ```
 `RUN_ID` = id записи в mlflow  
 
 - пример:
 ```
-  sh deploy.sh 89d43de209874227af95fcbeaf048340
+  sh cli/deploy.sh 89d43de209874227af95fcbeaf048340
 ```
