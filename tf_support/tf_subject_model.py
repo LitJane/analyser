@@ -16,9 +16,12 @@ EMB = 1024  # embedding dimentionality
 
 def decode_subj_prediction(result: FixedVector) -> (ContractSubject, float, int):
   max_i = result.argmax()
-  predicted_subj_name = ContractSubject(max_i)
-  confidence = float(result[max_i])
-  return predicted_subj_name, confidence, max_i
+  try:
+    predicted_subj_name = ContractSubject(max_i)
+    confidence = float(result[max_i])
+    return predicted_subj_name, confidence, max_i
+  except ValueError as e:
+    return ContractSubject(0), 0.0, 0
 
 
 def nn_predict(umodel, doc):
