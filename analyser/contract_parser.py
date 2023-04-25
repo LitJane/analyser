@@ -333,6 +333,7 @@ def check_org_intersections(contract_agents: [OrgItem]) -> None:
 
 def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPrice]:
   # TODO: FIX SENTENCE!
+  # TODO: estimate NN thresholds on model validation phase!
 
   cp = ContractPrice()
 
@@ -368,6 +369,14 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     if span_len(cp.span) > 200 or span_len(cp.span) < 20:
       sentence_span = textmap.sentence_at_index(sentence_seed_tag.span[0])
       cp.span = sentence_span
+
+    # removing attributes that lay outside the parent block
+    for child_name in cp.list_children_names():
+      child = getattr(cp, child_name)
+      if child is not None:
+        if not cp.contains(child.span):
+          # remove it, then later (fallback) try to find it inside parent span
+          setattr(cp, child_name, None)
 
   #   ///SIGN
 
