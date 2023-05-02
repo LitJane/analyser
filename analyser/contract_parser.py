@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 
 import pandas as pd
@@ -178,7 +179,8 @@ class ContractParser(GenericParser):
 
     # --------------------------------------insider
     self._logstep("finding insider info")
-    #     self.insides_finder.find_insides(contract)
+    if 'GPN_DISABLE_INSIDES' not in os.environ:
+      self.insides_finder.find_insides(contract)
 
     # --------------------------------------
     self.validate(contract, ctx)
