@@ -1,10 +1,10 @@
 import math
 import warnings
-from datetime import datetime
 from enum import Enum
 from typing import List, TypeVar, Iterable, Generic
 
 import numpy as np
+import pandas as pd
 import scipy.spatial.distance as distance
 from pandas import DataFrame
 from scipy import special as scs
@@ -673,7 +673,7 @@ def calc_distances_to_pattern(sentences_embeddings_: FixedVectors, pattern_embed
   return _distances
 
 
-import pandas as pd
+
 
 
 def calc_distances_per_pattern(sentences_embeddings_: [], patterns_named_embeddings: DataFrame) -> DataFrame:

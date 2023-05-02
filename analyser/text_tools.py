@@ -17,7 +17,7 @@ Tokens = List[str] or ndarray
 def to_float(string) -> float:
   try:
     return float(str(string).replace(" ", "").replace(",", ".").replace("=", "."))
-  except:
+  except Exception:
     return np.nan
 
 
@@ -44,7 +44,8 @@ def dist_cosine_to_point(text_emb, pt):
   for i in range(len(text_emb)):
 
     d = distance.cosine(text_emb[i], pt)
-    if d > 1: d = 1
+    if d > 1:
+      d = 1
     t_distances[i] = d
 
   return t_distances
@@ -216,7 +217,7 @@ def check_valid_roman(roman) -> bool:
 def roman_might_be(wrd) -> int or None:
   try:
     return roman_to_arabic(wrd)
-  except:
+  except Exception:
     return None
 
 
@@ -226,7 +227,7 @@ def string_to_ip(txt) -> list or None:
   for c in n:
     try:
       ret.append(int(c))
-    except:
+    except Exception:
       pass
   return ret
 

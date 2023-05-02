@@ -8,8 +8,10 @@ import traceback
 import pymongo
 from pandas import DataFrame
 
+from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import TOKENIZER_DEFAULT
 from analyser.legal_docs import LegalDocument
+from integration.db import get_mongodb_connection
 from integration.word_document_parser import WordDocParser, join_paragraphs
 
 
@@ -100,8 +102,7 @@ def dump_contracts_from_db_to_jsons(output_path):
         print(f'saved file to {json_name}')
 
 
-from integration.db import get_mongodb_connection
-from analyser.doc_structure import get_tokenized_line_number
+
 
 
 def analyse_headers():

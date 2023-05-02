@@ -1,4 +1,4 @@
-import re
+import os
 from enum import Enum
 
 import pandas as pd
@@ -21,8 +21,8 @@ from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import to_float, span_len
 from analyser.transaction_values import ValueSpansFinder
-from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, \
-  nn_predict
+from gpn.gpn import is_gpn_name
+from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, nn_predict
 
 
 class ContractDocument(LegalDocument):
@@ -179,7 +179,8 @@ class ContractParser(GenericParser):
 
     # --------------------------------------insider
     self._logstep("finding insider info")
-    #     self.insides_finder.find_insides(contract)
+    if 'GPN_DISABLE_INSIDES' not in os.environ:
+      self.insides_finder.find_insides(contract)
 
     # --------------------------------------
     self.validate(contract, ctx)
@@ -282,7 +283,7 @@ def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext
       # known subsidiary may not be natural person
       return
 
-    if re.search('Газпром', name, re.IGNORECASE):  # TODO: hack
+    if is_gpn_name(name):  # TODO: hack
       return
 
     if audit_ctx.is_same_org(name):
@@ -334,6 +335,7 @@ def check_org_intersections(contract_agents: [OrgItem]) -> None:
 
 def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPrice]:
   # TODO: FIX SENTENCE!
+  # TODO: estimate NN thresholds on model validation phase!
 
   cp = ContractPrice()
 
@@ -370,6 +372,14 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
       sentence_span = textmap.sentence_at_index(sentence_seed_tag.span[0])
       cp.span = sentence_span
 
+    # removing attributes that lay outside the parent block
+    for child_name in cp.list_children_names():
+      child = getattr(cp, child_name)
+      if child is not None:
+        if not cp.contains(child.span):
+          # remove it, then later (fallback) try to find it inside parent span
+          setattr(cp, child_name, None)
+
   #   ///SIGN
 
   if cp.sign:
@@ -393,7 +403,7 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     cp.amount.span = region_map.token_indices_by_char_range(results.number_span)
     cp.amount.value = results.original_sum
     cp.amount.offset(cp.span[0])
-    if results.including_vat == False:
+    if results.including_vat is False:
       cp.amount.value = results.value
 
     if cp.currency is None:
@@ -404,35 +414,36 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
 
 
   except TypeError as e:
-    logger.exception(f'smthinf wrong {str(cp)=}')
+    msg = f'smthinf wrong cp={str(cp)}'
+    logger.exception(msg)
     logger.error(e)
     results = None
 
   if cp.amount:
     try:
       cp.amount.value = to_float(cp.amount.value)
-    except Exception as e:
+    except Exception:
       logger.error(f'amount is {cp.amount}')
     # logger.error(e)
 
   if cp.vat:
     try:
       cp.vat.value = to_float(cp.vat.value)
-    except Exception as e:
+    except Exception:
       # logger.error(e)
       logger.error(f'vat is {cp.vat.value}, cannot cast to float')
 
   if cp.amount_netto:
     try:
       cp.amount_netto.value = to_float(cp.amount_netto.value)
-    except Exception as e:
+    except Exception:
       # logger.error(e)
       logger.error(f'amount_netto is {cp.amount_netto}')
 
   if cp.amount_brutto:
     try:
       cp.amount_brutto.value = to_float(cp.amount_brutto.value)
-    except Exception as e:
+    except Exception:
       logger.error(f'amount_brutto is {cp.amount_brutto}')
 
   if (results is not None):

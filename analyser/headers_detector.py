@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import TextMap
+from analyser.hyperparams import HyperParameters
 from analyser.hyperparams import models_path
 from analyser.legal_docs import PARAGRAPH_DELIMITER, make_headline_attention_vector
 from analyser.ml_tools import sum_probabilities, FixedVector
@@ -15,7 +16,7 @@ from analyser.text_tools import Tokens, _count_capitals, _count_digits
 popular_headers = pd.read_csv(os.path.join(models_path, 'headers_by_popularity.csv'))[2:50]
 popular_headers = list(popular_headers['text'])
 
-from analyser.hyperparams import HyperParameters
+
 
 if HyperParameters.headers_detector_use_regressor:
   model_path = os.path.join(models_path, 'rf_headers_detector_model.joblib')

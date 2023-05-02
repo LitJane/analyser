@@ -1,3 +1,4 @@
+import logging
 import time
 from functools import wraps
 from typing import List
@@ -16,8 +17,6 @@ from gpn.gpn import subsidiaries
 from tf_support.embedder_elmo import ElmoEmbedder
 
 PROF_DATA = {}
-
-import logging
 
 logger = logging.getLogger('analyser')
 
@@ -234,7 +233,7 @@ def find_most_relevant_paragraphs(section: TextMap,
   for i in top_indices:
     span = section.sentence_at_index(i, return_delimiters)
     if min_len is not None and span[1] - span[0] < min_len:
-      if not span in spans:
+      if span not in spans:
         spans.append(span)
 
   return spans, paragraph_attention_vector

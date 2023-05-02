@@ -204,7 +204,7 @@ class PriceExtractTestCase(unittest.TestCase):
         # TODO: test value
         # print(f"\033[1;32m{f}\u2713")
 
-      except:
+      except Exception:
         print("\033[1;35;40m FAILED: Expected:", value, currency, normal_text, '\n actual=', val)
         print(sys.exc_info())
         errorsc += 1
@@ -256,7 +256,7 @@ class PriceExtractTestCase(unittest.TestCase):
     print(doc.tokens_map_norm.text_range(r[0].amount.span))
     self.assertEqual(price, r[0].amount.value, text)
     self.assertEqual(currency_exp, r[0].currency.value)
-    print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
+    print(f'{r[0].value}, {r[0].sign}, {r[0].currency} {sign_exp}')
 
   def test_find_all_value_sign_currency_a(self):
     for (sign_exp, price, currency_exp, vat, text) in data:

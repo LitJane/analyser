@@ -75,7 +75,8 @@ if __name__ == '__main__':
 
         count += 1
 
-    if count > MAX_DOCS: break
+    if count > MAX_DOCS:
+      break
 
   featuresX_data = pd.DataFrame.from_records(features_dicts)
   print(featuresX_data.head())

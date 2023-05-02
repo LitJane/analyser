@@ -1,4 +1,5 @@
 import os
+import re
 
 from analyser.hyperparams import HyperParameters
 from analyser.text_tools import compare_masked_strings
@@ -714,6 +715,10 @@ def estimate_subsidiary_name_match_min_jaro_similarity():
           top_similarity = similarity
 
   return top_similarity
+
+
+def is_gpn_name(name):
+  return re.search('Газпром', name, re.IGNORECASE)
 
 
 def update_subsidiaries_cache(new_subsidiaries):

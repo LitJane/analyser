@@ -23,13 +23,19 @@ from sklearn.metrics import classification_report
 from tensorflow.keras import Model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
+from analyser.documents import TextMap
 from analyser.finalizer import get_doc_by_id
+from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
 from analyser.hyperparams import work_dir as default_work_dir
+from analyser.legal_docs import embedd_tokens
+from analyser.persistence import DbJsonDoc
 from analyser.structures import ContractSubject
 from colab_support.renderer import plot_cm
 from integration.db import get_mongodb_connection
 from tf_support import super_contract_model
+from tf_support.embedder_elmo import ElmoEmbedder
+from tf_support.super_contract_model import get_semantic_map_new
 from tf_support.super_contract_model import make_att_model
 from tf_support.tools import KerasTrainingContext
 from trainsets.trainset_tools import split_trainset_evenly
@@ -45,6 +51,38 @@ _EMBEDD = True
 
 # TODO: 2. use averaged tags confidence for sample weighting
 # TODO: 3. evaluate on user-marked documents only
+
+
+def _dp_fn(doc_id, suffix):
+  return os.path.join(default_work_dir, 'datasets', f'{doc_id}-datapoint-{suffix}.npy')
+
+
+def save_contract_data_arrays(db_json_doc: DbJsonDoc):
+  embedder = ElmoEmbedder.get_instance('elmo')
+  # TODO: trim long documens according to contract parser
+
+  id_ = db_json_doc.get_id()
+
+  tokens_map: TextMap = db_json_doc.get_tokens_for_embedding()
+
+  # 1) EMBEDDINGS
+  print(len(tokens_map))
+  embeddings = embedd_tokens(tokens_map,
+                             embedder,
+                             log_key=f'id={id_} chs={tokens_map.get_checksum()}')
+
+  # 2) TOKEN FEATURES
+  token_features: DataFrame = get_tokens_features(db_json_doc.get_tokens_map_unchaged().tokens)
+
+  # 3) SEMANTIC MAP
+  semantic_map: DataFrame = get_semantic_map_new(db_json_doc)
+  #####
+
+  np.save(_dp_fn(id_, 'token_features'), token_features)
+  np.save(_dp_fn(id_, 'semantic_map'), semantic_map)
+  _embeddings_file = _dp_fn(id_, 'embeddings')
+  np.save(_embeddings_file, embeddings)
+  print(f'embeddings saved to {_embeddings_file} {embeddings.shape}')
 
 
 def pad_things(xx, maxlen, padding='post'):
@@ -205,15 +243,15 @@ class UberModelTrainsetManager:
       model.load_weights(weights_file_new, by_name=True, skip_mismatch=True)
       logger.info(f'weights loaded: {weights_file_new}')
 
-    except:
-      msg = f'cannot load  {model_name} from  {weights_file_new}'
+    except Exception as e:
+      msg = f'cannot load  {model_name} from  {weights_file_new}: {e}'
       warnings.warn(msg)
       model.load_weights(weights_file_old, by_name=True, skip_mismatch=True)
       logger.info(f'weights loaded: {weights_file_old}')
 
     # freeze bottom 6 layers, including 'embedding_reduced' #TODO: this must be model-specific parameter
-    for l in model.layers[0:6]:
-      l.trainable = False
+    for layer in model.layers[0:6]:
+      layer.trainable = False
 
     model.compile(loss=super_contract_model.losses, optimizer='Nadam', metrics=super_contract_model.metrics)
     # model.summary()
@@ -316,7 +354,8 @@ class UberModelTrainsetManager:
 
     return self.trim_maxlen(dp, cutoff, maxlen)
 
-  def trim_maxlen(self, dp, start_from, maxlen):
+  @staticmethod
+  def trim_maxlen(dp, start_from, maxlen):
     (emb, tok_f), (sm, subj), (sample_weight, subject_weight) = dp
 
     # if emb is not None:  # paranoia, TODO: fail execution, because trainset mut be verifyed in advance

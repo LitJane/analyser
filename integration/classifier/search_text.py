@@ -3,6 +3,7 @@ import json
 import logging
 import os.path
 import re
+from pathlib import Path
 
 import tensorflow as tf
 from nltk.tokenize import WhitespaceTokenizer
@@ -159,7 +160,7 @@ def remove_header(text: str) -> (str, bool):
     if phrase:
         try:
             return ' '.join(text.split(phrase[0][0])[1:]), True
-        except Exception as e:
+        except Exception:
             print(phrase)
     else:
         number = re.findall(r'(\d\.\d\.)', text)

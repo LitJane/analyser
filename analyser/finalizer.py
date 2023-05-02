@@ -1,5 +1,4 @@
 import datetime
-import json
 import logging
 import re
 from collections import deque
@@ -1394,7 +1393,7 @@ def finalize():
                     if violation is not None:
                         violations.append(violation)
                 except Exception as err:
-                    logger.exception(f'cant finalize document {document_id["_id"]}')
+                    logger.exception(f'cant finalize document {document_id["_id"]} {err}')
 
             save_violations(audit, violations)
             logger.info(f'.....pre-audit {audit["_id"]} is waiting for approval')
@@ -1426,7 +1425,7 @@ def finalize():
                 violations.extend(new_violations)
                 links.extend(new_links)
             except Exception as err:
-                logger.exception(f'cant finalize contract {document_id["_id"]}')
+                logger.exception(f'cant finalize contract {document_id["_id"]} {err}')
         update_links(audit, links)
         save_violations(audit, violations)
         logger.info(f'.....audit {audit["_id"]} is waiting for approval')

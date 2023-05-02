@@ -458,36 +458,36 @@ class SinePositionEncoding(layers.Layer):
     return config
 
 
-def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
-  input_text_emb = layers.Input(shape=[None, config.EMBED_DIM], dtype='float32', name="input_text_emb")
-  _out = layers.BatchNormalization(name="bn1")(input_text_emb)
-  _out = layers.Dropout(0.2, name="drops")(_out)  # small_drops_of_poison
-
-  token_features = layers.Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="token_features")
-  token_features_n = layers.BatchNormalization(name="bn2")(token_features)
-
-  _out = layers.concatenate([input_text_emb, token_features_n], axis=-1, name='rmb_plus_tokens')
-
-  for i in range(config.NUM_LAYERS):
-    _out = bert_module(_out, _out, _out, i, height=config.EMBED_DIM + TOKEN_FEATURES)
-
-  _out = layers.BatchNormalization(name="bn1")(_out)
-  _out = layers.LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
-  #   _out1 = layers.ReLU(name='O1_tagging')(_out)
-  _out1 = ThresholdLayer(name='O1_tagging')(_out)
-
-  #   _out = Conv1D(filters=FEATURES * 4, kernel_size=(2), padding='same', activation='relu' , name='embedding_reduced')(_out)
-  _out = layers.Bidirectional(layers.LSTM(16, return_sequences=False, name='narcissisism'), name='embedding_reduced')(
-    _out)
-  _out = layers.BatchNormalization(name="bn_bi_2")(_out)
-  _out = layers.Dropout(0.1, name='forgetting')(_out)
-
-  _out2 = layers.Dense(CLASSES, activation='softmax', name='O2_subject')(_out)
-
-  base_model_inputs = [input_text_emb, token_features]
-  model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
-  model.compile(loss=losses, optimizer='Adam', metrics=metrics)
-  return model
+# def make_att_model(name='make_att_model', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
+#   input_text_emb = layers.Input(shape=[None, config.EMBED_DIM], dtype='float32', name="input_text_emb")
+#   _out = layers.BatchNormalization(name="bn1")(input_text_emb)
+#   _out = layers.Dropout(0.2, name="drops")(_out)  # small_drops_of_poison
+#
+#   token_features = layers.Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="token_features")
+#   token_features_n = layers.BatchNormalization(name="bn2")(token_features)
+#
+#   _out = layers.concatenate([input_text_emb, token_features_n], axis=-1, name='rmb_plus_tokens')
+#
+#   for i in range(config.NUM_LAYERS):
+#     _out = bert_module(_out, _out, _out, i, height=config.EMBED_DIM + TOKEN_FEATURES)
+#
+#   _out = layers.BatchNormalization(name="bn1")(_out)
+#   _out = layers.LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
+#   #   _out1 = layers.ReLU(name='O1_tagging')(_out)
+#   _out1 = ThresholdLayer(name='O1_tagging')(_out)
+#
+#   #   _out = Conv1D(filters=FEATURES * 4, kernel_size=(2), padding='same', activation='relu' , name='embedding_reduced')(_out)
+#   _out = layers.Bidirectional(layers.LSTM(16, return_sequences=False, name='narcissisism'), name='embedding_reduced')(
+#     _out)
+#   _out = layers.BatchNormalization(name="bn_bi_2")(_out)
+#   _out = layers.Dropout(0.1, name='forgetting')(_out)
+#
+#   _out2 = layers.Dense(CLASSES, activation='softmax', name='O2_subject')(_out)
+#
+#   base_model_inputs = [input_text_emb, token_features]
+#   model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
+#   model.compile(loss=losses, optimizer='Adam', metrics=metrics)
+#   return model
 
 
 def make_att_model_02(name='make_att_model_02', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
@@ -642,7 +642,7 @@ def get_semantic_map_new(doc) -> DataFrame:
   def add_span_vectors(_name, span):
     bn = _name + "-begin"
     en = _name + "-end"
-    if not span is None:
+    if  span is not None:
       df[bn][span[0]:span[1]] = 1.
       df[en][span[1]] = 1.
 

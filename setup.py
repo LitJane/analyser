@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 # coding=utf-8
 from pip._internal.req import parse_requirements
-from setuptools import setup, find_packages, find_namespace_packages
+from setuptools import setup, find_namespace_packages
 
 import analyser
-
-
 
 with open("README.md", "r") as fh:
   long_description = fh.read()

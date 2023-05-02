@@ -6,7 +6,6 @@ from typing import Iterator
 from pyjarowinkler import distance
 
 from analyser.attributes import to_json
-from analyser.case_numbers import find_case_number
 from analyser.contract_agents import complete_re as agents_re, find_org_names, ORG_LEVELS_re, find_org_names_raw, \
   ContractAgent, _rename_org_tags, protocol_caption_complete_re, protocol_caption_complete_re_ignore_case
 from analyser.doc_dates import find_document_date

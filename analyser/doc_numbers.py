@@ -23,7 +23,7 @@ def find_document_number_span(head_text: str) -> SemanticTag or None:
       _number = finding['number']
       if is_number_valid(_number):
         return _number, finding.span()
-  except:
+  except Exception:
     pass
   return None, None
 
