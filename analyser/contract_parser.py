@@ -84,6 +84,7 @@ class ContractParser(GenericParser):
     self.subject_prediction_model = load_subject_detection_trained_model()
     self.insides_finder = InsidesFinder()
 
+
   def find_org_date_number(self, contract: ContractDocument, ctx: AuditContext) -> ContractDocument:
 
     # GenericParser is called an all documents before this
