@@ -141,6 +141,7 @@ class LegalDocument:
     self.sentence_map = tokenize_doc_into_sentences_map(self.tokens_map.get_full_text(),
                                                         sentence_max_len)
 
+
   def __len__(self):
     return self.tokens_map.get_len()
 
@@ -313,6 +314,7 @@ class LegalDocumentExt(LegalDocument):
     super().parse(txt)
     self.split_into_sentenses()
     return self
+
 
   def subdoc_slice(self, __s: slice, name='undef'):
     sub = super().subdoc_slice(__s, name)

@@ -89,6 +89,7 @@ class ContractParser(GenericParser):
     if INSIDES_FINDER_ENABLED:
       self.insides_finder = InsidesFinder()
 
+
   def find_org_date_number(self, contract: ContractDocument, ctx: AuditContext) -> ContractDocument:
 
     # GenericParser is called an all documents before this
