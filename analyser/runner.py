@@ -299,12 +299,6 @@ def change_doc_state(doc, state):
   db = get_mongodb_connection()
   db['documents'].update_one({'_id': doc.get_id()}, {"$set": {"state": state}})
 
-
-def change_doc_state(doc, state):
-  db = get_mongodb_connection()
-  db['documents'].update_one({'_id': doc._id}, {"$set": {"state": state}})
-
-
 def change_audit_status(audit, status):
   db = get_mongodb_connection()
   db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"status": status}})
