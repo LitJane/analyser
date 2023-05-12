@@ -1,16 +1,26 @@
 # origin: charter_parser.py
-from analyser.contract_agents import find_org_names
+import os
+import warnings
+
+import pandas as pd
+# from overrides import overrides
+from pandas import DataFrame
+
+from analyser.attributes import to_json
+from analyser.contract_agents import find_org_names, ContractAgent, find_org_names_raw
 from analyser.doc_dates import find_document_date
 from analyser.embedding_tools import AbstractEmbedder
-from analyser.legal_docs import LegalDocument, LegalDocumentExt, remap_attention_vector, ContractValue, \
-  embedd_sentences, ParserWarnings, tokenize_doc_into_sentences_map
-from analyser.ml_tools import *
+from analyser.hyperparams import HyperParameters, models_path
+from analyser.legal_docs import LegalDocumentExt, remap_attention_vector, embedd_sentences, LegalDocument, \
+  ParserWarnings
+from analyser.ml_tools import SemanticTag, calc_distances_per_pattern, merge_colliding_spans, Spans, \
+  FixedVector, span_to_slice, estimate_confidence_by_mean_top_non_zeros, calc_distances_per_pattern_dict, \
+  max_exclusive_pattern_by_prefix, relu, attribute_patternmatch_to_index, SemanticTagBase
 from analyser.parsing import ParsingContext, AuditContext, find_value_sign_currency_attention, \
   _find_most_relevant_paragraph
 from analyser.patterns import build_sentence_patterns, PATTERN_DELIMITER
-
-from analyser.structures import *
-from analyser.transaction_values import number_re
+from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, ContractPrice
+from analyser.structures import OrgStructuralLevel, ContractSubject
 
 WARN = '\033[1;31m'
 
@@ -24,73 +34,44 @@ class CharterDocument(LegalDocumentExt):
   def __init__(self, doc: LegalDocument = None):
     super().__init__(doc)
     if doc is not None:
-      # self.__dict__ = {**super().__dict__, **doc.__dict__}
       self.__dict__.update(doc.__dict__)
-    self.org_tags = []
-    self.charity_tags = []
-    self.org_levels = []
-    self.constraint_tags = []
-    self.org_level_tags = []
-
-    self.margin_values: [ContractValue] = []
+    self.attributes_tree = CharterSchema()
 
   def reset_attributes(self):
-    # reset for preventing doubling tags
-    self.margin_values = []
-    self.constraint_tags = []
-    self.charity_tags = []
-    self.org_levels = []
-    self.org_level_tags = []
+    """
+    reset for preventing doubling tags
+    :return:
+    """
+    self.attributes_tree = CharterSchema()
 
-  # def sentence_at_index(self, i: int, return_delimiters=True) -> (int, int):
-  #
-  #   char_range = self.tokens_map.char_range((i, i + 1))
-  #   sentences_range = self.sentence_map.token_indices_by_char_range(char_range)
-  #
-  #   char_range = self.sentence_map.char_range(sentences_range)
-  #   words_range = self.tokens_map.token_indices_by_char_range(char_range)
-  #
-  #   return words_range
+  def get_number(self) -> SemanticTagBase:
+    return self.attributes_tree.number
 
-  def get_tags(self) -> [SemanticTag]:
-    tags = []
+  def set_number(self, number):
+    self.attributes_tree.number = number
 
-    if self.date is not None:
-      tags.append(self.date)
+  def get_date(self) -> SemanticTagBase:
+    warnings.warn("use attributes_tree.date", DeprecationWarning)
+    return self.attributes_tree.date
 
-    if self.number is not None:
-      tags.append(self.number)
+  def set_date(self, date):
+    warnings.warn("use attributes_tree.date", DeprecationWarning)
+    self.attributes_tree.date = date
 
-    tags += self.org_tags
-    tags += self.charity_tags
-    tags += self.org_levels
-    tags += self.org_level_tags
-    tags += self.constraint_tags
+  date = property(get_date, set_date)
+  number = property(get_number, set_number)
 
-    for mv in self.margin_values:
-      tags += mv.as_list()
-
-    return tags
+  #   @overrides
+  def to_json_obj(self) -> dict:
+    j: dict = super().to_json_obj()
+    _attributes_tree_dict, _ = to_json(self.attributes_tree)
+    j['attributes_tree']['charter'] = _attributes_tree_dict
+    return j
 
 
 def _make_org_level_patterns() -> pd.DataFrame:
-  p = competence_headline_pattern_prefix  # just shortcut
-  comp_str_pat = pd.DataFrame()
-  for ol in OrgStructuralLevel:
-    comp_str_pat[PATTERN_DELIMITER.join([p, ol.name])] = [ol.display_string.lower()]
-    comp_str_pat[PATTERN_DELIMITER.join([p, 'comp', 'q', ol.name])] = [
-      f'к компетенции {ol.display_string} относятся следующие вопросы'.lower()]
-    comp_str_pat[PATTERN_DELIMITER.join([p, 'comp', ol.name])] = f"компетенции {ol.display_string}".lower()
-
-  _key = PATTERN_DELIMITER.join([p, 'comp', 'qr', OrgStructuralLevel.ShareholdersGeneralMeeting.name])
-  comp_str_pat[_key] = ['Компетенция Общего собрания акционеров Общества'.lower()]
-
-  _key = PATTERN_DELIMITER.join([p, 'comp', 'qr', OrgStructuralLevel.BoardOfDirectors.name])
-  comp_str_pat[_key] = ['Компетенция Совета директоров Общества'.lower()]
-
-  _key = PATTERN_DELIMITER.join([p, 'comp', 'qr', OrgStructuralLevel.CEO.name])
-  comp_str_pat[_key] = ['Единоличный исполнительный орган Общества'.lower()]
-
+  p = os.path.join(models_path, 'charter_org_level_patterns.json')
+  comp_str_pat = pd.read_json(p, orient='index')
   return comp_str_pat.astype('str')
 
 
@@ -192,16 +173,15 @@ class CharterParser(ParsingContext):
 
     return self._subj_patterns_embeddings
 
-
   def _embedd(self, charter: CharterDocument):
 
     ### ⚙️🔮 SENTENCES embedding
 
-    charter.sentences_embeddings = embedd_sentences(charter.sentence_map, self.get_sentence_embedder())
+    charter.sentences_embeddings = embedd_sentences(charter.sentence_map, self.get_sentence_embedder(), log_addon=str(charter.get_id()))
     charter.distances_per_sentence_pattern_dict = calc_distances_per_pattern(charter.sentences_embeddings,
                                                                              self.get_patterns_named_embeddings())
 
-  def find_org_date_number(self, doc: LegalDocumentExt, ctx: AuditContext) -> LegalDocument:
+  def find_org_date_number(self, doc: CharterDocument, ctx: AuditContext) -> LegalDocument:
     """
     phase 1, before embedding
     searching for attributes required for filtering
@@ -210,24 +190,23 @@ class CharterParser(ParsingContext):
     """
     # charter.sentence_map = tokenize_doc_into_sentences_map(charter, HyperParameters.charter_sentence_max_len)
 
-    doc.org_tags = find_charter_org(doc)
-    doc.date = find_document_date(doc)
+    # doc.org_tags = find_charter_org(doc)
+    doc.attributes_tree.org = find_charter_org_obj(doc)
+    if doc.attributes_tree.org:
+      doc.attributes_tree.org.alias = None
+    doc.attributes_tree.date = find_document_date(doc)
 
     return doc
 
   def find_attributes(self, _charter: CharterDocument, ctx: AuditContext) -> CharterDocument:
+    # reset for preventing tags doubling
+    _charter.reset_attributes()
 
     self.find_org_date_number(_charter, ctx)
 
-    margin_values = []
-    org_levels = []
-    constraint_tags = []
     if _charter.sentences_embeddings is None:
       # lazy embedding
       self._embedd(_charter)
-
-    # reset for preventing tags doubling
-    _charter.reset_attributes()
 
     # --------------
     # (('Pattern name', 16), 0.8978644013404846),
@@ -242,98 +221,67 @@ class CharterParser(ParsingContext):
 
       paragraph_body: SemanticTag = _charter.paragraphs[_paragraph_id].body
       confidence = p_mapping[1]
-      _org_level_name = _pattern_name.split('/')[-1]
+      _org_level_name = _pattern_name.split(PATTERN_DELIMITER)[-1]
       org_level: OrgStructuralLevel = OrgStructuralLevel[_org_level_name]
       subdoc = _charter.subdoc_slice(paragraph_body.as_slice())
       # --
-      parent_org_level_tag = SemanticTag(org_level.name, org_level, paragraph_body.span)
-      parent_org_level_tag.confidence = confidence
-      # -------
-      # constraint_tags, values, subject_attentions_map = self.attribute_charter_subjects(subdoc,
-      #                                                                                   parent_org_level_tag)
+      structurallevel = CharterStructuralLevel()
+      structurallevel.value = org_level
+      structurallevel.set_confidence(confidence)
+      structurallevel.set_span(paragraph_body.span)
+      _charter.attributes_tree.structural_levels.append(structurallevel)
 
-      _constraint_tags, _margin_values = self.find_attributes_in_sections(subdoc, parent_org_level_tag)
-      margin_values += _margin_values
-      constraint_tags += _constraint_tags
+      self.find_attributes_in_sections(subdoc, structurallevel)
 
-      if _constraint_tags:
-        # _key = parent_org_level_tag.get_key()
-        #   if _key in _parent_org_level_tag_keys:  # number keys to avoid duplicates
-        #     parent_org_level_tag.kind = number_key(_key, len(_parent_org_level_tag_keys))
-        org_levels.append(parent_org_level_tag)
-        # _parent_org_level_tag_keys.append(_key)
-
-    # --------------- populate charter
-
-    _charter.org_levels = org_levels
-    _charter.constraint_tags = constraint_tags
-    _charter.margin_values = margin_values
     return _charter
 
-  def find_attributes_in_sections(self, subdoc: LegalDocumentExt, parent_org_level_tag):
+  def find_attributes_in_sections(self, subdoc: LegalDocumentExt, structural_level: CharterStructuralLevel):
 
-    subject_attentions_map = get_charter_subj_attentions(subdoc, self.get_subj_patterns_embeddings())  # dictionary
-    subject_spans = collect_subjects_spans2(subdoc, subject_attentions_map)
+    # finding Subjects
+    _subject_attentions_map = get_charter_subj_attentions(subdoc, self.get_subj_patterns_embeddings())  # dictionary
+    subject_spans: Spans = collect_subjects_spans2(subdoc, _subject_attentions_map)
 
-    values: [ContractValue] = find_value_sign_currency_attention(subdoc, None, absolute_spans=False)
-    self._rename_margin_values_tags(values)
-    valued_sentence_spans = collect_sentences_having_constraint_values(subdoc, values, merge_spans=True)
+    # finding Values(amounts)
+    values: [ContractPrice] = find_value_sign_currency_attention(subdoc, None, absolute_spans=False)
+    # self._rename_margin_values_tags(values)
+    valued_sentence_spans: Spans = collect_sentences_having_constraint_values(subdoc, values, merge_spans=True)
 
-    united_spans = []
-    for c in valued_sentence_spans:
-      united_spans.append(c)
-    for c in subject_spans:
-      united_spans.append(c)
+    _united_spans: Spans = []
+    for _s in valued_sentence_spans:
+      _united_spans.append(_s)
+    for _s in subject_spans:
+      _united_spans.append(_s)
 
-    united_spans = merge_colliding_spans(united_spans, eps=-1)  # XXX: check this
+    _united_spans = merge_colliding_spans(_united_spans, eps=-1)  # TODO: check this
 
-    constraint_tags, subject_attentions_map = self.attribute_spans_to_subjects(united_spans, subdoc,
-                                                                               parent_org_level_tag,
-                                                                               absolute_spans=False)
+    self.attribute_spans_to_subjects(_united_spans,
+                                     subdoc,
+                                     structural_level  # OrgStructuralLevel.BoardOfDirectors
+                                     )
 
-    # nesting values
-    for parent_tag in constraint_tags:
-      for value in values:
-        v_group = value.parent
-        if parent_tag.contains(v_group.span):
-          v_group.set_parent_tag(parent_tag)
-
+    # --------------------
     # offsetting tags to absolute values
-    for value in values: value += subdoc.start
-    for constraint_tag in constraint_tags: constraint_tag += subdoc.start
-
-    return constraint_tags, values
-
-  def _rename_margin_values_tags(self, values):
-
     for value in values:
-      if value.sign.value < 0:
-        sfx = '-max'
-      elif value.sign.value > 0:
-        sfx = '-min'
-      else:
-        sfx = ''
+      value += subdoc.start
+    # --------------------
+    for competence_tag in structural_level.competences:
+      competence_tag += subdoc.start
 
-      value.parent.kind = f"constraint{sfx}"
+    # nesting values (assigning parents)
+    for competence in structural_level.competences:  # contract subjects
 
-    known_keys = []
-    k = 0  # constraints numbering
-    for value in values:
-      k += 1
-      if value.parent.get_key() in known_keys:
-        value.parent.kind = f"{value.parent.kind}{TAG_KEY_DELIMITER}{k}"
-
-      known_keys.append(value.parent.get_key())
+      for value in values:
+        if competence.contains(value.get_span()):
+          competence.constraints.append(value)
 
   def attribute_spans_to_subjects(self,
                                   unique_sentence_spans: Spans,
                                   subdoc: LegalDocumentExt,
-                                  parent_org_level_tag: SemanticTag,
-                                  absolute_spans=True):
+                                  parent_org_level_tag: CharterStructuralLevel):
 
-    subject_attentions_map = get_charter_subj_attentions(subdoc, self.get_subj_patterns_embeddings())
-    all_subjects = [k for k in subject_attentions_map.keys()]
-    constraint_tags = []
+    subject_attentions_map: dict = get_charter_subj_attentions(subdoc, self.get_subj_patterns_embeddings())
+    all_subjects = list(subject_attentions_map.keys())
+    parent_org_level_tag.competences = []
     # attribute sentences to subject
     for contract_value_sentence_span in unique_sentence_spans:
 
@@ -352,32 +300,26 @@ class CharterParser(ParsingContext):
       # end for
 
       if best_subject is not None:
-        constraint_tag = SemanticTag(best_subject.name,
-                                     best_subject,
-                                     contract_value_sentence_span,
-                                     parent=parent_org_level_tag)
-        constraint_tag.confidence = max_confidence
-        constraint_tags.append(constraint_tag)
+        competence = Competence()
+        competence.value = best_subject
+        competence.set_span(contract_value_sentence_span)
+        competence.set_confidence(max_confidence)
+
+        parent_org_level_tag.competences.append(competence)
 
         all_subjects.remove(best_subject)  # taken: avoid duplicates
 
-    # ofsetting
-    if absolute_spans:
-      for constraint_tag in constraint_tags:
-        constraint_tag.offset(subdoc.start)
 
-    return constraint_tags, subject_attentions_map
-
-
-def collect_sentences_having_constraint_values(subdoc: LegalDocumentExt, contract_values: [ContractValue],
+def collect_sentences_having_constraint_values(subdoc: LegalDocumentExt, contract_values: [ContractPrice],
                                                merge_spans=True) -> Spans:
   # collect sentences having constraint values
   unique_sentence_spans: Spans = []
   for contract_value in contract_values:
-    contract_value_sentence_span = subdoc.sentence_at_index(contract_value.parent.span[0], return_delimiters=False)
+    parent_span = contract_value.get_span()
+    contract_value_sentence_span = subdoc.sentence_at_index(parent_span[0], return_delimiters=False)
     if contract_value_sentence_span not in unique_sentence_spans:
       unique_sentence_spans.append(contract_value_sentence_span)
-    contract_value_sentence_span = subdoc.sentence_at_index(contract_value.parent.span[1], return_delimiters=False)
+    contract_value_sentence_span = subdoc.sentence_at_index(parent_span[1], return_delimiters=False)
     if contract_value_sentence_span not in unique_sentence_spans:
       unique_sentence_spans.append(contract_value_sentence_span)
   # --
@@ -385,32 +327,6 @@ def collect_sentences_having_constraint_values(subdoc: LegalDocumentExt, contrac
   if merge_spans:
     unique_sentence_spans = merge_colliding_spans(unique_sentence_spans, eps=1)
   return unique_sentence_spans
-
-
-def split_by_number_2(tokens: List[str], attention: FixedVector, threshold) -> (
-        List[List[str]], List[int], List[slice]):
-  indexes = []
-  last_token_is_number = False
-  for i, token in enumerate(tokens):
-
-    if attention[i] > threshold and len(number_re.findall(token)) > 0:
-      if not last_token_is_number:
-        indexes.append(i)
-      last_token_is_number = True
-    else:
-      last_token_is_number = False
-
-  text_fragments = []
-  ranges: List[slice] = []
-  if len(indexes) > 0:
-    for i in range(1, len(indexes)):
-      _slice = slice(indexes[i - 1], indexes[i])
-      text_fragments.append(tokens[_slice])
-      ranges.append(_slice)
-
-    text_fragments.append(tokens[indexes[-1]:])
-    ranges.append(slice(indexes[-1], len(tokens)))
-  return text_fragments, indexes, ranges
 
 
 def embedd_charter_subject_patterns(patterns_dict, embedder: AbstractEmbedder):
@@ -427,7 +343,8 @@ def embedd_charter_subject_patterns(patterns_dict, embedder: AbstractEmbedder):
   return emb_subj_patterns
 
 
-def get_charter_subj_attentions(subdoc: LegalDocumentExt, emb_subj_patterns):
+def get_charter_subj_attentions(subdoc: LegalDocumentExt, emb_subj_patterns) -> dict:
+  # TODO: use pandas
   _distances_per_subj = {}
 
   for subj in emb_subj_patterns.keys():
@@ -445,7 +362,7 @@ def get_charter_subj_attentions(subdoc: LegalDocumentExt, emb_subj_patterns):
   return _distances_per_subj
 
 
-def collect_subjects_spans2(subdoc, subject_attentions_map, min_len=20):
+def collect_subjects_spans2(subdoc, subject_attentions_map, min_len=20) -> Spans:
   spans = []
   for subj in subject_attentions_map.keys():
 
@@ -463,6 +380,16 @@ def collect_subjects_spans2(subdoc, subject_attentions_map, min_len=20):
   return unique_sentence_spans
 
 
+def find_charter_org_obj(doc: LegalDocument) -> ContractAgent or None:
+  _subdoc = doc[0:HyperParameters.protocol_caption_max_size_words]
+
+  orgs: [ContractAgent] = find_org_names_raw(_subdoc, max_names=1)
+  if len(orgs) == 0:
+    return None
+
+  return orgs[0]
+
+
 def find_charter_org(charter: LegalDocument) -> [SemanticTag]:
   """
   TODO: see also find_protocol_org
@@ -470,7 +397,7 @@ def find_charter_org(charter: LegalDocument) -> [SemanticTag]:
   :return:
   """
   ret = []
-  x: List[SemanticTag] = find_org_names(charter[0:HyperParameters.protocol_caption_max_size_words], max_names=1)
+  x: [SemanticTag] = find_org_names(charter[0:HyperParameters.protocol_caption_max_size_words], max_names=1)
   nm = SemanticTag.find_by_kind(x, 'org-1-name')
   if nm is not None:
     ret.append(nm)

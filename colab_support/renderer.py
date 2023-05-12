@@ -89,20 +89,25 @@ def as_offset(txt):
 
 
 def as_currency(v):
-  if v is None: return "any"
+  if v is None:
+    return "any"
   return f'{v.value:20,.0f} {v.currency} '
 
 
 class AbstractRenderer:
 
   def sign_to_text(self, sign: int):
-    if sign < 0: return " < "
-    if sign > 0: return " > "
+    if sign < 0:
+      return " < "
+    if sign > 0:
+      return " > "
     return ' = '
 
   def sign_to_html(self, sign: int):
-    if sign < 0: return " &lt; "
-    if sign > 0: return " &gt; "
+    if sign < 0:
+      return " &lt; "
+    if sign > 0:
+      return " &gt; "
     return ' = '
 
   def value_to_html(self, vc: ValueConstraint):
@@ -171,9 +176,8 @@ for k in colors_by_contract_subject:
 
 
 class HtmlRenderer(AbstractRenderer):
-  ''' AZ:-Rendering CHARITY🔥-----💸------💸-------💸------------------------------'''
 
-  def _to_color_text(self, _tokens, weights, mpl, colormap='coolwarm', _range=None, separator=' '):
+  def _to_color_text(self, _tokens, weights, mpl_, colormap='coolwarm', _range=None, separator=' '):
     tokens = [escaper.escape(t) for t in _tokens]
 
     if len(tokens) == 0:
@@ -190,8 +194,8 @@ class HtmlRenderer(AbstractRenderer):
       vmin = _range[0]
       vmax = _range[1]
 
-    norm = mpl.colors.Normalize(vmin=vmin - 0.5, vmax=vmax)
-    cmap = mpl.cm.get_cmap(colormap)
+    norm = mpl_.colors.Normalize(vmin=vmin - 0.5, vmax=vmax)
+    cmap = mpl_.cm.get_cmap(colormap)
 
     html = ""
 
@@ -218,8 +222,10 @@ class HtmlRenderer(AbstractRenderer):
     return attention_vectors
 
   def sign_to_text(self, sign: int):
-    if sign < 0: return " &lt; "
-    if sign > 0: return " &gt; "
+    if sign < 0:
+      return " &lt; "
+    if sign > 0:
+      return " &gt; "
     return ' = '
 
   def probable_value_to_html(self, pv):
@@ -281,10 +287,10 @@ def to_multicolor_text(tokens, vectors, colormap, min_color=None, _slice=None) -
   if _slice is not None:
     tokens = tokens[_slice]
 
-  colors = mixclr(colormap, vectors, min_color=min_color, _slice=_slice)
+  _colors = mixclr(colormap, vectors, min_color=min_color, _slice=_slice)
   html = ''
   for i in range(len(tokens)):
-    c = colors[i]
+    c = _colors[i]
     r = int(255 * c[0])
     g = int(255 * c[1])
     b = int(255 * c[2])
@@ -356,8 +362,8 @@ def render_spans(spans, subdoc, attention_v, ht='') -> str:
 
     ht += '<li>'
     t = subdoc.tokens_map.tokens[_s]
-    l = attention_v[_s]
-    ht += to_color_text(t, l, _range=(0, 1.2))
+    att = attention_v[_s]
+    ht += to_color_text(t, att, _range=(0, 1.2))
     ht += '<br><hr>'
     ht += '</li>'
   ht += '</ol>'
@@ -370,8 +376,8 @@ def render_slices(slices, subdoc, attention_v, ht='') -> str:
   for _s in slices:
     ht += '<li>'
     t = subdoc.tokens_map.tokens[_s]
-    l = attention_v[_s]
-    ht += to_color_text(t, l, _range=(0, 1.2))
+    att = attention_v[_s]
+    ht += to_color_text(t, att, _range=(0, 1.2))
     ht += '<br><hr>'
     ht += '</li>'
   ht += '</ol>'
@@ -460,11 +466,12 @@ def render_doc(doc, semantic_map, default_color='#eeeeee', palette: [str] or Non
 def plot_embedding(matrix, title=None, width=25, height=6):
   mt = matrix.T
   with sns.axes_style("white"):
-    plt.figure(figsize=(width, height))
+    fig = plt.figure(figsize=(width, height))
     sns.heatmap(mt, square=False, cmap="RdYlBu", center=0)
     if title:
       plt.title(title)
     plt.show()
+    return fig
 
 
 def plot_cm(y_true, y_pred, figsize=(12, 12)):

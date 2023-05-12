@@ -14,7 +14,7 @@ from analyser.legal_docs import LegalDocument
 from analyser.ml_tools import SemanticTag
 from analyser.protocol_parser import ProtocolDocument, find_protocol_org
 from analyser.text_normalize import _r_name_ru, r_human_abbr_name, r_human_full_name, _r_name_lat, replacements_regex, \
-  r_alias_prefix, r_types, sub_ip_quoter, sub_alias_quote, r_human_name, ru_cap, r_quoted_name
+  r_alias_prefix, r_types, sub_ip_quoter, sub_alias_quote, r_human_name, ru_cap, r_quoted_name, r_group
 
 _suffix = " слово" * 1000
 
@@ -814,8 +814,19 @@ class TestContractAgentsSearch(unittest.TestCase):
     self.assertEqual(None, x)
 
   def test_r_human_name(self):
-    r = re.compile(r'\W' + r_human_name, re.MULTILINE)
+    # r = re.compile(r'\W' + r_human_name, re.MULTILINE)
+    r = re.compile(r'\W' + r_group(r_human_abbr_name, 'human_name'), re.MULTILINE)
+    # r_human_full_name
+    # r_human_abbr_name
 
+    x = r.search('что-то Газпромнефть-Омский НПЗ, который был')
+    self.assertIsNone(x)
+
+    r = re.compile(r'\W' + r_group(r_human_full_name, 'human_name'), re.MULTILINE)
+    x = r.search('что-то Газпромнефть-Омский НПЗ, который был')
+    self.assertIsNone(x)
+
+    r = re.compile(r'\W' + r_human_name, re.MULTILINE)
     x = r.search('что-то Мироздания С.К., который был')
     self.assertEqual('Мироздания С.К.', x['human_name'])
 

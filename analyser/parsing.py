@@ -1,20 +1,22 @@
+import logging
 import time
 from functools import wraps
 from typing import List
 
 import numpy as np
 
+from analyser.contract_agents import find_closest_org_name
 from analyser.contract_patterns import ContractPatternFactory
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.legal_docs import LegalDocument, ContractValue, extract_sum_sign_currency
 from analyser.ml_tools import estimate_confidence_by_mean_top_non_zeros, FixedVector, smooth_safe, relu
+from analyser.schemas import ContractPrice
 from analyser.transaction_values import complete_re as transaction_values_re
+from gpn.gpn import subsidiaries
 from tf_support.embedder_elmo import ElmoEmbedder
 
 PROF_DATA = {}
-
-import logging
 
 logger = logging.getLogger('analyser')
 
@@ -34,7 +36,7 @@ class ParsingSimpleContext:
 
   def _logstep(self, name: str) -> None:
     s = self.__step
-    print(f'{s}.\t❤️ ACCOMPLISHED:\t {name}')
+    logger.info(f'{s}.\t❤️ ACCOMPLISHED:\t {name}')
     self.__step += 1
 
   def warning(self, text):
@@ -58,6 +60,16 @@ class AuditContext:
 
   def __init__(self, audit_subsidiary_name=None):
     self.audit_subsidiary_name: str = audit_subsidiary_name
+    self.fixed_audit_subsidiary_name = '__unknown___'
+
+    known_org_name, best_similarity = find_closest_org_name(subsidiaries, audit_subsidiary_name,
+                                                            HyperParameters.subsidiary_name_match_min_jaro_similarity)
+    if known_org_name is not None:
+      self.fixed_audit_subsidiary_name = known_org_name['_id']
+
+  def is_same_org(self, name: str) -> bool:
+    ret = self.audit_subsidiary_name == name or self.fixed_audit_subsidiary_name == name
+    return ret
 
 
 class ParsingContext(ParsingSimpleContext):
@@ -135,7 +147,7 @@ head_types = ['head.directors', 'head.all', 'head.gen', 'head.pravlenie']
 
 
 def find_value_sign_currency(value_section_subdoc: LegalDocument,
-                             factory: ContractPatternFactory = None) -> List[ContractValue]:
+                             factory: ContractPatternFactory = None) -> List[ContractPrice]:
   if factory is not None:
     value_section_subdoc.calculate_distances_per_pattern(factory)
     vectors = factory.make_contract_value_attention_vectors(value_section_subdoc)
@@ -153,12 +165,13 @@ def find_value_sign_currency(value_section_subdoc: LegalDocument,
 def find_value_sign_currency_attention(value_section_subdoc: LegalDocument,
                                        attention_vector_tuned: FixedVector or None,
                                        parent_tag=None,
-                                       absolute_spans=False) -> List[ContractValue]:
+                                       absolute_spans=False) -> List[ContractPrice]:
   spans = [m for m in value_section_subdoc.tokens_map.finditer(transaction_values_re)]
-  values_list = []
+  values_list: [ContractValue] = []
 
   for span in spans:
     value_sign_currency: ContractValue = extract_sum_sign_currency(value_section_subdoc, span)
+    # TODO: replace with ContractPrice type
     if value_sign_currency is not None:
 
       # Estimating confidence by looking at attention vector
@@ -178,7 +191,7 @@ def find_value_sign_currency_attention(value_section_subdoc: LegalDocument,
     for value in values_list:
       value += value_section_subdoc.start
 
-  return values_list
+  return [f.as_ContractPrice() for f in values_list]
 
 
 def _find_most_relevant_paragraph(section: LegalDocument,
@@ -220,7 +233,7 @@ def find_most_relevant_paragraphs(section: TextMap,
   for i in top_indices:
     span = section.sentence_at_index(i, return_delimiters)
     if min_len is not None and span[1] - span[0] < min_len:
-      if not span in spans:
+      if span not in spans:
         spans.append(span)
 
   return spans, paragraph_attention_vector

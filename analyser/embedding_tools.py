@@ -1,14 +1,13 @@
-import logging
+import os
 from abc import abstractmethod
 
 import numpy as np
 
 from analyser.documents import TextMap
-from analyser.hyperparams import work_dir
+from analyser.hyperparams import datasets_dir
+from analyser.log import logger as elmo_logger
 from analyser.ml_tools import Embeddings
 from analyser.text_tools import Tokens
-
-elmo_logger = logging.getLogger('elmo')
 
 
 def embedd_tokenized_sentences_list(embedder, tokenized_sentences_list):
@@ -34,13 +33,10 @@ def embedd_tokenized_sentences_list(embedder, tokenized_sentences_list):
   return sentences_emb, None, lens
 
 
-import os
-
-
 class AbstractEmbedder:
 
   def __cache_fn(self, checksum):
-    return os.path.join(work_dir, f'cache-{checksum}-embeddings-ElmoEmbedder.npy')
+    return os.path.join(datasets_dir, f'cache-{checksum}-embeddings-ElmoEmbedder.npy')
 
   def get_cached_embedding(self, checksum) -> Embeddings or None:
     fn = self.__cache_fn(checksum)
@@ -122,7 +118,8 @@ class AbstractEmbedder:
 
     return patterns_emb, regions
 
-  def embedd_large(self, text_map, max_tokens=8000, log_addon=''):
+  def embedd_large(self, text_map, max_tokens=6000, log_addon=''):
+    elmo_logger.info(f'{log_addon} {len(text_map)} max_tokens={max_tokens}')
     overlap = max_tokens // 20
 
     number_of_windows = 1 + len(text_map) // max_tokens

@@ -27,7 +27,7 @@ class TestHeaderDetector(unittest.TestCase):
     with open(os.path.join(os.path.dirname(__file__), '2. Договор по благ-ти Радуга.docx.pickle'), 'rb') as handle:
       contract: LegalDocument = pickle.load(handle)
 
-    features, body_lines_ranges = doc_features(contract.tokens_map)
+    features, _ = doc_features(contract.tokens_map)
     self.assertEqual(27, len(features))
     print(features[0])
     pass

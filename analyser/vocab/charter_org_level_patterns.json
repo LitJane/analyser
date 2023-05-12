@@ -1,0 +1,28 @@
+{"0":
+  {
+    "headline:CEO":"генеральный директор",
+    "headline:BoardOfCompany":"правление общества",
+    "headline:BoardOfDirectors":"совет директоров",
+    "headline:ShareholdersGeneralMeeting":"общее собрание акционеров",
+    "headline:AllMembers":"общее собрание участников",
+
+    "headline:comp:q:AllMembers":"к компетенции общего собрания участников относятся следующие вопросы",
+    "headline:comp:AllMembers":"компетенции общего собрания участников",
+
+    "headline:comp:q:ShareholdersGeneralMeeting":"к компетенции общего собрания акционеров относятся следующие вопросы",
+    "headline:comp:ShareholdersGeneralMeeting":"компетенции общего собрания акционеров",
+    "headline:comp:qr:ShareholdersGeneralMeeting":"компетенция общего собрания акционеров общества",
+
+    "headline:comp:BoardOfDirectors":"компетенции совета директоров",
+    "headline:comp:q:BoardOfDirectors":"к компетенции совета директоров относятся следующие вопросы",
+    "headline:comp:qr:BoardOfDirectors":"компетенция совета директоров общества",
+
+    "headline:comp:q:BoardOfCompany":"к компетенции правления общества относятся следующие вопросы",
+    "headline:comp:BoardOfCompany":"компетенции правления общества",
+
+    "headline:comp:CEO":"компетенции генерального директора",
+    "headline:comp:qr:CEO":"единоличный исполнительный орган общества",
+    "headline:comp:qqr:CEO":"компетенции единоличного исполнительного органа общества",
+    "headline:comp:q:CEO":"к компетенции генерального директора относятся следующие вопросы"
+  }
+}

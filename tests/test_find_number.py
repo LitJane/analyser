@@ -41,7 +41,7 @@ class NumbersTestCase(unittest.TestCase):
   def test_find_doc_number_N(self):
     t = 'ДОГОВОР чего-то-там N 16-89/44 г. Санкт-Петербург    '
 
-    _number, finding_span = find_document_number_span(t)
+    _number, _ = find_document_number_span(t)
     self.assertEqual('16-89/44', _number)
 
   def test_find_doc_number_N_g(self):

@@ -2,7 +2,6 @@ from analyser.legal_docs import rectifyed_sum_by_pattern_prefix
 from analyser.ml_tools import max_exclusive_pattern_by_prefix, momentum, cut_above, relu
 from analyser.patterns import AbstractPatternFactoryLowCase
 from analyser.structures import ContractSubject
-from tf_support.embedder_elmo import ElmoEmbedder
 
 contract_headlines_patterns = {
   'КУПЛИ-ПРОДАЖИ НЕДВИЖИМОГО ИМУЩЕСТВА': ContractSubject.RealEstate,
@@ -34,7 +33,6 @@ contract_headlines_patterns = {
   'ДАРЕНИЯ': ContractSubject.Charity,
   'дарения движимого имущества': ContractSubject.Charity,
   'безвозмездного пользования нежилым помещением': ContractSubject.Charity,
-
 
   'генерального подряда': ContractSubject.GeneralContract,
   'подряда': ContractSubject.GeneralContract,
@@ -82,7 +80,6 @@ class ContractPatternFactory(AbstractPatternFactoryLowCase):
                              '\n город, месяц, год \n общество с ограниченной ответственностью, в лице, действующего на основании, именуемое далее, заключили настоящий договор о нижеследующем'))
     cp('headline.def', (p_r_f_x, 'Термины и определения', 'толкования'))
 
-
     cp('headline.subj.1', ('договора заключили настоящий Договор нижеследующем:', 'Предмет ',
                            'договора:\n Исполнитель обязуется, заказчик поручает'))
     cp('headline.subj.2', (p_r_f_x, 'ПРЕДМЕТ', 'ДОГОВОРА'))
@@ -116,7 +113,6 @@ class ContractPatternFactory(AbstractPatternFactoryLowCase):
 
     cp('headline.obl.4', (p_r_f_x, 'ГАРАНТИЙНЫЕ', 'ОБЯЗАТЕЛЬСТВА.'))
 
-
     cp('headline.resp', (p_r_f_x, 'Ответственность сторон.\n',
                          'невыполнения или ненадлежащего выполнения своих обязательств, несут ответственность в соответствии с действующим законодательством'))
 
@@ -127,7 +123,6 @@ class ContractPatternFactory(AbstractPatternFactoryLowCase):
     # КОНФИДЕНЦИАЛЬНОСТЬ
     cp('headline.security.1', (p_r_f_x, 'КОНФИДЕНЦИАЛЬНОСТЬ ИНФОРМАЦИИ.', ''))
     cp('headline.security.2', (p_r_f_x, 'КОНФИДЕНЦИАЛЬНОСТЬ', ''))
-
 
     cp('headline.special.1', (p_r_f_x + 'ОСОБЫЕ, дополнительные', ' УСЛОВИЯ.', ''))
     cp('headline.special.2', (p_r_f_x, 'ЗАКЛЮЧИТЕЛЬНЫЕ ПОЛОЖЕНИЯ.', ''))
@@ -284,9 +279,3 @@ class ContractPatternFactory(AbstractPatternFactoryLowCase):
     subj = ContractSubject.AgencyContract
     if True:
       cp('', 'Агент', 'обязуется совершать по поручению Принципала')
-
-
-if __name__ == '__main__':
-  CPF = ContractPatternFactory(ElmoEmbedder.get_instance('elmo'))
-  for p in CPF.patterns:
-    print(p.prefix_pattern_suffix_tuple)

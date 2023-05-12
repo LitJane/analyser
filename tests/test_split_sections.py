@@ -5,11 +5,10 @@
 
 import unittest
 
+import numpy as np
+
 from analyser.contract_parser import ContractDocument
-from analyser.ml_tools import *
-
-
-# from patterns import *
+from analyser.ml_tools import split_by_token_into_ranges, remove_similar_indexes
 
 
 class SplitSectionsTest(unittest.TestCase):

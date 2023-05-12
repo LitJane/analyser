@@ -4,6 +4,7 @@ from enum import Enum
 from typing import List, TypeVar, Iterable, Generic
 
 import numpy as np
+import pandas as pd
 import scipy.spatial.distance as distance
 from pandas import DataFrame
 from scipy import special as scs
@@ -130,7 +131,7 @@ def smooth(x: FixedVector, window_len=11, window='hanning'):
   if window_len < 3:
     return x
 
-  if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
+  if window not in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
     raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
   s = np.r_[x[window_len - 1:0:-1], x, x[-2:-window_len - 1:-1]]
@@ -149,7 +150,7 @@ def smooth(x: FixedVector, window_len=11, window='hanning'):
 
 def relu(x: np.ndarray, relu_th: float = 0.0) -> np.ndarray:
   """deprecated: use np.maximum( )"""
-  assert type(x) is np.ndarray
+  # assert type(x) is np.ndarray
 
   _relu = x * (x > relu_th)
   return _relu
@@ -204,7 +205,7 @@ def momentum(x: FixedVector, decay=0.999) -> np.ndarray:
 
 
 def momentum_t(x: FixedVector, half_decay: int = 10, left=False) -> np.ndarray:
-  assert half_decay > 0
+  # assert half_decay > 0
 
   decay = math.pow(2, -1 / half_decay)
   innertia = np.zeros(len(x))
@@ -222,7 +223,7 @@ def momentum_t(x: FixedVector, half_decay: int = 10, left=False) -> np.ndarray:
 
 
 def momentum_p(x, half_decay: int = 10, left=False) -> np.ndarray:
-  assert half_decay > 0
+  # assert half_decay > 0
 
   decay = math.pow(2, -1 / half_decay)
   innertia = np.zeros(len(x))
@@ -315,7 +316,7 @@ def rectifyed_sum(vectors: FixedVectors, relu_th: float = 0.0) -> np.ndarray:
       _sum = np.zeros(len(x))
     _sum += relu(x, relu_th)
 
-  assert _sum is not None
+  # assert _sum is not None
 
   return _sum
 
@@ -326,7 +327,7 @@ def filter_values_by_key_prefix(dictionary: dict, prefix: str) -> Vectors:
       yield dictionary[p]
 
 
-def max_exclusive_pattern_by_prefix(distances_per_pattern_dict, prefix):
+def max_exclusive_pattern_by_prefix(distances_per_pattern_dict, prefix) -> FixedVector:
   vectors = filter_values_by_key_prefix(distances_per_pattern_dict, prefix)
 
   return max_exclusive_pattern(vectors)
@@ -370,7 +371,7 @@ def subtract_probability(a: FixedVector, b: FixedVector) -> FixedVector:
 class TokensWithAttention:
   def __init__(self, tokens: Tokens, attention: FixedVector):
     warnings.warn("TokensWithAttention is deprecated, use ...", DeprecationWarning)
-    assert len(tokens) == len(attention)
+    # assert len(tokens) == len(attention)
     self.tokens = tokens
     self.attention = attention
 
@@ -378,15 +379,67 @@ class TokensWithAttention:
 TAG_KEY_DELIMITER = '/'
 
 
-class SemanticTag:
+class SemanticTagBase:
+  # value: str or Enum or int or float or datetime.date or None = None
+  # span: (int, int)
+
+  def __init__(self, tag=None):
+    super().__init__()
+    self.confidence: float = 0.0
+    self.value = None
+    if tag is not None:
+      self.value = tag.value
+      self.set_span(tag.span)
+      self.set_confidence(tag.confidence)
+
+  def get_confidence(self) -> float:
+    return self.confidence
+
+  def get_span(self) -> (int, int):
+    return self.span
+
+  def set_span(self, span: (int, int)):
+    self.span = (int(span[0]), int(span[1]))
+
+  def set_confidence(self, confidence: float):
+    if confidence is None:
+      self.confidence = 0
+    else:
+      self.confidence = float(confidence)
+
+  def as_json_attribute(self):
+    raise NotImplementedError()
+
+  def __len__(self) -> int:
+    if self.span:
+      return self.span[1] - self.span[0]
+    return 0
+
+  def __add__(self, addon: int):
+    return self.offset(addon)
+
+  def offset(self, addon: int):
+    self.span = self.span[0] + int(addon), self.span[1] + int(addon)
+    return self
+
+  def contains(self, child: [int]) -> bool:
+    return self.span[0] <= child[0] and child[1] <= self.span[1]
+
+  def as_slice(self):
+    return slice(self.span[0], self.span[1])
+
+  slice = property(as_slice)
+
+
+class SemanticTag(SemanticTagBase):
 
   def __init__(self,
-               kind: str,
-               value: str or Enum or None,
-               span: (int, int),
+               kind: str = None,
+               value: str or Enum or None = None,
+               span: (int, int) = (-1, -1),
                span_map: str or None = 'words',
-               parent: 'SemanticTag' = None):
-
+               parent: 'SemanticTag' = None, confidence: float = 1.0):
+    super().__init__()
     self.kind = kind
     self.value: str or Enum or None = value
     '''name of the parent (or group) tag '''
@@ -398,8 +451,14 @@ class SemanticTag:
     else:
       self.span = (0, 0)  # TODO: might be keep None?
     self.span_map = span_map
-    self.confidence = 1.0
+    self.confidence = confidence
 
+  def clean_copy(self) -> SemanticTagBase:
+
+    r = SemanticTagBase()
+    for a in ['value', 'span', 'confidence']:
+      setattr(r, a, getattr(self, a))
+    return r
 
   def as_json_attribute(self):
 
@@ -417,14 +476,15 @@ class SemanticTag:
 
     return key, attribute
 
-
-
   @staticmethod
   def number_key(base: str or Enum, number: int) -> str:
     if isinstance(base, Enum):
       base = base.name
 
     return f'{base}-{number}'
+
+  def is_child_of(self, p: 'SemanticTag') -> bool:
+    return self._parent_tag == p
 
   def get_parent(self) -> str or None:
     if self._parent_tag is not None:
@@ -434,25 +494,11 @@ class SemanticTag:
 
   parent = property(get_parent)
 
-  def __len__(self) -> int:
-    return self.span[1] - self.span[0]
-
-  def __add__(self, addon: int) -> 'SemanticTag':
-    self.span = self.span[0] + addon, self.span[1] + addon
-    return self
-
-  def offset(self, span_add: int):
-    self.span = self.span[0] + span_add, self.span[1] + span_add
-    return self
-
   def get_key(self):
     key = self.kind.replace('.', '-').replace(TAG_KEY_DELIMITER, '-')
     if self._parent_tag is not None:
       key = TAG_KEY_DELIMITER.join([self._parent_tag.get_key(), key])
     return key
-
-  def as_slice(self):
-    return slice(self.span[0], self.span[1])
 
   def isNotEmpty(self) -> bool:
     return self.span is not None and self.span[0] != self.span[1]
@@ -472,24 +518,37 @@ class SemanticTag:
   def set_parent_tag(self, pt):
     self._parent_tag = pt
 
-  def contains(self, child: [int]) -> bool:
-    return self.span[0] <= child[0] and child[1] <= self.span[1]
-
   def __str__(self):
     return f'SemanticTag: {self.get_key()} {self.span} {self.value} {self.confidence}'
 
-  slice = property(as_slice)
+
+def clean_semantic_tag_copy(t: SemanticTag) -> SemanticTagBase or None:
+  if t is None:
+    return None
+
+  r = SemanticTagBase()
+  for a in ['value', 'span', 'confidence']:
+    setattr(r, a, getattr(t, a))
+  return r
 
 
-def max_confident_tags(vals: List[SemanticTag]) -> [SemanticTag]:
+def clean_semantic_tags_copy(tags: [SemanticTag]) -> [SemanticTagBase]:
+  return [clean_semantic_tag_copy(t) for t in tags]
+
+
+def max_confident_tags(vals: [SemanticTagBase]) -> [SemanticTagBase]:
   if vals:
     return [max(vals, key=lambda a: a.confidence)]
   else:
     return []
 
 
+def max_confident_tag(vals: [SemanticTagBase]) -> SemanticTagBase:
+  if vals:
+    return max(vals, key=lambda a: a.confidence)
+
+
 def estimate_confidence(vector: FixedVector) -> (float, float, int, float):
-  assert vector is not None
   if len(vector) == 0:
     return 0, np.nan, 0, np.nan
 
@@ -603,9 +662,9 @@ def merge_colliding_spans(spans: Spans, eps=0) -> Spans:
 
 def calc_distances_to_pattern(sentences_embeddings_: FixedVectors, pattern_embedding: FixedVector,
                               dist_func=distance.cosine) -> FixedVector:
-  assert len(pattern_embedding.shape) == 1
-  assert len(sentences_embeddings_.shape) == 2
-  assert sentences_embeddings_.shape[1] == pattern_embedding.shape[0]
+  # assert len(pattern_embedding.shape) == 1
+  # assert len(sentences_embeddings_.shape) == 2
+  # assert sentences_embeddings_.shape[1] == pattern_embedding.shape[0]
 
   _distances = np.ones(len(sentences_embeddings_))
   for word_index in range(0, len(sentences_embeddings_)):
@@ -614,7 +673,7 @@ def calc_distances_to_pattern(sentences_embeddings_: FixedVectors, pattern_embed
   return _distances
 
 
-import pandas as pd
+
 
 
 def calc_distances_per_pattern(sentences_embeddings_: [], patterns_named_embeddings: DataFrame) -> DataFrame:
@@ -634,7 +693,7 @@ def calc_distances_per_pattern_dict(sentences_embeddings_: [], patterns_names: [
   # TODO: see https://keras.io/layers/merge/#dot
   # TODO: use pandas dataframes
   warnings.warn("use calc_distances_per_pattern", DeprecationWarning)
-  assert len(patterns_names) == len(patterns_embeddings)
+  # assert len(patterns_names) == len(patterns_embeddings)
   distances_per_pattern_dict = {}
   for i in range(len(patterns_names)):
     _distances = calc_distances_to_pattern(sentences_embeddings_, patterns_embeddings[i])
@@ -735,18 +794,6 @@ def multi_attention_vector(patterns_emb: Embeddings, text_emb: Embeddings) -> Fi
   return max_exclusive_pattern(vectors)
 
 
-def best_window(attention_vector, wnd_len) -> (int, float, float):
-  max_sum = 0
-  best_index = 0
-  for k in range(len(attention_vector) - wnd_len + 1):
-    wnd = attention_vector[k:k + wnd_len]
-    _sum = sum(wnd)
-    if _sum > max_sum:
-      max_sum = _sum
-      best_index = k
-  return best_index, max_sum, max_sum / wnd_len
-
-
 def get_centroids(embeddings: Embeddings, clustered: pd.DataFrame, labels_column: str) -> Embeddings:
   centroids = []
   for cn in np.unique(clustered[labels_column]):
@@ -763,3 +810,19 @@ def softmax_rows(headers_df: DataFrame, columns):
   headers_df[columns] = _x
 
   return headers_df
+
+
+def is_in(c: int, span: [int]):
+  return c >= span[0] and c < span[1]
+
+
+def is_span_intersect(span1, span2) -> bool:
+  '''
+  ......a.....b....
+  ....c....d.......
+  :param span1:
+  :param span2:
+  :return:
+  '''
+  return is_in(span1[0], span2) or is_in(span1[1], span2) \
+         or is_in(span2[0], span1) or is_in(span2[1], span1)

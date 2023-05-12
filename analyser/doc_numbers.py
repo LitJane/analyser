@@ -23,7 +23,7 @@ def find_document_number_span(head_text: str) -> SemanticTag or None:
       _number = finding['number']
       if is_number_valid(_number):
         return _number, finding.span()
-  except:
+  except Exception:
     pass
   return None, None
 
@@ -54,11 +54,3 @@ def find_document_number_in_subdoc(doc: LegalDocument, tagname='number', parent=
         print('invalid', _number)
 
   return ret
-
-
-if __name__ == '__main__':
-  doc = LegalDocument(
-    'Договор пожертвования N 16-89/44 г. Санкт-Петербург                     «11» декабря 2018 год.\nМуниципальное бюджетное учреждение города Москвы «Радуга» именуемый в дальнейшем «Благополучатель»')
-  doc.parse()
-  tag = find_document_number(doc)
-  print(tag)

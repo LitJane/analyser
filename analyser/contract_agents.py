@@ -4,12 +4,14 @@
 
 
 import re
+import warnings
 
 from pyjarowinkler import distance
 
 from analyser.hyperparams import HyperParameters
 from analyser.legal_docs import LegalDocument
 from analyser.ml_tools import SemanticTag, put_if_better
+from analyser.schemas import OrgItem
 from analyser.structures import ORG_LEVELS_names, legal_entity_types
 from analyser.text_normalize import r_group, r_bracketed, r_quoted, r_capitalized_ru, \
   _r_name, r_quoted_name, ru_cap, normalize_company_name, r_alias_prefix, r_types, r_human_name, morphology_agnostic_re
@@ -26,12 +28,13 @@ def re_legal_entity_type(xx):
 
 
 legal_entity_types_re = {}
-for t in sorted(legal_entity_types, key=lambda x: -len(x)):
-  _regex = re_legal_entity_type(t)
+
+for __t in sorted(legal_entity_types, key=lambda x: -len(x)):
+  _regex = re_legal_entity_type(__t)
   rr = re.compile(_regex, re.IGNORECASE | re.UNICODE)
-  legal_entity_types_re[rr] = t
-  found = rr.match(t)[0]
-  assert t == found
+  legal_entity_types_re[rr] = __t
+  if __t != rr.match(__t)[0]:
+    raise RuntimeError(f"{__t}")
 
 _is_valid = is_long_enough
 
@@ -64,17 +67,18 @@ protocol_caption_complete_re_ignore_case = re.compile(complete_re_str_org,
 org_pieces = ['type', 'name', 'human_name', 'alt_name', 'alias', 'type_ext']
 
 
-class ContractAgent:
+class ContractAgent(OrgItem):
   # org_pieces = ['type', 'name', 'alt_name', 'alias', 'type_ext']
   def __init__(self):
-    self.name: SemanticTag or None = None
+
+    super().__init__()
     self.human_name: SemanticTag or None = None
-    self.type: SemanticTag or None = None
     self.alt_name: SemanticTag or None = None
-    self.alias: SemanticTag or None = None
     self.type_ext: SemanticTag or None = None
+    self.is_known_subsidiary = False
 
   def as_list(self):
+    warnings.warn("use OrgItem", DeprecationWarning)
     return [self.__dict__[key] for key in org_pieces if self.__dict__[key] is not None]
 
   def confidence(self):
@@ -85,6 +89,12 @@ class ContractAgent:
         confidence += tag.confidence
 
     return confidence / 3.0
+
+  def is_valid(self):
+    for child in self.as_list():
+      if child is not None:
+        return True
+    return False
 
 
 def clean_value(x: str) -> str or None:
@@ -100,17 +110,20 @@ def find_org_names(doc: LegalDocument,
                    decay_confidence=True,
                    audit_subsidiary_name=None, regex=complete_re,
                    re_ignore_case=complete_re_ignore_case) -> [SemanticTag]:
+  warnings.warn("deprecated because it calls _rename_org_tags", DeprecationWarning)
   _all: [ContractAgent] = find_org_names_raw(doc, max_names, parent, decay_confidence, regex=regex,
                                              re_ignore_case=re_ignore_case)
+
   if audit_subsidiary_name:
     _all = sorted(_all, key=lambda a: a.name.value != audit_subsidiary_name)
   else:
     _all = sorted(_all, key=lambda a: a.name.value)
 
-  return _rename_org_tags(_all, tag_kind_prefix, start_from=1)
+  return _rename_org_tags(_all, prefix=tag_kind_prefix, start_from=1)
 
 
 def _rename_org_tags(all_: [ContractAgent], prefix='', start_from=1) -> [SemanticTag]:
+  warnings.warn("please switch to attributes_tree struktur", DeprecationWarning)
   tags = []
   for group, agent in enumerate(all_):
     for tag in agent.as_list():
@@ -183,13 +196,12 @@ def find_org_names_raw_by_re(doc: LegalDocument, regex, confidence_base: float, 
         pass
 
   # normalize org_name names by find_closest_org_name
-  for ca in all_:
-    normalize_contract_agent(ca)
+  all_ = [normalize_contract_agent(ca) for ca in all_]
 
   return all_
 
 
-def normalize_contract_agent(ca: ContractAgent):
+def normalize_contract_agent(ca: ContractAgent or OrgItem) -> OrgItem:
   if ca.name is not None:
     _, val = normalize_company_name(ca.name.value)
     ca.name.value = val
@@ -198,6 +210,7 @@ def normalize_contract_agent(ca: ContractAgent):
     if known_org_name is not None:
       ca.name.value = known_org_name['_id']
       ca.name.confidence *= best_similarity
+      ca.is_known_subsidiary = True
 
   # normalize org_type names by find_closest_org_name
   if ca.type is not None:
@@ -205,15 +218,18 @@ def normalize_contract_agent(ca: ContractAgent):
     ca.type.value = long_
     ca.type.confidence *= confidence_
 
+  return ca
 
-def find_closest_org_name(subsidiaries:dict, pattern:str, threshold=HyperParameters.subsidiary_name_match_min_jaro_similarity):
-  if pattern is None:
+
+def find_closest_org_name(subsidiaries_: [dict], pattern: str,
+                          threshold=HyperParameters.subsidiary_name_match_min_jaro_similarity):
+  if pattern is None or pattern=='':
     return None, 0
   best_similarity = 0
   finding = None
   _entity_type, pn = normalize_company_name(pattern)
 
-  for s in subsidiaries:
+  for s in subsidiaries_:
     for alias in s['aliases'] + [s['_id']]:
       similarity = compare_masked_strings(pn, alias, [])
       if similarity > best_similarity:

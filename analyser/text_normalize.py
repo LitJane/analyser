@@ -52,13 +52,19 @@ r_name = r_group(_r_name, 'name')
 """Puts name into qotes"""
 r_human_name_part = r_capitalized
 
-r_human_full_name = r_group(r_human_name_part + r'\s*' + r_human_name_part + '\s*' + r_human_name_part + '?\w')
-r_human_abbr_name = r_group(r_human_name_part + r'\s*' + '([А-ЯA-Z][.]\s?){1,2}')
+r_human_name_part_norm = r_group(r'\b[А-ЯA-Z]\B[а-яa-z]{1,25}')
+r_human_name_part_cap = r_group(r'[A-ZА-Я-]{0,25}')
+
+
+r_human_full_name = r_group(r_human_name_part_norm + r'\s*' + r_human_name_part_norm + r'\s*' + r_human_name_part_norm + r'?\w')
+r_human_abbr_name = r_group(r_human_name_part_norm + r'\s*' + r'([А-ЯA-Z][.]\s?){1,2}')
 r_human_name = r_group(r_human_full_name + '|' + r_human_abbr_name, 'human_name')
 
+r_human_name_compilled = re.compile(r'\W' + r_human_name, re.MULTILINE)
 
 def r_quoted(x):
-  assert x is not None
+  if x is None:
+    raise ValueError('provide x please')
   return r_quote_open + r'\s*' + x + r'\s*' + r_quote_close
 
 
@@ -162,7 +168,6 @@ fixtures_regex = [
   (re.compile(r'FORMTEXT'), ''),
   (re.compile(r''), ' ')  # ACHTUNG!! this is not just a space
 
-
 ]
 
 formatting_regex = [
@@ -183,9 +188,9 @@ table_of_contents_regex = [
 ]
 
 
-def normalize_text(_t: str, replacements_regex):
+def normalize_text(_t: str, replacements_regex_):
   t = _t.replace("''", r'"')
-  for (reg, to) in replacements_regex:
+  for (reg, to) in replacements_regex_:
     t = reg.sub(to, t)
 
   return t

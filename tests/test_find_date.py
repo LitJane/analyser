@@ -19,13 +19,13 @@ class DatesTestCase(unittest.TestCase):
    
   Акционерное общество «Тумманность Рассудка» (АО «Тумманность Рассудка»), именуемое в дальнейшем «Тумманность», в лице Генерального директора Леопольда Никанорыча Вжик, действующего на основании Сустава, с одной стороны, 
     '''
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(15, 4, 2015, date_)
 
-    span, date_ = find_date(txt.lower())
+    _, date_ = find_date(txt.lower())
     self.validate_date(15, 4, 2015, date_)
 
-    span, date_ = find_date(txt.upper())
+    _, date_ = find_date(txt.upper())
     self.validate_date(15, 4, 2015, date_)
 
   def validate_date(self, d, m, y, date_):
@@ -53,55 +53,55 @@ class DatesTestCase(unittest.TestCase):
 
   заочное голосование'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(15, 5, 2014, date_)
 
   def test_find_date_2(self):
     txt = '''1 мая 2014 года'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(1, 5, 2014, date_)
 
   def test_find_date_3(self):
     txt = '''1 марта 2014 года'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(1, 3, 2014, date_)
 
   def test_find_date_3_1(self):
     txt = '''1 янв 2014 года'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(1, 1, 2014, date_)
 
   def test_find_date_3_0(self):
     txt = '''1 января 2014 года'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(1, 1, 2014, date_)
 
   def test_find_date_4(self):
     txt = '''1.12.2019'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(1, 12, 2019, date_)
 
   def test_find_date_4_1(self):
     txt = '''01.12.2019'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(1, 12, 2019, date_)
 
   def test_find_date_5(self):
     txt = '''01-12-2019'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(1, 12, 2019, date_)
 
   def test_find_date_6(self):
     txt = '''1-12-2019'''
 
-    span, date_ = find_date(txt)
+    _, date_ = find_date(txt)
     self.validate_date(1, 12, 2019, date_)
 
 

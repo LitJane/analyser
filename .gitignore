@@ -1,5 +1,6 @@
 
 venv/
+work_bak/
 .idea/
 
 tests/libs/**/
@@ -42,3 +43,13 @@ trainsets/uber_detection_model_003.0.log.csv
 
 
 trainsets/.ipynb_checkpoints
+/venv3.9/
+notebooks/.ipynb_checkpoints/**
+.DS_Store
+libs/document-parser-1.6.4.jar
+libs/document-parser-1.6.4-distribution.zip
+tmp.py
+trainsets/uber_detection_model_003.21.log.csv
+libs/document-parser-1.6.14.jar
+libs/document-parser-1.6.14.zip
+libs/document-parser-1.6.7.jar

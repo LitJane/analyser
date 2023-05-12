@@ -131,19 +131,11 @@ class TestTextNormalization(unittest.TestCase):
     self.assertEqual('с передачей в аренду / субаренду недвижимого', doc.text)
 
   def test_normalize_double_quotes(self):
-    # doc_text = " '' "
-    # doc = CharterDocument(doc_text)
-    # doc.parse()
-    # self.assertEqual(' " ', doc.text)
 
     tt = "''Газпром''"
     self._testNorm(tt, '"Газпром"')
 
   def test_normalize_doc_double_quotes(self):
-    doc_text = " '' "
-    # doc = CharterDocument(doc_text)
-    # doc.parse()
-    # self.assertEqual(' " ', doc.text)
 
     tt = "''Газпром''"
     doc = LegalDocument(tt)
@@ -264,14 +256,14 @@ class TestTextNormalization(unittest.TestCase):
     for t in legal_entity_types:
       print(t, legal_entity_types[t])
 
-      long_, short_, confidence = normalize_legal_entity_type(t)
+      long_, _, _ = normalize_legal_entity_type(t)
       self.assertEqual(t, long_)
 
   def test_normalize_legal_entity_type_short(self):
     for t in legal_entity_types:
       print(t, legal_entity_types[t])
 
-      long_, short_, confidence = normalize_legal_entity_type(t)
+      _, short_, _ = normalize_legal_entity_type(t)
       self.assertEqual(legal_entity_types[t], short_)
 
 

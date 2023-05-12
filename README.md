@@ -16,7 +16,7 @@ https://colab.research.google.com/github/nemoware/analyser/blob/master/notebooks
 
 
 ___
-## Misc commands
+## Miscl. commands
 - Create wheel: 
 ```
 python setup.py bdist_wheel 
@@ -30,7 +30,7 @@ pip wheel -r requirements.txt --wheel-dir=tmp/wheelhouse
 pip install --no-index --find-links=tmp/wheelhouse SomePackage 
 ```
 
-## Assign release tag:
+## Assign a release tag:
 1. Create a tag:
     ```                     
     > git tag -a vX.X.X -m "<release comment>"
@@ -40,7 +40,7 @@ pip install --no-index --find-links=tmp/wheelhouse SomePackage
     > git push origin --tags
     ```
 
-## Usage(Windows):
+## Usage (Windows):
 1. Install Python >=3.6 and pip
 1. Install ```virtualenv```( [https://virtualenv.pypa.io/en/latest/installation/]() ):
     ```
@@ -70,7 +70,7 @@ pip install --no-index --find-links=tmp/wheelhouse SomePackage
     ```
 
 
-## Run analyzer as service
+## Run analyzer as a service
 1. Register systemd service
     ```
     > cd bin 
@@ -82,4 +82,25 @@ pip install --no-index --find-links=tmp/wheelhouse SomePackage
     sudo systemctl start nemoware-analyzer.service         #To start running service 
     sudo systemctl restart nemoware-analyzer.service       #To restart running service 
     ```
+    
+# CML 
+### contintinous machine learning
+CML is triggered only on push or pull request to `model` branch.  
+refer https://github.com/nemoware/analyser/.github/workflows/cml.yaml
+
+to run CML worker (just example, parameters may differ):
+
+```
+sudo docker run --name <ANYNAME> -d 
+   -v ~/pip_cache:/pip_cache 
+   -v ~/gpn:/gpn_cml 
+   -e GPN_WORK_DIR=/gpn_cml   
+   -e RUNNER_IDLE_TIMEOUT=18000  
+   -e RUNNER_LABELS=cml,cpu   
+   -e RUNNER_REPO=https://github.com/nemoware/analyser   
+   -e repo_token=<personal github access token> 
+   -e GPN_DB_HOST=192.168.10.36 
+   -e PIP_DOWNLOAD_CACHE=/pip_cache    
+   dvcorg/cml-py3
+```
 

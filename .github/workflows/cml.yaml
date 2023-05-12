@@ -1,0 +1,62 @@
+name: train-my-model
+
+on: 
+  # Trigger the workflow on push or pull request,
+  # but only for the main branch
+  push:
+    branches:
+      - model
+  pull_request:
+    branches:
+      - model
+
+jobs:
+  train:
+    runs-on: [self-hosted, cml, cpu]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: cml_run
+        run: |
+          echo '# Hail from CML runner @ NeMo ' >> report.md
+          
+          python --version >> report.md          
+          pip3 install -r requirements.txt          
+          python -c "import tensorflow as tf; print('Tensorflow:',tf.__version__)" >> report.md
+          
+          python check_db.py           
+          python train.py 
+          
+          REPORTS=$GPN_WORK_DIR/reports
+          MODEL_NAME="uber_detection_model_005_1_1"
+          QQQ="\`\`\`"
+          
+          
+          echo '## Evaluating ' >> report.md
+          echo $MODEL_NAME >> report.md
+          
+          echo $QQQ >> report.md
+          cat $REPORTS/subjects-classification_report-$MODEL_NAME.txt >> report.md 
+          echo $QQQ >> report.md   
+          
+          echo '### Subjects distribution in trainset' >> report.md     
+          cml-publish $REPORTS/contracts-subjects-dist.png --md >> report.md
+          
+          echo '### Subjects confusion matrix' >> report.md     
+          cml-publish $REPORTS/subjects-confusion-matrix-$MODEL_NAME.png --md >> report.md
+    
+          echo '### Tagging loss' >> report.md     
+          cml-publish $REPORTS/$MODEL_NAME-O1_tagging_loss.png --md >> report.md
+          
+          echo '### Subjects prediction loss' >> report.md     
+          cml-publish $REPORTS/$MODEL_NAME-O2_subject_loss.png --md >> report.md
+          
+          echo '### Loss' >> report.md     
+          cml-publish $REPORTS/$MODEL_NAME-loss.png --md >> report.md
+          
+          
+          
+          cml-send-comment report.md
+          
+

@@ -32,7 +32,7 @@ class FuzzyPattern():
 
   def set_embeddings(self, pattern_embedding, region=None):
     # TODO: check dimensions
-    assert pattern_embedding[0][0]
+
     self.embeddings = pattern_embedding
     self.region = region
 
@@ -155,7 +155,7 @@ class ExclusivePattern(CompoundPattern):
     for row in distances_per_pattern:
       b = row
 
-      if len(b):
+      if len(b) > 0:
         min = np.nanmin(b)
         max = np.nanmax(b)
         mean = np.nanmean(b)
@@ -195,7 +195,8 @@ class AbstractPatternFactory:
 
     # =========
     patterns_emb, regions = embedder.embedd_contextualized_patterns(arr)
-    assert len(patterns_emb) == len(self.patterns)
+    if len(patterns_emb) != len(self.patterns):
+      raise RuntimeError("len(patterns_emb) != len(self.patterns)")
     # =========
 
     for i in range(len(patterns_emb)):
@@ -216,7 +217,8 @@ class AbstractPatternFactory:
         else:
           av_emb += p_av_emb
 
-    assert cnt > 0
+    if cnt <= 0:
+      raise RuntimeError("count must be >0")
 
     av_emb /= cnt
 
@@ -272,7 +274,9 @@ def make_pattern_attention_vector(pat: FuzzyPattern, embeddings, dist_function=D
 
 
 def make_smart_meta_click_pattern(attention_vector, embeddings, name=None):
-  assert attention_vector is not None
+  if attention_vector is None:
+    raise ValueError("please provide non empty attention_vector")
+
   if name is None:
     name = 's-meta-na-' + str(random.random())
 
@@ -295,7 +299,7 @@ class PatternMatch():
 
   def __init__(self, region):
     warnings.warn("use SemanticTag", DeprecationWarning)
-    assert region.stop - region.start > 0
+
     self.subject_mapping = {
       'subj': ContractSubject.Other,
       'confidence': 0
@@ -329,8 +333,7 @@ class PatternMatch():
 class PatternSearchResult(PatternMatch):
   def __init__(self, org_level: OrgStructuralLevel, region):
     warnings.warn("use SemanticTag", DeprecationWarning)
-    super(PatternSearchResult, self).__init__(region)
-
+    super().__init__(region)
     self.org_level: OrgStructuralLevel = org_level
 
 
@@ -338,16 +341,13 @@ class ConstraintsSearchResult:
   def __init__(self):
     warnings.warn("ConstraintsSearchResult is deprecated, use PatternSearchResult.constraints", DeprecationWarning)
     self.constraints: [ValueConstraint] = []
-    self.subdoc: PatternSearchResult = None
+    self.subdoc = None
 
-  def get_context(self) -> PatternSearchResult:  # alias
+  def get_context(self):  # alias
     warnings.warn("ConstraintsSearchResult is deprecated, use PatternSearchResult.constraints", DeprecationWarning)
     return self.subdoc
 
   context = property(get_context)
-
-
-PatternSearchResults = [PatternSearchResult]
 
 
 def create_value_negation_patterns(f: AbstractPatternFactory, name='not_sum_'):
@@ -380,7 +380,7 @@ def create_value_patterns(f: AbstractPatternFactory, name='sum_max_p_'):
   f.create_pattern(f'{name}9', (_prefix + 'максимальная сумма', '0', suffix))
 
 
-PATTERN_DELIMITER = '/'
+PATTERN_DELIMITER = ':'
 
 
 def build_sentence_patterns(strings: Tokens, prefix: str, prefix_obj=None):

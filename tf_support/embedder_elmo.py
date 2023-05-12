@@ -1,21 +1,21 @@
-import logging
+import os
 
 import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 
 from analyser.embedding_tools import AbstractEmbedder
-from analyser.hyperparams import tf_cache
+from analyser.hyperparams import work_dir
+from analyser.log import logger
 from analyser.text_tools import Tokens
 
-_e_instance: AbstractEmbedder = None
-
-import os
+_e_instance: AbstractEmbedder or None = None
 
 if "TFHUB_CACHE_DIR" not in os.environ:
+  tf_cache = os.path.join(work_dir, 'tf_cache')
   os.environ["TFHUB_CACHE_DIR"] = tf_cache
 
-logger = logging.getLogger('root')
+
 
 
 class ElmoEmbedderWrapper(AbstractEmbedder):
@@ -26,8 +26,8 @@ class ElmoEmbedderWrapper(AbstractEmbedder):
   def embedd_tokens(self, tokens: Tokens) -> np.ndarray:
     if self.layer_name == 'elmo':
       return self.instance.embedd_tokenized_text([tokens], [len(tokens)])[0]
-    else:
-      return self.instance.embedd_strings(tokens)
+
+    return self.instance.embedd_strings(tokens)
 
   def embedd_tokenized_text(self, words: [Tokens], lens: [int]) -> np.ndarray:
     return self.instance.embedd_tokenized_text(words, lens)
@@ -40,7 +40,7 @@ class ElmoEmbedderImpl(AbstractEmbedder):
 
   def __init__(self, module_url: str = 'https://storage.googleapis.com/az-nlp/elmo_ru-news_wmt11-16_1.5M_steps.tar.gz'):
     self.module_url = module_url
-    self.elmo = None
+    # self.elmo = None
     self.session = None
 
   def _build_session_and_graph(self):
@@ -49,8 +49,8 @@ class ElmoEmbedderImpl(AbstractEmbedder):
 
     with embedding_graph.as_default():
       logger.info(f'< loading ELMO module {self.module_url}')
-      logger.info(f'TF hub cache dir is models{os.environ["TFHUB_CACHE_DIR"]}')
-      self.elmo = hub.Module(self.module_url, trainable=False)
+      logger.info(f'TF hub cache dir is  {os.environ["TFHUB_CACHE_DIR"]}')
+      _elmo = hub.Module(self.module_url, trainable=False)
       logger.info(f'ELMO module loaded >')
 
       self.text_input = tf.compat.v1.placeholder(dtype='string', name="text_input")
@@ -66,14 +66,14 @@ class ElmoEmbedderImpl(AbstractEmbedder):
     }
 
     with embedding_graph.as_default():
-      logger.info(f'ELMO: creating embedded_out_elmo')
-      self.embedded_out_elmo = self.elmo(
+      logger.info('ELMO: creating embedded_out_elmo...')
+      self.embedded_out_elmo = _elmo(
         inputs=inputs_elmo,
         signature="tokens",
         as_dict=True)['elmo']
 
-      logger.info(f'ELMO: embedded_out_defaut embedded_out_elmo')
-      self.embedded_out_defaut = self.elmo(
+      logger.info('ELMO: embedded_out_defaut embedded_out_elmo')
+      self.embedded_out_defaut = _elmo(
         inputs=inputs_default,
         signature="default",
         as_dict=True)['default']
@@ -84,6 +84,7 @@ class ElmoEmbedderImpl(AbstractEmbedder):
       self.session.run(init_op)
 
     embedding_graph.finalize()
+    logger.info(f'graph finalized >>')
 
   def embedd_tokens(self, tokens: Tokens) -> np.ndarray:
     if self.session is None:

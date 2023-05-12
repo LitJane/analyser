@@ -17,12 +17,12 @@ from integration.word_document_parser import WordDocParser, join_paragraphs
 MAX_DOCS = 500  # 0.0153 degrees.
 
 
-def doc_line_features(legal_doc: LegalDocument) -> []:
-  tmap = legal_doc.tokens_map
-  features = []
+def doc_line_features(doc: LegalDocument) -> []:
+  tmap = doc.tokens_map
+  _features = []
   ln: int = 0
   _prev_features = None
-  for p in legal_doc.paragraphs:
+  for p in doc.paragraphs:
 
     header_tokens = tmap[p.header.slice]
     # print('☢️', header_tokens)
@@ -33,7 +33,7 @@ def doc_line_features(legal_doc: LegalDocument) -> []:
     else:
       header_features['actual'] = 1.0
 
-    features.append(header_features)
+    _features.append(header_features)
     _prev_features = header_features.copy()
     ln += 1
     # --
@@ -45,11 +45,11 @@ def doc_line_features(legal_doc: LegalDocument) -> []:
 
       body_features = line_features(bodymap, line_span, ln, _prev_features)
       body_features['actual'] = 0
-      features.append(body_features)
+      _features.append(body_features)
       _prev_features = body_features.copy()
       ln += 1
 
-  return features
+  return _features
 
 
 if __name__ == '__main__':
@@ -67,7 +67,7 @@ if __name__ == '__main__':
   for resp in res:
     for d in resp['documents']:
       doctype = d['documentType']
-      if doctype == 'CONTRACT' or doctype == 'PROTOCOL' or doctype == 'CHARTER':
+      if doctype in ('CONTRACT', 'PROTOCOL', 'CHARTER'):
         print(resp['_id'])
         legal_doc = join_paragraphs(d, resp['_id'])
         _doc_features = doc_line_features(legal_doc)
@@ -75,7 +75,8 @@ if __name__ == '__main__':
 
         count += 1
 
-    if count > MAX_DOCS: break
+    if count > MAX_DOCS:
+      break
 
   featuresX_data = pd.DataFrame.from_records(features_dicts)
   print(featuresX_data.head())

@@ -6,14 +6,15 @@ import traceback
 import warnings
 
 import nltk
-
-from analyser.hyperparams import models_path
-
-nltk.data.path.append(os.path.join(models_path, 'nltk'))
 import numpy as np
 
-from analyser.ml_tools import spans_to_attention
+from analyser.hyperparams import models_path
+from analyser.log import logger
+from analyser.ml_tools import spans_to_attention, FixedVector
 from analyser.text_tools import Tokens, untokenize, replace_tokens, split_into_sentences
+
+nltk.data.path.append(os.path.join(models_path, 'nltk'))
+
 
 TEXT_PADDING_SYMBOL = ' '
 
@@ -39,6 +40,9 @@ class TextMap:
     tm._offset_chars = self._offset_chars
     return tm
 
+  def get_full_text(self):
+    return str(self._full_text)
+
   def cleanup(self):
     warnings.warn("fix tokenization instead of using it, also, it breaks attributes mapping", DeprecationWarning)
     '''
@@ -60,7 +64,7 @@ class TextMap:
 
     return self
 
-  def regex_attention(self, regex):
+  def regex_attention(self, regex) -> FixedVector:
     matches = list(self.finditer(regex))
     return spans_to_attention(matches, len(self))
 
@@ -80,7 +84,8 @@ class TextMap:
       yield self.token_indices_by_char_range(m.span(0))
 
   def token_index_by_char(self, _char_index: int) -> int:
-    if not self.map: return -1
+    if not self.map:
+      return -1
 
     local_off = self.map[0][0] - self._offset_chars
     """
@@ -140,7 +145,7 @@ class TextMap:
 
   def sentence_at_index(self, i: int, return_delimiters=True) -> (int, int):
 
-    warnings.warn("use LegalDocument.sentence_at_index", DeprecationWarning)
+    warnings.warn("use LegalDocument.sentence_at_index and sentence map", DeprecationWarning)
 
     sent_spans = self.split_spans('\n', add_delimiter=return_delimiters)
     d_add = 1
@@ -173,7 +178,8 @@ class TextMap:
     return start - self._offset_chars, stop - self._offset_chars
 
   def remap_spans(self, spans, target_map: 'TextMap'):
-    assert self._full_text == target_map._full_text
+    if self._full_text != target_map._full_text:
+      raise ValueError("_full_text != target_map._full_text")
     ret = []
     for span in spans:
       char_range = self.char_range(span)
@@ -185,7 +191,6 @@ class TextMap:
     if self._full_text != target_map._full_text:
       msg = f'remap: texts differ {len(self._full_text)}!={len(target_map._full_text)}'
       raise ValueError(msg)
-
 
     char_range = self.char_range(span)
     target_range = target_map.token_indices_by_char_range(char_range)
@@ -204,7 +209,7 @@ class TextMap:
     try:
       start, stop = self.char_range(span)
       return self._full_text[start + self._offset_chars: stop + self._offset_chars]
-    except:
+    except Exception:
       err = f'cannot deal with {span}'
       traceback.print_exc(file=sys.stdout)
       raise RuntimeError(err)
@@ -226,7 +231,7 @@ class TextMap:
   def __len__(self):
     return self.get_len()
 
-  def __getitem__(self, key):
+  def __getitem__(self, key) -> str:
     if isinstance(key, slice):
       # Get the start, stop, and step from the slice
       return [self[ii] for ii in range(*key.indices(len(self)))]
@@ -263,7 +268,7 @@ class CaseNormalizer:
     self.__dict__ = self.__shared_state
     if 'replacements_map' not in self.__dict__:
       p = os.path.join(models_path, 'word_cases_stats.pickle')
-      print('loading word cases stats model from:', p)
+      logger.info(f'loading word cases stats model from: {p}')
 
       with open(p, 'rb') as handle:
         self.replacements_map: dict = pickle.load(handle)

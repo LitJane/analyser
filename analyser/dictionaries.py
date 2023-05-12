@@ -1,10 +1,25 @@
+import json
+import os
+from pathlib import Path
+
+from pymongo import DESCENDING
+
 import analyser
 from analyser.charter_parser import CharterParser
+from analyser.schemas import document_schemas
 from analyser.structures import OrgStructuralLevel, ContractSubject, contract_subjects, \
   legal_entity_types
 from gpn.gpn import subsidiaries
 from integration.db import get_mongodb_connection
-from pymongo import DESCENDING
+
+integration_path = Path(analyser.__file__).parent.parent / 'integration' / 'classifier'  # .parent/'integration/classifier'
+
+with open(integration_path / 'practices.json', encoding='utf-8') as practice_json_file:
+  all_labels = json.load(practice_json_file)
+
+labels = list(map(lambda item: item['label'], filter(lambda item: item['auto-classified'], all_labels)))
+
+label2id = {item['label']: item['_id'] for item in all_labels}
 
 
 def contract_subject_as_db_json():
@@ -24,12 +39,26 @@ def legal_entity_types_as_db_json():
     yield {'_id': k, 'alias': legal_entity_types[k]}
 
 
+def insert_schemas_to_db(db):
+  collection_schemas = db['schemas']
+
+  json_str = json.dumps(document_schemas, indent=4)
+  # print(json_str)
+  # print(type(json_str))
+  key = f"documents_schema_{analyser.__version__}"
+  collection_schemas.delete_many({"_id": key})
+  collection_schemas.insert_one({"_id": key, 'json': json_str, "version": analyser.__version__})
+
+
 def update_db_dictionaries():
   db = get_mongodb_connection()
 
-  coll = db["subsidiaries"]
-  coll.delete_many({})
-  coll.insert_many(subsidiaries)
+  insert_schemas_to_db(db)
+
+  if os.environ.get("GPN_CSGK_WSDL") is None:
+    coll = db["subsidiaries"]
+    coll.delete_many({})
+    coll.insert_many(subsidiaries)
 
   coll = db["orgStructuralLevel"]
   coll.delete_many({})
@@ -47,6 +76,11 @@ def update_db_dictionaries():
   coll.delete_many({})
   coll.insert_one({'version': analyser.__version__})
 
+  coll = db['practices']
+  coll.delete_many({})
+  coll.insert_many(all_labels)
+  coll.create_index('tessa_id')
+
   # indexing
   print('creating db indices')
   coll = db["documents"]
@@ -57,6 +91,15 @@ def update_db_dictionaries():
   print("index response:", resp)
   resp = coll.create_index([("analysis.attributes.date.value", DESCENDING)])
   print("index response:", resp)
+
+  coll = db['audits']
+  coll.create_index('status')
+  coll.create_index('email_sent')
+  coll.create_index('additionalFields.external_source')
+  coll.create_index('toBeApproved')
+
+  coll = db['subsidiarybookvalues']
+  coll.create_index('uploadDate')
 
 
 if __name__ == '__main__':

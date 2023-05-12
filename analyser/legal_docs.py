@@ -12,17 +12,18 @@ from enum import Enum
 import numpy as np
 from bson import json_util
 from overrides import final
-from pandas import DataFrame
 
 import analyser
+from analyser.attributes import to_json
 from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import split_sentences_into_map, TextMap, CaseNormalizer
 from analyser.embedding_tools import AbstractEmbedder
 from analyser.hyperparams import HyperParameters
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, FixedVector, Embeddings, filter_values_by_key_prefix, rectifyed_sum, \
-  conditional_p_sum
+  conditional_p_sum, clean_semantic_tag_copy
 from analyser.patterns import DIST_FUNC, AbstractPatternFactory, make_pattern_attention_vector
+from analyser.schemas import ContractPrice, DocumentSchema, GenericDocSchema
 from analyser.structures import ContractTags
 from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.text_tools import find_token_before_index
@@ -66,8 +67,10 @@ class LegalDocument:
   def __init__(self, original_text=None, name="legal_doc"):
 
     self._id = None  # TODO
-    self.date: SemanticTag or None = None
-    self.number: SemanticTag or None = None
+
+    self.attributes_tree: DocumentSchema or None = DocumentSchema()
+    # self.date: SemanticTag or None = None
+    # self.number: SemanticTag or None = None
 
     self.filename = None
     self._original_text = original_text
@@ -92,6 +95,9 @@ class LegalDocument:
 
     # TODO: probably we don't have to keep embeddings, just distances_per_pattern_dict
     self.embeddings = None
+
+  def get_id(self):
+    return self._id
 
   def clear_warnings(self):
     self.warnings = []
@@ -118,7 +124,8 @@ class LegalDocument:
     if txt is None:
       txt = self.original_text
 
-    assert txt is not None
+    if txt is None:
+      raise ValueError('text is a must')
 
     _preprocessed_text = self.preprocess_text(txt)
     self.tokens_map = TextMap(_preprocessed_text)
@@ -127,12 +134,13 @@ class LegalDocument:
     return self
 
   def sentence_at_index(self, i: int, return_delimiters=True) -> (int, int):
-    #TODO: employ elf.sentence_map
+    # TODO: employ elf.sentence_map
     return self.tokens_map.sentence_at_index(i, return_delimiters)
 
-  def split_into_sentenses(self):
-    self.sentence_map = tokenize_doc_into_sentences_map(self.tokens_map._full_text,
-                                                        HyperParameters.protocol_sentence_max_len)
+  def split_into_sentenses(self, sentence_max_len=HyperParameters.protocol_sentence_max_len):
+    self.sentence_map = tokenize_doc_into_sentences_map(self.tokens_map.get_full_text(),
+                                                        sentence_max_len)
+
 
   def __len__(self):
     return self.tokens_map.get_len()
@@ -160,48 +168,19 @@ class LegalDocument:
 
     return self
 
-  def get_tags(self) -> [SemanticTag]:
-    return []
-
   def headers_as_sentences(self) -> [str]:
     return headers_as_sentences(self)
 
-  def get_semantic_map(self, confidence_override=None) -> DataFrame:
+  def get_headline(self):
+    hh = headers_as_sentences(self)
+    if (hh is not None) and len(hh) > 0:
+      return hh[0]
 
-    '''
-    #TODO: do not ignore user corrections
-    used in jupyter notebooks
-    :return:
-    '''
-
-    _tags = self.get_tags()
-    _attention = np.zeros((len(_tags), self.__len__()))
-
-    df = DataFrame()
-    for i, t in enumerate(_tags):
-      df[t.kind] = 0
-      _conf = t.confidence
-      if confidence_override is not None:
-        _conf = confidence_override
-
-      _attention[i][t.as_slice()] = _conf
-
-    for i, t in enumerate(_tags):
-      df[t.kind] = 0
-      df[t.kind] = _attention[i]
-
-    return df
-
-  def get_tags_attention(self) -> FixedVector:
-    _attention = np.zeros(self.__len__())
-
-    for t in self.get_tags():
-      _attention[t.as_slice()] += t.confidence
-    return _attention
-
-  def to_json_obj(self):
+  def to_json_obj(self) -> dict:
     j = DocumentJson(self)
-    return j.__dict__
+    _json_tree = j.__dict__
+    _json_tree['attributes_tree'] = {}
+    return _json_tree
 
   def to_json(self) -> str:
     j = DocumentJson(self)
@@ -233,7 +212,8 @@ class LegalDocument:
   checksum = property(get_checksum, None)
 
   def preprocess_text(self, txt):
-    assert txt is not None
+    if txt is None:
+      raise ValueError('text is a must')
     return normalize_text(txt, replacements_regex)
 
   def find_sentence_beginnings(self, indices):
@@ -245,14 +225,18 @@ class LegalDocument:
     if self.embeddings is None:
       raise UnboundLocalError(f'Embedd document first, {self._id}')
 
-    self.distances_per_pattern_dict = calculate_distances_per_pattern(self, pattern_factory, dist_function, merge=merge,
+    self.distances_per_pattern_dict = calculate_distances_per_pattern(self, pattern_factory, dist_function,
+                                                                      merge=merge,
                                                                       verbosity=verbosity,
                                                                       pattern_prefix=pattern_prefix)
 
     return self.distances_per_pattern_dict
 
   def subdoc_slice(self, __s: slice, name='undef'):
-    assert self.tokens_map is not None
+
+    if self.tokens_map is None:
+      raise RuntimeError('self.tokens_map is required, tokenize first')
+
     # TODO: support None in slice begin
     _s = slice(max((0, __s.start)), max((0, __s.stop)))
 
@@ -292,15 +276,7 @@ class LegalDocument:
     self.embeddings = embedd_tokens(self.tokens_map_norm,
                                     embedder,
                                     max_tokens=max_tokens,
-                                    log_key=self._id)
-
-  def is_same_org(self, org_name: str) -> bool:
-    tags: [SemanticTag] = self.get_tags()
-    for t in tags:
-      if t.kind in ['org-1-name', 'org-2-name', 'org-3-name']:
-        if t.value == org_name:
-          return True
-    return False
+                                    log_key=f'_id:{self._id}')
 
   def get_tag_text(self, tag: SemanticTag) -> str:
     return self.tokens_map.text_range(tag.span)
@@ -308,12 +284,18 @@ class LegalDocument:
   def substr(self, tag: SemanticTag) -> str:
     return self.tokens_map.text_range(tag.span)
 
-  def tag_value(self, tagname):
-    t = SemanticTag.find_by_kind(self.get_tags(), tagname)
-    if t:
-      return t.value
-    else:
-      return None
+
+class GenericDocument(LegalDocument):
+
+  def __init__(self, original_text):
+    LegalDocument.__init__(self, original_text)
+    self.attributes_tree = GenericDocSchema()
+
+  def to_json_obj(self) -> dict:
+    j: dict = super().to_json_obj()
+    _attributes_tree_dict, _ = to_json(self.attributes_tree)
+    j['attributes_tree']["generic"] = _attributes_tree_dict
+    return j
 
 
 class LegalDocumentExt(LegalDocument):
@@ -321,15 +303,12 @@ class LegalDocumentExt(LegalDocument):
   def __init__(self, doc: LegalDocument):
     super().__init__('')
 
-
     if doc is not None:
       # self.__dict__ = doc.__dict__
       self.__dict__.update(doc.__dict__)
 
     self.sentences_embeddings: Embeddings = None
     self.distances_per_sentence_pattern_dict = {}
-
-
 
   def parse(self, txt=None):
     super().parse(txt)
@@ -379,6 +358,8 @@ class DocumentJson:
 
     if doc is None:
       return
+
+    # ---------------- bred
     self.checksum = doc.get_checksum()
     self.warnings: [str] = list(doc.warnings)
 
@@ -391,28 +372,14 @@ class DocumentJson:
     self.original_text = doc.original_text
     self.normal_text = doc.normal_text
 
-    self.attributes = self.__tags_to_attributes_dict(doc.get_tags())
     self.headers = self.__tags_to_attributes_list([hi.header for hi in doc.paragraphs])
 
-  def __tags_to_attributes_list(self, _tags):
+  def __tags_to_attributes_list(self, _tags) -> []:
 
     attributes = []
     for t in _tags:
       key, attr = t.as_json_attribute()
       attributes.append(attr)
-
-    return attributes
-
-  def __tags_to_attributes_dict(self, _tags: [SemanticTag]):
-
-    attributes = {}
-    for t in _tags:
-      key, attr = t.as_json_attribute()
-
-      if key in attributes:
-        raise RuntimeError(key + ' duplicated key')
-
-      attributes[key] = attr
 
     return attributes
 
@@ -440,7 +407,8 @@ def calculate_distances_per_pattern(doc: LegalDocument, pattern_factory: Abstrac
   c = 0
   for pat in pattern_factory.patterns:
     if pattern_prefix is None or pat.name[:len(pattern_prefix)] == pattern_prefix:
-      if verbosity > 1: print(f'estimating distances to pattern {pat.name}', pat)
+      if verbosity > 1:
+        print(f'estimating distances to pattern {pat.name}', pat)
 
       dists = make_pattern_attention_vector(pat, doc.embeddings, dist_function)
       distances_per_pattern_dict[pat.name] = dists
@@ -470,12 +438,37 @@ def find_value_sign(txt: TextMap) -> (int, (int, int)):
 
 class ContractValue:
   def __init__(self, sign: SemanticTag, value: SemanticTag, currency: SemanticTag, parent: SemanticTag = None):
+    warnings.warn("switch to ContractPrice struktur", DeprecationWarning)
     self.value: SemanticTag = value
     self.sign: SemanticTag = sign
     self.currency: SemanticTag = currency
     self.parent: SemanticTag = parent
 
+  def is_child_of(self, p: SemanticTag) -> bool:
+    return self.parent.is_child_of(p)
+
+  def as_ContractPrice(self) -> ContractPrice or None:
+    warnings.warn("switch to attributes_tree struktur", DeprecationWarning)
+
+    if self.value is None and self.currency is None and self.sign is None:
+      return None
+
+    o: ContractPrice = ContractPrice()
+
+    o.amount = clean_semantic_tag_copy(self.value)
+    o.currency = clean_semantic_tag_copy(self.currency)
+    o.sign = clean_semantic_tag_copy(self.sign)
+    confidence = 0.0
+    if o.amount is not None:
+      confidence = o.amount.confidence
+
+    o.confidence = confidence
+    o.span = self.span()
+
+    return o
+
   def as_list(self) -> [SemanticTag]:
+    warnings.warn("switch to attributes_tree struktur", DeprecationWarning)
     if self.sign.value != 0:
       return [self.value, self.sign, self.currency, self.parent]
     else:
@@ -488,7 +481,7 @@ class ContractValue:
 
   def span(self):
     left = min([tag.span[0] for tag in self.as_list()])
-    right = max([tag.span[0] for tag in self.as_list()])
+    right = max([tag.span[1] for tag in self.as_list()])
     return left, right
 
   def __mul__(self, confidence_k):
@@ -507,7 +500,10 @@ def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> Contrac
   _sign, _sign_span = find_value_sign(subdoc.tokens_map)
 
   # ======================================
-  results = ValueSpansFinder(subdoc.text)
+  try:
+    results = ValueSpansFinder(subdoc.text)
+  except TypeError:
+    results = None
   # ======================================
 
   if results:
@@ -522,7 +518,8 @@ def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> Contrac
     value_tag = SemanticTag(ContractTags.Value.display_string, results.value, value_span, parent=group)
     value_tag.offset(subdoc.start)
 
-    currency = SemanticTag(ContractTags.Currency.display_string, results.currencly_name, currency_span, parent=group)
+    currency = SemanticTag(ContractTags.Currency.display_string, results.currencly_name, currency_span,
+                           parent=group)
     currency.offset(subdoc.start)
 
     groupspan = [0, 0]
@@ -530,6 +527,7 @@ def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> Contrac
     groupspan[1] = max(sign.span[1], value_tag.span[1], currency.span[1], group.span[1])
     group.span = groupspan
 
+    # TODO: return ContractPrice
     return ContractValue(sign, value_tag, currency, group)
   else:
     return None
@@ -549,9 +547,10 @@ def tokenize_doc_into_sentences_map(txt: str, max_len_chars=150) -> TextMap:
 PARAGRAPH_DELIMITER = '\n'
 
 
-def embedd_sentences(text_map: TextMap, embedder: AbstractEmbedder, log_addon='', max_tokens=100):
+def embedd_sentences(text_map: TextMap, embedder: AbstractEmbedder, log_addon='',
+                     max_tokens=HyperParameters.max_sentenses_to_embedd):
   warnings.warn("use embedd_words", DeprecationWarning)
-
+  logger.info(f'{log_addon} {len(text_map)}')
   if text_map is None:
     # https://github.com/nemoware/analyser/issues/224
     raise ValueError('text_map must not be None')

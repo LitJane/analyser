@@ -4,8 +4,8 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from keras.preprocessing.sequence import pad_sequences
 from pandas import DataFrame
+from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 from analyser.legal_docs import LegalDocument
 from analyser.structures import ContractSubject
@@ -81,10 +81,9 @@ class TrainsetBalancer:
     _bags = {key: [] for key in cat_count.index}
 
     _idx: int = 0
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
       subj_code = row[category_column_name]
       _bags[subj_code].append(_idx)
-
       _idx += 1
 
     _desired_number_of_samples = max(cat_count.values)

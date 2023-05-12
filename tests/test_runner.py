@@ -6,11 +6,15 @@
 import unittest
 
 import pymongo
+from bson import ObjectId
 
 from analyser import finalizer
+from analyser.finalizer import get_doc_by_id, get_audit_by_id
+from analyser.log import logger
 from analyser.parsing import AuditContext
 from analyser.persistence import DbJsonDoc
-from analyser.runner import Runner, get_audits, get_docs_by_audit_id, document_processors, save_analysis
+from analyser.runner import Runner, get_audits, get_docs_by_audit_id, document_processors, save_analysis, \
+  contract_processor
 from integration.db import get_mongodb_connection
 
 SKIP_TF = True
@@ -27,6 +31,17 @@ class TestRunner(unittest.TestCase):
   default_no_tf_instance: Runner = None
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  def test_is_valid(self):
+    doc = get_doc_by_id(ObjectId('5fb3d79f78df3635f5441d31'))
+    if doc is None:
+      raise RuntimeError("fix unit test please, doc with given UID is not in test DB")
+
+    audit = get_audit_by_id(doc['auditId'])
+    jdoc = DbJsonDoc(doc)
+    contract_processor.is_valid(audit, jdoc)
+    # is_va
+
+  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_get_audits(self):
     aa = get_audits()
     for a in aa:
@@ -34,7 +49,13 @@ class TestRunner(unittest.TestCase):
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_get_docs_by_audit_id(self):
-    audit_id = next(get_audits())['_id']
+    audits = get_audits()
+    if len(audits) == 0:
+      logger.warning('no audits')
+      return
+
+    audit_id = audits[0]['_id']
+
     docs = get_docs_by_audit_id(audit_id, kind='PROTOCOL')
     for a in docs:
       print(a['_id'], a['filename'])
@@ -67,22 +88,34 @@ class TestRunner(unittest.TestCase):
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_process_contracts_phase_1(self):
-    runner = Runner.get_instance()
+    # runner = Runner.get_instance()
 
-    audit_id = next(get_audits())['_id']
+    audits = get_audits()
+    if len(audits) == 0:
+      logger.warning('no audits')
+      return
+
+    audit_id = audits[0]['_id']
+
     docs = get_docs_by_audit_id(audit_id, kind='CONTRACT')
-    for doc in docs:
-      processor = document_processors.get('CONTRACT')
-      processor.preprocess(doc, AuditContext())
+    processor = document_processors.get('CONTRACT')
+    for _doc in docs:
+      jdoc = DbJsonDoc(_doc)
+      processor.preprocess(jdoc, AuditContext())
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_process_charters_phase_1(self):
+    audits = get_audits()
+    if len(audits) == 0:
+      logger.warning('no audits')
+      return
 
-    audit_id = next(get_audits())['_id']
-    docs = get_docs_by_audit_id(audit_id, kind='CHARTER')
-    for doc in docs:
-      processor = document_processors.get('CHARTER')
-      processor.preprocess(doc, AuditContext())
+    audit_id = audits[0]['_id']
+    docs: [dict] = get_docs_by_audit_id(audit_id, kind='CHARTER')
+    processor = document_processors.get('CHARTER')
+    for _doc in docs:
+      jdoc = DbJsonDoc(_doc)
+      processor.preprocess(jdoc, AuditContext())
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_process_protocols_phase_1(self):
