@@ -4,17 +4,14 @@
 
 import unittest
 
-import keras
 import numpy as np
-from keras import Model
+from tensorflow import keras
+from tensorflow.keras import Model
 
 from analyser.ml_tools import Embeddings
-from tests.test_utilits import load_json_sample
 from tf_support.embedder_elmo import ElmoEmbedder
-from tf_support.super_contract_model import uber_detection_model_005_1_1, uber_detection_model_003, \
-  structure_detection_model_001
+from tf_support.super_contract_model import uber_detection_model_005_1_1
 from tf_support.tools import KerasTrainingContext
-from trainsets.retrain_contract_uber_model import _get_semantic_map, DbJsonDoc
 
 
 class TestLoadTfModel(unittest.TestCase):
@@ -27,17 +24,11 @@ class TestLoadTfModel(unittest.TestCase):
     # just expecting NO failure
     print(e)
 
-  def test_get_semantic_map(self):
-    json_dict = load_json_sample('contract_db_1.json')
-
-    sm = _get_semantic_map(DbJsonDoc(json_dict))
-    print(sm.shape)
-
-  def test_resave_models_h5(self):
-    ctx = KerasTrainingContext()
-    ctx.resave_model_h5(structure_detection_model_001)
-    ctx.resave_model_h5(uber_detection_model_003)
-    ctx.resave_model_h5(uber_detection_model_005_1_1)
+  # def test_resave_models_h5(self):
+  #   ctx = KerasTrainingContext()
+  #   # ctx.resave_model_h5(structure_detection_model_001)
+  #   # ctx.resave_model_h5(uber_detection_model_003)
+  #   ctx.resave_model_h5(uber_detection_model_005_1_1)
 
   def test_load_uber_model_005(self):
     ctx = KerasTrainingContext()

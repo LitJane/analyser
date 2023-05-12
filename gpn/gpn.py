@@ -1,3 +1,6 @@
+import os
+import re
+
 from analyser.hyperparams import HyperParameters
 from analyser.text_tools import compare_masked_strings
 
@@ -25,10 +28,11 @@ data = {
       ]
     },
     {
-      "_id": "ИПП Мастерская печати",
+      "_id": "Издательско-полиграфическое предприятие «Мастерская печати»",
       "legal_entity_type": "ООО",
       "aliases": [
-        "ИПП Мастерская печати"
+        "ИПП Мастерская печати",
+        "ИПП «Мастерская печати»"
       ]
     },
     {
@@ -36,9 +40,7 @@ data = {
       "legal_entity_type": "ООО",
       "aliases": [
         "РИА Город",
-        "РИА «Город»",
-        "Рекламно-информационное агентство «Город»",
-        "Рекламно-Информационное агентство «Город»"
+        "РИА «Город»"
       ]
     },
     {
@@ -159,7 +161,9 @@ data = {
       "_id": "Газпромнефть-ОНПЗ",
       "legal_entity_type": "АО",
       "aliases": [
-        "Газпромнефть-Омский НПЗ"
+        "Газпромнефть-Омский НПЗ",
+        "Газпромнефть - ОНПЗ",
+        "Газпромнефть - Омский НПЗ",
       ]
     },
 
@@ -349,11 +353,18 @@ data = {
       ]
     },
     {
-      "_id": "Газпром нефть Оренбург",
+      "_id": "Газпромнефть Экспертные решения",
       "legal_entity_type": "ООО",
       "aliases": [
-        "Газпром нефть Оренбург",
-        "Газпромнефть Оренбург"
+        "Газпромнефть Экспертные решения",
+        "Газпромнефть-Экспертные решения"
+      ]
+    },
+    {
+      "_id": "Газпромнефть-Оренбург",
+      "legal_entity_type": "ООО",
+      "aliases": [
+        "Газпромнефть-Оренбург"
       ]
     },
     {
@@ -677,7 +688,7 @@ data = {
   ]
 }
 
-subsidiaries = data['Subsidiary']
+subsidiaries = []
 
 
 def all_do_names():
@@ -706,6 +717,17 @@ def estimate_subsidiary_name_match_min_jaro_similarity():
   return top_similarity
 
 
-HyperParameters.subsidiary_name_match_min_jaro_similarity = estimate_subsidiary_name_match_min_jaro_similarity()
-print('HyperParameters.subsidiary_name_match_min_jaro_similarity',
-      HyperParameters.subsidiary_name_match_min_jaro_similarity)
+def is_gpn_name(name):
+  return re.search('Газпром', name, re.IGNORECASE)
+
+
+def update_subsidiaries_cache(new_subsidiaries):
+  global subsidiaries
+  subsidiaries = new_subsidiaries
+  HyperParameters.subsidiary_name_match_min_jaro_similarity = estimate_subsidiary_name_match_min_jaro_similarity()
+  print('HyperParameters.subsidiary_name_match_min_jaro_similarity',
+        HyperParameters.subsidiary_name_match_min_jaro_similarity)
+
+
+if os.environ.get("GPN_CSGK_WSDL") is None:
+  update_subsidiaries_cache(data['Subsidiary'])

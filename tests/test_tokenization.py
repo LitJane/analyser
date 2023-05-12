@@ -56,8 +56,6 @@ class TokenisationTestCase(unittest.TestCase):
     self.assertLessEqual(max(lens), maxlen)
     self.assertEqual(doc.tokens_map._full_text, tm._full_text)
 
-
-
   def test_normalize_doc_slice_1(self):
     doc_text = """\n\n\nАкционерное 3`4`` общество «Газпром - 'Вибраниум' и Криптонит» (АО «ГВК»), "именуемое" в собранием `` акционеров собранием `` акционеров \'\' \
         дальнейшем «Благотворитель», 
@@ -340,7 +338,7 @@ class TokenisationTestCase(unittest.TestCase):
     text = 'этилен мама этилен'
     __doc = LegalDocument(text)
     __doc.parse()
-    tm: TextMap = __doc.tokens_map
+    # tm: TextMap = __doc.tokens_map
     subdoc = __doc.subdoc_slice(slice(0, 1))
     del __doc
 
@@ -381,6 +379,21 @@ class TokenisationTestCase(unittest.TestCase):
     self.assertEqual(1, ti[1])
 
     self.assertEqual(expected, tm.text_range(ti))
+
+  def test_token_indices_by_char_range_2(self):
+    text = '10. Размер платы за технологическое присоединение определяется в соответствии с ' \
+           'постановлением министерства тарифного регулирования и энергетики Пермского края ' \
+           'и составляет 1000 рублей 00 копеек, в том числе НДС (20%) в размере.'
+    span = [178, 184]
+    expected = text[span[0]:span[1]]
+    print("expected", expected)
+
+    tm = TextMap(text)  # tokenization
+    ti = tm.token_indices_by_char_range(span)
+    # self.assertEqual(0, ti[0])
+    # self.assertEqual(1, ti[1])
+    actual = tm.text_range(ti)
+    self.assertEqual(expected, actual)
 
   def test_token_indices_by_char_range_sliced(self):
     text = 'm йe qwert'

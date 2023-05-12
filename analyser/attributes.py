@@ -1,4 +1,3 @@
-import datetime
 import json
 import logging
 import sys
@@ -12,12 +11,12 @@ from bson.objectid import ObjectId
 from jsonschema import validate, FormatChecker
 
 import analyser
-from analyser.finalizer import get_doc_by_id
 # from analyser.log import logger
 from analyser.ml_tools import SemanticTagBase
 from analyser.schemas import document_schemas, ProtocolSchema, OrgItem, AgendaItem, AgendaItemContract, HasOrgs, \
   ContractPrice, ContractSchema, CharterSchema, CharterStructuralLevel, Competence
 from analyser.structures import OrgStructuralLevel, ContractSubject
+from integration.db import get_doc_by_id
 from integration.db import get_mongodb_connection
 
 migration_logger = logging.getLogger('db_migration')
@@ -41,6 +40,17 @@ class NumpyFloatHandler(jsonpickle.handlers.BaseHandler):
     return round(obj, 6)
 
 
+class AgendaItemContractHandler(jsonpickle.handlers.BaseHandler):
+  def flatten(self, obj: AgendaItemContract, data):
+    pickler = self.context
+    data['span'] = pickler.flatten(obj.span)
+    data['orgs'] = pickler.flatten(obj.orgs)
+    data['date'] = pickler.flatten(obj.date)
+    data['price'] = pickler.flatten(obj.price)
+    data['number'] = pickler.flatten(obj.number)
+    return data  # [obj.span, pickler.flatten(obj.orgs), obj.date, obj.price, obj.number]
+
+
 class EnumHandler(jsonpickle.handlers.BaseHandler):
   def flatten(self, e: Enum, data):
     return e.name
@@ -53,6 +63,8 @@ jsonpickle.handlers.registry.register(Enum, EnumHandler, base=True)
 jsonpickle.handlers.registry.register(np.float, NumpyFloatHandler)
 jsonpickle.handlers.registry.register(np.float32, NumpyFloatHandler)
 jsonpickle.handlers.registry.register(np.float64, NumpyFloatHandler)
+
+jsonpickle.handlers.registry.register(AgendaItemContract, AgendaItemContractHandler)
 
 
 def del_none(d):
@@ -72,6 +84,8 @@ def del_none(d):
       for itm in list(value):
         if isinstance(itm, dict):
           del_none(itm)
+      if len(value) == 0:
+        del d[key]
   return d  # For convenience
 
 
@@ -213,15 +227,13 @@ def convert_constraints(path_s: [str], attr, structural_level_node: CharterStruc
 
 
 def remove_empty_from_list(lst):
-  l = [v for v in lst if v is not None]
-  return l
+  return [v for v in lst if v is not None]
 
 
 def clean_up_tree(tree: CharterSchema):
   for s_node in tree.structural_levels:
     for subj_node in s_node.competences:
-      l = remove_empty_from_list(subj_node.constraints)
-      subj_node.constraints = l
+      subj_node.constraints = remove_empty_from_list(subj_node.constraints)
 
 
 def index_of_key(s: str) -> (str, int):
@@ -230,7 +242,7 @@ def index_of_key(s: str) -> (str, int):
   if len(n_i) > 1:
     try:
       _idx = int(n_i[-1]) - 1
-    except ValueError as e:
+    except ValueError:
       return s, 0
   return n_i[0], _idx
 
@@ -370,35 +382,9 @@ def convert_charter_db_attributes_to_tree(attrs):
   return tree
 
 
-# ----------------------
-
-
-def get_attributes_tree(id: str):
-  # x = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
-  # print(x.name, x.hometown.name, x.hometown.id)
-  db = get_mongodb_connection()
-  doc = get_doc_by_id(ObjectId(id))
-
-  analysis = doc.get('analysis')
-  if analysis:
-    tree = analysis.get('attributes_tree')
-    r = dotdict(tree)
-
-    return r.charter
-
-
-class dotdict(dict):
-  """dot.notation access to dictionary attributes"""
-  __getattr__ = dict.get
-  __setattr__ = dict.__setitem__
-  __delattr__ = dict.__delitem__
-
-
 def get_legacy_docs_ids() -> []:
   db = get_mongodb_connection()
   documents_collection = db['documents']
-
-  vv = analyser.__version_ints__  # TODO: check version
 
   _attr_updated_by_user = {
     '$and': [
@@ -457,6 +443,8 @@ def convert_one(db, doc: dict):
     "protocol": convert_protocol_db_attributes_to_tree,
     "charter": convert_charter_db_attributes_to_tree,
     "contract": convert_contract_db_attributes_to_tree,
+    'annex': convert_contract_db_attributes_to_tree,
+    'supplementary_agreement': convert_contract_db_attributes_to_tree,
   }
 
   if kind in kind2method:
@@ -479,7 +467,7 @@ def convert_one(db, doc: dict):
 
 def should_i_migrate(ids) -> bool:
   if len(ids) == 0:
-    migration_logger.info(f"Migration: no legacy docs found in DB")
+    migration_logger.info("Migration: no legacy docs found in DB")
     return False
 
   print(f">> {len(ids)} legacy doc(s) found in DB. ")
@@ -490,7 +478,7 @@ def should_i_migrate(ids) -> bool:
 
   if '-forcemigration' in sys.argv:
     return True
-  
+
   print("use -forcemigration cmd line arg if your answer is always yes")
   print("use -skipmigration cmd line arg if your answer is always no")
   print('\a')

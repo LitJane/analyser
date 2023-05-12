@@ -7,18 +7,31 @@
 import warnings
 from enum import Enum
 
-from analyser.ml_tools import SemanticTagBase
-from analyser.structures import OrgStructuralLevel, ContractSubject, currencly_map
+from analyser.ml_tools import SemanticTagBase, conditional_p_sum
+from analyser.structures import OrgStructuralLevel, ContractSubject, InsiderInfoType, Currencies
 
 tag_value_field_name = "value"
+
+def merge_spans(tags: [SemanticTagBase]) -> (int, int):
+  arr = []
+  for attr in tags:
+    if attr is not None:
+      arr.append(attr.get_span()[0])
+      arr.append(attr.get_span()[1])
+  if len(arr) > 0:
+    return min(arr), max(arr)
+
+  return None
 
 
 class DocumentSchema:
   date: SemanticTagBase or None = None
   number: SemanticTagBase or None = None
+  case_number: SemanticTagBase or None = None
 
   def __init__(self):
     super().__init__()
+    self.insideInformation: SemanticTagBase or None = None
 
 
 class HasOrgs:
@@ -31,13 +44,45 @@ class ContractPrice(SemanticTagBase):
   def __init__(self):
     super().__init__()
 
-    self.amount: SemanticTagBase  # netto or brutto #deprecated
-    self.currency: SemanticTagBase
-    self.sign: SemanticTagBase
-    self.vat: SemanticTagBase  # number
-    self.vat_unit: SemanticTagBase  # percentage
-    self.value_brutto: SemanticTagBase  # netto + VAT
-    self.value_netto: SemanticTagBase  # value before VAT
+    self.amount: SemanticTagBase = None  # netto or brutto #deprecated
+    self.currency: SemanticTagBase = None
+    self.sign: SemanticTagBase = None
+    self.vat: SemanticTagBase = None  # number
+    self.vat_unit: SemanticTagBase = None  # percentage
+    self.amount_brutto: SemanticTagBase = None  # netto + VAT
+    self.amount_netto: SemanticTagBase = None  # value before VAT
+
+  def list_children(self):
+    # TODO: consider listing these by name, for consistency with list_children_names method
+    return [self.amount, self.currency, self.sign, self.amount_netto, self.amount_brutto, self.vat, self.vat_unit]
+
+  def list_children_names(self):
+    return ["amount", "currency", "sign", "amount_netto", "amount_brutto", "vat", "vat_unit"]
+
+  def integral_sorting_confidence(self) -> float:
+    confs = [c.confidence for c in self.list_children() if c is not None]
+    return conditional_p_sum(confs)
+
+  def get_span(self) -> (int, int):
+    return merge_spans(self.list_children())
+
+  def __add__(self, addon: int) -> 'ContractPrice':
+    for t in self.list_children():
+      if t is not None:
+        t.offset(addon)
+
+    self.offset(addon)
+    return self
+
+  def __mul__(self, confidence_k) -> 'ContractPrice':
+
+    for _r in self.list_children():
+      if _r is not None:
+        _r.confidence *= confidence_k
+    return self
+
+
+
 
 
 class AgendaItemContract(HasOrgs, SemanticTagBase):
@@ -46,7 +91,16 @@ class AgendaItemContract(HasOrgs, SemanticTagBase):
   price: ContractPrice = None
 
   def __init__(self):
+    self.span = None
     super().__init__()
+
+  def get_span(self) -> (int, int):
+    return merge_spans([self.number, self.date, self.price, *self.orgs])
+
+  def set_span(self, s):
+    pass
+
+  span = property(get_span, set_span)
 
 
 class AgendaItem(SemanticTagBase):
@@ -55,7 +109,14 @@ class AgendaItem(SemanticTagBase):
     super().__init__(tag)
     self.solution: SemanticTagBase or None = None
 
-    self.contract: AgendaItemContract = AgendaItemContract()
+    # TODO: this must be an array of contracts,
+    self.contracts: [AgendaItemContract] = []
+
+  def get_contract_at(self, idx) -> AgendaItemContract:
+    if len(self.contracts) <= idx:
+      for k in range(len(self.contracts), idx + 1):
+        self.contracts.append(AgendaItemContract())
+    return self.contracts[idx]
 
 
 class OrgItem():
@@ -67,13 +128,28 @@ class OrgItem():
     self.alias: SemanticTagBase or None = None  # a.k.a role in the contract
     self.alt_name: SemanticTagBase or None = None
 
+  def get_span(self):
+    return merge_spans([self.type, self.name, self.alias, self.alt_name])
+
   def as_list(self) -> [SemanticTagBase]:
     warnings.warn("use OrgItem", DeprecationWarning)
-    return [getattr(self, key) for key in ["type", "name", "alias"] if getattr(self, key) is not None]
+    return [getattr(self, key) for key in ["type", "name", "alias", "alt_name"] if getattr(self, key) is not None]
 
+  def is_valid(self):
+    for child in self.as_list():
+      if child is not None:
+        return True
+    return False
+
+
+class GenericDocSchema(DocumentSchema):
+  def __init__(self):
+    super().__init__()
+    self.case_number: SemanticTagBase or None = None
 
 class ContractSchema(DocumentSchema, HasOrgs):
   price: ContractPrice = None
+
 
   def __init__(self):
     super().__init__()
@@ -89,6 +165,7 @@ class ProtocolSchema(DocumentSchema):
     self.agenda_items: [AgendaItem] = []
 
 
+
 # class CharterConstraint:
 #   def __init__(self):
 #     super().__init__()
@@ -100,12 +177,12 @@ class Competence(SemanticTagBase):
   child of CharterStructuralLevel
   """
 
-  def __init__(self, tag: SemanticTagBase = None, value:ContractSubject=None):
+  def __init__(self, tag: SemanticTagBase = None, value: ContractSubject = None):
     super().__init__(tag)
     self.constraints: [ContractPrice] = []
     if value is not None:
       if isinstance(value, ContractSubject):
-        self.value=value
+        self.value = value
       else:
         raise ValueError(value)
 
@@ -125,14 +202,14 @@ class CharterSchema(DocumentSchema):
 
 
 document_schemas = {
-  "$schema": "http://json-schema.org/draft-04/schema#",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Legal document attributes",
   "description": "Legal document attributes. Schema draft 4 is used for compatibility with Mongo DB",
 
   "definitions": {
 
     "tag": {
-      "description": "a piece of text, denoting an attributes",
+      "description": "a piece of text, denoting an attribute",
       "type": "object",
 
       "properties": {
@@ -148,7 +225,8 @@ document_schemas = {
           "type": "string"
         }
       },
-      "required": ["span", tag_value_field_name]
+      # "required": ["span", tag_value_field_name]
+      "required": ["span"]
     },
 
     "string_tag": {
@@ -160,6 +238,7 @@ document_schemas = {
               "type": "string"
             }
           },
+          "required": ["span", tag_value_field_name]
 
         }]
     },
@@ -173,12 +252,13 @@ document_schemas = {
               "type": "boolean"
             }
           },
+          "required": ["span", tag_value_field_name]
 
         }]
 
     },
 
-    "number_tag": {
+    "numeric_tag": {
       "allOf": [
         {"$ref": "#/definitions/tag"},
         {
@@ -186,8 +266,25 @@ document_schemas = {
             tag_value_field_name: {
               "type": "number"
             }
-          }
+          },
+          "required": ["span", tag_value_field_name]
         }],
+    },
+
+    "insideInformation": {
+      "description": "Инсайдерская информация",
+      "allOf": [
+        {
+          "$ref": "#/definitions/tag"
+        },
+        {
+          "properties": {
+            tag_value_field_name: {
+              "enum": InsiderInfoType.list_names()
+            }
+          }
+        }
+      ]
     },
 
     "date_tag": {
@@ -200,6 +297,8 @@ document_schemas = {
               "format": "date-time"
             }
           },
+
+          "required": ["span", tag_value_field_name]
 
         }],
 
@@ -215,16 +314,14 @@ document_schemas = {
         },
 
         "date": {
+          "description": "Дата (чаще всего) договора",
           "$ref": "#/definitions/date_tag"
         },
 
-        "solution": {
-          "$ref": "#/definitions/boolean_tag"
-        },
-
-        "warnings": {
-          "type": "string"
-        },
+        # "warnings": {
+        #   "description": "Всевозможные сложности анализа",
+        #   "type": "string"
+        # },
 
         "orgs": {
           "type": "array",
@@ -233,7 +330,7 @@ document_schemas = {
           }
         },
 
-        "value": {
+        "price": {
           "$ref": "#/definitions/currency_value"
         },
 
@@ -241,16 +338,52 @@ document_schemas = {
       "additionalProperties": False
 
     },
+
     "agenda": {
       "allOf": [
         {"$ref": "#/definitions/tag"},
         {
           "properties": {
-            "contract": {"$ref": "#/definitions/agenda_contract"}
+            "contracts": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/agenda_contract"}
+            },
+
+            "solution": {
+              "description": "Решение, принятое относительно вопроса повестки дня",
+              "$ref": "#/definitions/boolean_tag"
+            }
           },
           "required": ["span"],
           # "additionalProperties": False
         }],
+    },
+
+    "terms": {
+      "description": "Сроки/периоды договора",
+      "allOf": [
+        {"$ref": "#/definitions/tag"},
+        {
+          "properties": {
+            "term": {
+              "description": "Количество периодов. Пример: сроком на **11** (одиннадцать) месяцев",
+              "$ref": "#/definitions/numeric_tag"
+            },
+            "term_unit": {
+              "description": "Продолжительность периода. Пример: месяцев, лет, дней",
+              "$ref": "#/definitions/string_tag"
+            },
+            "date_start": {
+              "description": "Дата вступления договора в силу",
+              "$ref": "#/definitions/date_tag"
+            },
+            "date_stop": {
+              "description": "Дата окончания сил договора",
+              "$ref": "#/definitions/date_tag"
+            }
+          }
+        }
+      ]
     },
 
     "currency": {
@@ -259,7 +392,7 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": list(currencly_map.values())
+              "enum": Currencies.list_names()
             }
           }
         }],
@@ -277,14 +410,36 @@ document_schemas = {
           }}]
     },
 
+    "person": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/tag"
+        },
+        {
+          "properties": {
+            "lastName": {
+              "$ref": "#/definitions/string_tag"
+            }
+          },
+          "required": ["lastName"],
+          "errorMessage": {
+            "required": {
+              "lastName": "Не размечена фамилия"
+            }
+          }
+        }
+      ]
+    },
+
     "currency_value": {
+      "description": "see ContractPrice class",
 
       "allOf": [
         {"$ref": "#/definitions/tag"},
         {
           "properties": {
-            "value": {
-              "$ref": "#/definitions/number_tag",
+            "amount": {
+              "$ref": "#/definitions/numeric_tag",
             },
 
             "currency": {
@@ -293,13 +448,49 @@ document_schemas = {
 
             "sign": {
               "$ref": "#/definitions/sign",
+            },
+
+            "vat": {
+              "description": "НДС",
+              "$ref": "#/definitions/numeric_tag",
+            },
+
+            "vat_unit": {
+              "description": "числовое значение или процент",
+              "$ref": "#/definitions/currency"
+            },
+
+            "amount_brutto": {
+              "description": "= amount_netto + VAT",
+              "$ref": "#/definitions/numeric_tag",
+            },
+
+            "amount_netto": {
+              "description": "amount_brutto minus VAT",
+              "$ref": "#/definitions/numeric_tag",
             }
 
           },
-          "required": ["sign", "value", "currency"],
+          "required": ["amount", "currency"],
         }
       ],
 
+    },
+
+    "subject": {
+      "allOf": [
+        {"$ref": "#/definitions/tag"},
+        {
+          "properties": {
+            tag_value_field_name: {
+              "enum": ContractSubject.list_names()
+            },
+
+            "insideInformation": {
+              "$ref": "#/definitions/insideInformation"
+            }
+
+          }}],
     },
 
     "competence": {
@@ -308,7 +499,7 @@ document_schemas = {
         {
           "properties": {
             tag_value_field_name: {
-              "enum": ContractSubject._member_names_
+              "enum": ContractSubject.list_names()
             },
             "constraints": {
               "type": "array",
@@ -322,7 +513,7 @@ document_schemas = {
         {"$ref": "#/definitions/tag"},
         {"properties": {
           tag_value_field_name: {
-            "enum": OrgStructuralLevel._member_names_
+            "enum": OrgStructuralLevel.list_names()
           },
 
           "competences": {
@@ -385,15 +576,52 @@ document_schemas = {
       }
     },
 
+    "generic": {
+      "properties": {
+        "case_number": {
+          "description": "Номер дела",
+          "$ref": "#/definitions/string_tag"
+        }
+      }
+    },
+
     "contract": {
       "properties": {
+
+        "price_for_period": {
+          "$ref": "#/definitions/currency_value",
+          "description": "Не общая сумма договора, а стоимость за период, например, за месяц аренды",
+        },
+
+        "terms": {
+          "$ref": "#/definitions/terms"
+        },
+
+        'subject': {
+          "$ref": "#/definitions/subject"
+        },
 
         "date": {
           "$ref": "#/definitions/date_tag"
         },
 
         "number": {
-          "$ref": "#/definitions/number_tag"
+          "$ref": "#/definitions/string_tag"
+        },
+
+        "price": {
+          "$ref": "#/definitions/currency_value"
+        },
+
+        "insideInformation": {
+          "$ref": "#/definitions/insideInformation"
+        },
+
+        "people": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/person"
+          }
         },
 
         "orgs": {
@@ -401,9 +629,9 @@ document_schemas = {
           "maxItems": 10,
           "uniqueItems": True,
           "items": {
-            "$ref": "#/definitions/org",
+            "$ref": "#/definitions/contract_agent",
           }
-        },
+        }
 
       }
     },
@@ -416,7 +644,7 @@ document_schemas = {
         },
 
         "number": {
-          "$ref": "#/definitions/number_tag"
+          "$ref": "#/definitions/string_tag"
         },
 
         "structural_level": {
@@ -489,9 +717,10 @@ class Schema2LegacyListConverter:
     if isinstance(tag, ContractPrice):
       suffix = 'min'
       if hasattr(tag, 'sign'):
-        amnt = tag.sign.value
-        if amnt < 0:
-          suffix = "max"
+        if tag.sign is not None:
+          amnt = tag.sign.value
+          if amnt < 0:
+            suffix = "max"
 
       return f"constraint-{suffix}"
 

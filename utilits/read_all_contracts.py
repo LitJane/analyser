@@ -8,10 +8,10 @@ import traceback
 import pymongo
 from pandas import DataFrame
 
-from analyser.contract_agents import find_org_names
-from analyser.contract_parser import ContractDocument
+from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import TOKENIZER_DEFAULT
 from analyser.legal_docs import LegalDocument
+from integration.db import get_mongodb_connection
 from integration.word_document_parser import WordDocParser, join_paragraphs
 
 
@@ -80,15 +80,6 @@ def _parse_doc(res, doc_id) -> LegalDocument:
   return join_paragraphs(res, doc_id)
 
 
-def _parse_contract(contract, row) -> ContractDocument:
-  contract.agents_tags = find_org_names(contract)
-  row[4:8] = [contract.tag_value('org.1.name'),
-              contract.tag_value('org.1.alias'),
-              contract.tag_value('org.2.name'),
-              contract.tag_value('org.2.alias')]
-  return contract
-
-
 def dump_contracts_from_db_to_jsons(output_path):
   db = get_mongodb_connection()
   collection = db['legaldocs']
@@ -111,8 +102,7 @@ def dump_contracts_from_db_to_jsons(output_path):
         print(f'saved file to {json_name}')
 
 
-from integration.db import get_mongodb_connection
-from analyser.doc_structure import get_tokenized_line_number
+
 
 
 def analyse_headers():

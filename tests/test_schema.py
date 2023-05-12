@@ -3,21 +3,65 @@
 # coding=utf-8
 
 
+import json
 import unittest
 
 from bson import ObjectId
-from jsonschema import validate, ValidationError, FormatChecker
+from jsonschema import ValidationError
 from pymongo import MongoClient
 
+import analyser
 from analyser.attributes import to_json, convert_one
 from analyser.ml_tools import SemanticTagBase
+from analyser.runner import schema_validator
 from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, ContractPrice, OrgItem, \
-  Schema2LegacyListConverter
+  Schema2LegacyListConverter, AgendaItemContract
 from analyser.schemas import document_schemas
 from analyser.structures import OrgStructuralLevel, ContractSubject
+from integration.db import get_mongodb_connection
 
 
 class TestSchema(unittest.TestCase):
+
+  # @unittest.skip
+  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  def test_insert_schema_to_db_json(self):
+    db = get_mongodb_connection()
+    collection_schemas = db['schemas']
+
+    json_str = json.dumps(document_schemas, indent=4, ensure_ascii=False)
+    print(json_str)
+    print(type(json_str))
+    key = f"documents_schema_{analyser.__version__}"
+    collection_schemas.delete_many({"_id": key})
+    collection_schemas.insert_one({"_id": key, 'json': json_str, "version": analyser.__version__})
+
+  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  def test_read_schema_from_db(self):
+    db = get_mongodb_connection()
+    collection_schemas = db['schemas']
+    key = f"documents_schema_{analyser.__version__}"
+    a = collection_schemas.find_one({"_id": key})['json']
+    db_document_schemas = json.loads(a)
+    print(a)
+    print(type(db_document_schemas))
+
+    wrong_tree = {
+      "contract": {
+        "date": {
+          "_ovalue": "2017-06-13T00:00:00.000Z",
+          "span": [14, 17],
+          "span_map": "words",
+          "confidence": 1
+        },
+      }
+    }
+
+    with self.assertRaises(ValidationError) as context:
+      schema_validator.validate(wrong_tree)
+
+    self.assertIsNotNone(context.exception)
+    print(context.exception)
 
   @unittest.skip
   def test_migrate_single_charter(self):
@@ -119,8 +163,9 @@ class TestSchema(unittest.TestCase):
       }
     }
 
-    with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas, format_checker=FormatChecker())
+    with self.assertRaises(Exception) as context:
+      schema_validator.validate(tree)
+      print(context)
 
     self.assertIsNotNone(context.exception)
     print(context.exception)
@@ -138,7 +183,7 @@ class TestSchema(unittest.TestCase):
     }
 
     with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas, format_checker=FormatChecker())
+      schema_validator.validate(tree)
 
     self.assertIsNotNone(context.exception)
     print(context.exception)
@@ -155,7 +200,7 @@ class TestSchema(unittest.TestCase):
     }
 
     with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas)
+      schema_validator.validate(tree)
 
     self.assertIsNotNone(context.exception)
 
@@ -171,7 +216,83 @@ class TestSchema(unittest.TestCase):
       }
     }
 
-    validate(instance=tree, schema=document_schemas)
+    schema_validator.validate(tree)
+
+  def test_value_correct(self):
+    tree = {
+      "contract": {
+        "price": {
+          "amount": {
+            "value": 2000,
+            "span": [14, 17],
+          },
+          "sign": {
+            "value": -1,
+            "span": [14, 17],
+          },
+          "vat": {
+            "value": 20,
+            "span": [17, 20],
+          },
+          "currency": {
+            "value": "RUB",
+            "span": [14, 17],
+          },
+          "span": [14, 17]
+        },
+      }
+    }
+
+    schema_validator.validate(tree)
+
+  def test_value_missing_fields(self):
+    tree = {
+      "contract": {
+        "price": {
+
+          "sign": {
+            "value": -1,
+            "span": [14, 17],
+          },
+          "currency": {
+            "value": "RUB",
+            "span": [14, 17],
+          },
+          "span": [14, 17]
+        },
+      }
+    }
+    with self.assertRaises(ValidationError) as context:
+      schema_validator.validate(tree)
+    self.assertIsNotNone(context.exception)
+
+  def test_subject_correct(self):
+    tree = {
+      "contract": {
+        "subject": {
+          "value": 'Charity',
+          "span": [14, 17],
+
+        },
+      }
+    }
+
+    schema_validator.validate(tree)
+
+  def test_subject_wrong(self):
+    tree = {
+      "contract": {
+        "subject": {
+          "value": 'Charity WRONG',
+          "span": [14, 17],
+
+        },
+      }
+    }
+
+    with self.assertRaises(ValidationError) as context:
+      schema_validator.validate(tree)
+    self.assertIsNotNone(context.exception)
 
   def test_org_correct(self):
     tree = {
@@ -191,7 +312,7 @@ class TestSchema(unittest.TestCase):
       }]}
     }
 
-    validate(instance=tree, schema=document_schemas)
+    schema_validator.validate(tree)
 
   def test_org_wrong(self):
     tree = {
@@ -213,9 +334,36 @@ class TestSchema(unittest.TestCase):
     }
 
     with self.assertRaises(ValidationError) as context:
-      validate(instance=tree, schema=document_schemas)
+      schema_validator.validate(tree)
 
     self.assertIsNotNone(context.exception)
+
+  def test_AgendaItemContract(self):
+    aic = AgendaItemContract()
+    aic.date = SemanticTagBase()
+    aic.date.span = (10, 20)
+
+    self.assertEqual(aic.span, (10, 20))
+
+    aic.price = SemanticTagBase()
+    aic.price.span = (15, 30)
+    self.assertEqual(aic.span, (10, 30))
+
+    aic.number = SemanticTagBase()
+    aic.number.span = (50, 100)
+    self.assertEqual(aic.span, (10, 100))
+
+    print(aic.span)
+
+    aic.orgs.append(OrgItem())
+    aic.orgs[0].type = SemanticTagBase()
+    aic.orgs[0].type.span = (110, 120)
+    self.assertEqual(aic.span, (10, 120))
+
+    # print(aic.__dict__)
+    # a, _p = to_json(aic)
+    # print(a)
+    # print(a)
 
 
 unittest.main(argv=['-e utf-8'], verbosity=3, exit=False)

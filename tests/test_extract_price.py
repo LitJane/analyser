@@ -13,6 +13,7 @@ from analyser.documents import TextMap
 from analyser.legal_docs import find_value_sign
 from analyser.ml_tools import conditional_p_sum
 from analyser.parsing import find_value_sign_currency
+from analyser.schemas import ContractPrice
 from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.transaction_values import ValueSpansFinder
 
@@ -55,7 +56,7 @@ data = [
   (0, 381600.0, 'RUB', False,
    'Общая стоимость Услуг по настоящему Договору составляет 381 600 (Триста восемьдесят одна тысяча  шестьсот ) рублей 00 коп., кроме того НДС (20%) в размере 76 320  (Семьдесят шесть тысяч триста двадцать) рублей 00 коп.'),
 
-  (0, 1000000.0, 'EURO', False,
+  (0, 1000000.0, 'EUR', False,
    'стоимость покупки: 1 000 000 евро '),
 
   (0, 86500.0, 'RUB', False,
@@ -91,6 +92,7 @@ data = [
   (0, 1999.44, 'RUB', False, 'Стоимость 1 999 (тысяча девятьсот) руб 44 (сорок четыре) коп'),
   (0, 1999.44, 'RUB', False, '1 999 (тысяча девятьсот) руб. 44 (сорок четыре) коп. и что-то 34'),
   (1, 25000000.0, 'USD', False, 'в размере более 25 млн . долларов сша'),
+
   (0, 25000000.0, 'USD', False, 'эквивалентной 25 миллионам долларов сша'),
   (0, 941216.44, 'RUB', True,
    'Стоимость Услуг составляет 1 110 635,40 (Один миллион сто десять тысяч шестьсот тридцать пять) рублей 40 копеек, в т.ч. НДС (18%): '
@@ -202,7 +204,7 @@ class PriceExtractTestCase(unittest.TestCase):
         # TODO: test value
         # print(f"\033[1;32m{f}\u2713")
 
-      except:
+      except Exception:
         print("\033[1;35;40m FAILED: Expected:", value, currency, normal_text, '\n actual=', val)
         print(sys.exc_info())
         errorsc += 1
@@ -228,7 +230,7 @@ class PriceExtractTestCase(unittest.TestCase):
     doc.parse()
     print(doc.normal_text)
     # =========================================
-    r = find_value_sign_currency(doc)
+    r: [ContractPrice] = find_value_sign_currency(doc)
     # =========================================
 
     # for sum, sign, currency in r:
@@ -237,24 +239,24 @@ class PriceExtractTestCase(unittest.TestCase):
 
     self.assertEqual('USD', r[0].currency.value)
     self.assertEqual(1, r[0].sign.value)
-    self.assertEqual(2000000, r[0].value.value)
+    self.assertEqual(2000000, r[0].amount.value)
 
     self.assertEqual('превышающую', doc.tokens_map_norm.text_range(r[0].sign.span))
     self.assertEqual('2000000',
-                     doc.tokens_map_norm.text_range(r[0].value.span))  # TODO:  keep 2000000
+                     doc.tokens_map_norm.text_range(r[0].amount.span))  # TODO:  keep 2000000
     self.assertEqual('долларов', doc.tokens_map_norm.text_range(r[0].currency.span))  # TODO: keep
 
   def test_find_all_value_sign_currency_d(self):
-    sign_exp, price, currency_exp, text = (0, 1000000.0, 'EURO', 'стоимость покупки: 1 000 000 евро ')
+    sign_exp, price, currency_exp, text = (0, 1000000.0, 'EUR', 'стоимость покупки: 1 000 000 евро ')
 
     doc = ContractDocument(text)
     doc.parse()
     r: List = find_value_sign_currency(doc)
 
-    print(doc.tokens_map_norm.text_range(r[0].value.span))
-    self.assertEqual(price, r[0].value.value, text)
+    print(doc.tokens_map_norm.text_range(r[0].amount.span))
+    self.assertEqual(price, r[0].amount.value, text)
     self.assertEqual(currency_exp, r[0].currency.value)
-    print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
+    print(f'{r[0].value}, {r[0].sign}, {r[0].currency} {sign_exp}')
 
   def test_find_all_value_sign_currency_a(self):
     for (sign_exp, price, currency_exp, vat, text) in data:
@@ -262,10 +264,10 @@ class PriceExtractTestCase(unittest.TestCase):
       doc.parse()
       r: List = find_value_sign_currency(doc)
       if r:
-        print(doc.tokens_map_norm.text_range(r[0].value.span))
-        self.assertEqual(price, r[0].value.value, text)
+        print(doc.tokens_map_norm.text_range(r[0].amount.span))
+        self.assertEqual(price, r[0].amount.value, text)
         self.assertEqual(currency_exp, r[0].currency.value, text)
-        print(r[0].value.value)
+        print(r[0].amount.value)
         print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
 
   def test_number_re(self):

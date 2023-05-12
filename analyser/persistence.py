@@ -25,7 +25,9 @@ class DbJsonDoc:
     self.isActive: bool or None = None
     self.retry_number: int = 0
     self.__dict__.update(j)  # ------important
-    self.documentType = self.parse['documentType']
+
+    if self.parse is not None:
+      self.documentType = self.parse['documentType']
 
     if self.state == DocumentState.New.value:
       # reset user data, because it is bound to tokenisation map, re-tokenisation is possible
@@ -34,6 +36,13 @@ class DbJsonDoc:
 
   def get_id(self):
     return self._id
+
+  def get_version_string(self):
+    attr_tree = self.get_attributes_tree()
+    if 'version' in attr_tree:
+      return '.'.join([str(x) for x in attr_tree['version']])
+    else:
+      return self.analysis['version']
 
   def isPreprocessed(self):
     return self.state == DocumentState.Preprocessed.value or self.state == DocumentState.Error.value
@@ -54,7 +63,8 @@ class DbJsonDoc:
     if self.is_analyzed():
       # attributes are bound to an existing tokens map
       # -->  preserve saved tokenization
-      doc = create_doc_by_type(self.parse['documentType'], self._id, filename=self.filename)
+      kind: str = self.parse['documentType']
+      doc = create_doc_by_type(kind, self._id, filename=self.filename)
 
       doc.tokens_map_norm = self.get_tokens_for_embedding()
       doc.tokens_map = self.get_tokens_map_unchaged()
@@ -62,6 +72,8 @@ class DbJsonDoc:
         doc.sentence_map = self.get_sentence_map()
         if doc.sentence_map is None:
           doc.split_into_sentenses()
+
+      # doc.attributes_tree.__dict__.update(self.analysis.get('attributes_tree', {}).get(kind.lower(), {}))
 
       headers = self.analysis.get('headers', None)
       if headers is not None:
@@ -109,14 +121,14 @@ class DbJsonDoc:
     return len(arrr)
 
   def is_analyzed(self) -> bool:
-    #TODO: this is waaaaay to complex
+    # TODO: this is waaaaay to complex
     if self.state == DocumentState.New.value:
       return False
 
     return ((self.analysis is not None) and (
-            self.analysis.get('attributes', None) is not None)) or self.is_user_corrected()
+            self.analysis.get('attributes_tree', None) is not None)) or self.is_user_corrected()
 
-  def get_attributes(self) -> dict:
+  def get_attributes_OLD(self) -> dict:
     warnings.warn("switch to attributes_tree", DeprecationWarning)
     attributes = {}
     if self.user is not None:
@@ -127,26 +139,28 @@ class DbJsonDoc:
 
   def get_attributes_tree(self) -> dict:
     a = {}
-    if self.user is not None:
+    if hasattr(self,'user') and self.user is not None:
       a = self.user.get('attributes_tree', {})
+      return next(iter(a.values()))
     elif self.analysis is not None:
       a = self.analysis.get('attributes_tree', {})
+      return next(iter(a.values()))
     return a
 
   def get_subject(self) -> dict:
-    return self.get_attribute('subject')
+    return self.get_attribute_OLD('subject')
 
   def get_attribute_value(self, attr: str) -> str or None:
-    a = self.get_attribute(attr)
+    a = self.get_attributes_tree().get(attr, None)
     if a is not None:
-      return a['value']
+      return a.get('value', None)
     return None
 
   def get_date_value(self) -> datetime.datetime or None:
     return self.get_attribute_value('date')
 
-  def get_attribute(self, attr) -> dict:
-    atts = self.get_attributes()
+  def get_attribute_OLD(self, attr) -> dict:
+    atts = self.get_attributes_OLD()
     if attr in atts:
       return atts[attr]
     else:
@@ -157,6 +171,7 @@ class DbJsonDoc:
       }  ## fallback for safety
 
   def get_attr_span_start(self, a):
-    att = self.get_attributes()
+    warnings.warn("switch to attributes_tree", DeprecationWarning)
+    att = self.get_attributes_OLD()
     if a in att:
       return att[a]['span'][0]

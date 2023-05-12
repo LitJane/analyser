@@ -13,7 +13,7 @@ from analyser.doc_numbers import document_number_c, find_document_number_in_subd
 from analyser.documents import sentences_attention_to_words
 from analyser.embedding_tools import AbstractEmbedder
 from analyser.hyperparams import HyperParameters
-from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, \
+from analyser.legal_docs import LegalDocument, ParserWarnings, \
   LegalDocumentExt
 from analyser.ml_tools import SemanticTag, calc_distances_per_pattern_dict, max_exclusive_pattern_by_prefix, relu, \
   sum_probabilities, best_above, smooth_safe, spans_between_non_zero_attention, \
@@ -21,7 +21,7 @@ from analyser.ml_tools import SemanticTag, calc_distances_per_pattern_dict, max_
 from analyser.parsing import ParsingContext, AuditContext, find_value_sign_currency_attention
 from analyser.patterns import AbstractPatternFactory, FuzzyPattern, create_value_negation_patterns, \
   create_value_patterns
-from analyser.schemas import ProtocolSchema, AgendaItem
+from analyser.schemas import ProtocolSchema, AgendaItem, ContractPrice
 from analyser.structures import ORG_LEVELS_names, OrgStructuralLevel
 from analyser.text_normalize import r_group, r_quoted
 from analyser.text_tools import is_long_enough, span_len
@@ -56,10 +56,6 @@ class ProtocolDocument(LegalDocumentExt):
       # self.__dict__ = {**super().__dict__, **doc.__dict__}
       self.__dict__.update(doc.__dict__)
 
-    self.agenda_questions: [SemanticTag] = []
-    self.margin_values: [ContractValue] = []
-    self.contract_numbers: [SemanticTag] = []
-
     self.attributes_tree = ProtocolSchema()
 
   def get_org_tags(self) -> [SemanticTag]:
@@ -70,20 +66,6 @@ class ProtocolDocument(LegalDocumentExt):
 
     return []
 
-  def get_agents_tags(self) -> [SemanticTag]:
-    warnings.warn("please switch to attributes_tree struktur", DeprecationWarning)
-    res = []
-    for agenda_item in self.attributes_tree.agenda_items:
-      parent = agenda_item._legacy_tag_ref
-      if agenda_item.contract is not None:
-
-        _tags = _rename_org_tags(agenda_item.contract.orgs, prefix='contract_agent_', start_from=2)
-        for t in _tags:
-          t._parent_tag = parent
-
-    return res
-
-  agents_tags = property(get_agents_tags)
   org_tags = property(get_org_tags)
 
   def get_org_level(self) -> SemanticTagBase:
@@ -102,27 +84,10 @@ class ProtocolDocument(LegalDocumentExt):
 
   date = property(get_date, set_date)
 
-  def get_tags(self) -> [SemanticTag]:
-    warnings.warn("please switch to attributes_tree struktur", DeprecationWarning)
-    tags = []
-    if self.date is not None:
-      tags.append(self.date)
-
-    tags += self.org_tags
-    tags += [self.org_level]
-    tags += self.agents_tags
-    tags += self.agenda_questions
-    tags += self.contract_numbers
-    for mv in self.margin_values:
-      tags += mv.as_list()
-
-    tags = [t for t in tags if t is not None]  # TODO remove this weirdo
-    return tags
-
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
     _attributes_tree_dict, _ = to_json(self.attributes_tree)
-    j['attributes_tree'] = {"protocol": _attributes_tree_dict}
+    j['attributes_tree']['protocol'] = _attributes_tree_dict
     return j
 
 
@@ -213,6 +178,7 @@ class ProtocolParser(ParsingContext):
     doc.org_level = max_confident_tag(list(find_org_structural_level(doc)))
     doc.attributes_tree.org = find_protocol_org_obj(doc)
     doc.date = find_document_date(doc)
+    # doc.attributes_tree.case_number=find_case_number(doc)
 
     if doc.attributes_tree.org is not None:
       if doc.attributes_tree.org.name is None:
@@ -233,89 +199,74 @@ class ProtocolParser(ParsingContext):
     if doc.sentences_embeddings is None or doc.embeddings is None:
       self.embedd(doc)  # lazy embedding
 
-    doc.agenda_questions = self.find_question_decision_sections(doc)
-    doc.margin_values = self.find_margin_values(doc)
-    doc.contract_numbers = self.find_contract_numbers(doc)
-    # doc.agents_tags = list(self.find_agents_in_all_sections(doc, doc.agenda_questions, ctx.audit_subsidiary_name))
+    self.find_question_decision_sections(doc)
+    self.find_margin_values(doc)
+    self.find_contract_numbers(doc)
+    self.find_contract_agents(doc, ctx.audit_subsidiary_name)
 
-    # migrazzio:
-    for aq in doc.agenda_questions:
-      agenda_item = AgendaItem(tag=aq)
-
-      setattr(agenda_item, '_legacy_tag_ref', aq)  # TODO: remove this shit, it must not go to DB
-      # ai.__dict__['_legacy_tag_ref'] = aq
-      doc.attributes_tree.agenda_items.append(agenda_item)
-
-      for mv in doc.margin_values:
-        if mv.is_child_of(aq):
-          agenda_item.contract.price = mv.as_ContractPrice()
-
-      for cn in doc.contract_numbers:
-        if cn.is_child_of(aq):
-          agenda_item.contract.number = cn.clean_copy()
-
-    self.find_orgs_in_agendas(doc, ctx.audit_subsidiary_name)
     self.validate(doc, ctx)
     return doc
 
   def validate(self, document: ProtocolDocument, ctx: AuditContext):
 
-    if not document.agenda_questions:
+    if not document.attributes_tree.agenda_items:
       document.warn(ParserWarnings.protocol_agenda_not_found)
 
-    if not document.margin_values and not document.agents_tags and not document.contract_numbers:
-      document.warn(ParserWarnings.boring_agenda_questions)
-
-    # TODO: add more warnings
-
-  def find_orgs_in_agendas(self,
+  def find_contract_agents(self,
                            doc: ProtocolDocument,
                            audit_subsidiary_name: str):
 
-    for ai in doc.attributes_tree.agenda_items:
-      span = ai.span
-      _subdoc = doc[span[0]:span[1]]
+    for agenda_item in doc.attributes_tree.agenda_items:
+      _subdoc = doc[agenda_item.slice]
 
-      all: [ContractAgent] = find_org_names_raw(_subdoc, max_names=10, parent=None, decay_confidence=False)
-      all: [ContractAgent] = sorted(all, key=lambda a: a.name.value != audit_subsidiary_name)
+      _all: [ContractAgent] = find_org_names_raw(_subdoc, max_names=10, parent=None, decay_confidence=False)
+      all: [ContractAgent] = sorted(_all, key=lambda a: a.name.value != audit_subsidiary_name)
 
-      ai.contract.orgs = all
+      # ai.contract.orgs = all
+      for k, v in enumerate(all):
+        agenda_item.get_contract_at(k).orgs.append(v)
+        # TODO: one contract have several orgs!!
 
-  def find_margin_values(self, doc) -> [ContractValue]:
+  def find_margin_values(self, doc):
+    '''
+    TODO: make doc.agenda_questions as the only argument, so it is independent of state
+    :param doc:
+    :return:
+    '''
     if ProtocolAV.relu_value_attention_vector.name not in doc.distances_per_pattern_dict:
       raise KeyError('call find_question_decision_sections first')
 
-    values: [ContractValue] = []
-    for agenda_question_tag in doc.agenda_questions:
-      subdoc = doc[agenda_question_tag.as_slice()]
-      relu_value_attention_vector = subdoc.distances_per_pattern_dict[ProtocolAV.relu_value_attention_vector.name]
-      subdoc_values: [ContractValue] = find_value_sign_currency_attention(subdoc,
+    for agenda_item in doc.attributes_tree.agenda_items:
+      agenda_subdoc = doc[agenda_item.as_slice()]
+      relu_value_attention_vector = agenda_subdoc.distances_per_pattern_dict[
+        ProtocolAV.relu_value_attention_vector.name]
+
+      subdoc_values: [ContractPrice] = find_value_sign_currency_attention(agenda_subdoc,
                                                                           relu_value_attention_vector,
-                                                                          parent_tag=agenda_question_tag,
+                                                                          parent_tag=agenda_item,
                                                                           absolute_spans=True)
-      values += subdoc_values
+
       if len(subdoc_values) > 1:
+        # decrease confidence
         confidence = 1.0 / len(subdoc_values)
 
         for k, v in enumerate(subdoc_values):
-          v *= confidence  # decrease confidence
-          v.parent.kind = SemanticTag.number_key(v.parent.kind, k)
+          v *= confidence
+          # v.parent.kind = SemanticTag.number_key(v.parent.kind, k)
 
-    return values
+      for k, v in enumerate(subdoc_values):
+        agenda_item.get_contract_at(k).price = v
 
-  def find_contract_numbers(self, doc) -> [ContractValue]:
+  def find_contract_numbers(self, doc):
 
-    values = []
-    for agenda_question_tag in doc.agenda_questions:
-      subdoc = doc[agenda_question_tag.as_slice()]
+    for agenda_item in doc.attributes_tree.agenda_items:
+      subdoc = doc[agenda_item.slice]
 
-      numbers = find_document_number_in_subdoc(subdoc, tagname='number', parent=agenda_question_tag)
+      numbers: [SemanticTag] = find_document_number_in_subdoc(subdoc, tagname='number',
+                                                              parent=None)
 
       for k, v in enumerate(numbers):
-        # v.parent = agenda_question_tag
-        v.kind = SemanticTag.number_key(v.kind, k)
-      values += numbers
-    return values
+        agenda_item.get_contract_at(k).number = v
 
   def collect_spans_having_votes(self, segments, textmap):
     warnings.warn("use TextMap.regex_attention", DeprecationWarning)
@@ -360,7 +311,7 @@ class ProtocolParser(ParsingContext):
     s_value_attention_vector = relu(s_value_attention_vector, 0.3)
     return s_value_attention_vector
 
-  def find_question_decision_sections(self, doc: ProtocolDocument) -> [SemanticTag]:
+  def find_question_decision_sections(self, doc: ProtocolDocument) -> [AgendaItem]:
 
     # DEAL APPROVAL SENTENCES
     _v_deal_approval: FixedVector = max_exclusive_pattern_by_prefix(doc.distances_per_sentence_pattern_dict,
@@ -399,9 +350,13 @@ class ProtocolParser(ParsingContext):
     _question_spans_sent = spans_between_non_zero_attention(_protocol_sections_edges)
     question_spans_words = doc.sentence_map.remap_slices(_question_spans_sent, doc.tokens_map)
 
-    agenda_questions = list(find_confident_spans(question_spans_words, combined_av_norm, 'agenda_item', 0.5))
+    _agenda_questions_iter = find_confident_spans(question_spans_words, combined_av_norm, 'agenda_item', 0.5)
 
-    return agenda_questions
+    for aq in _agenda_questions_iter:
+      agenda_item = AgendaItem(tag=aq)
+      doc.attributes_tree.agenda_items.append(agenda_item)
+
+    return doc.attributes_tree.agenda_items
 
 
 class ProtocolPatternFactory(AbstractPatternFactory):

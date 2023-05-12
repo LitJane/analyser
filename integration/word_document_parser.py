@@ -6,7 +6,7 @@ import warnings
 
 from analyser.charter_parser import CharterDocument
 from analyser.contract_parser import ContractDocument
-from analyser.legal_docs import LegalDocument, Paragraph, PARAGRAPH_DELIMITER
+from analyser.legal_docs import LegalDocument, Paragraph, PARAGRAPH_DELIMITER, GenericDocument
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag
 from analyser.protocol_parser import ProtocolDocument
@@ -54,7 +54,7 @@ class WordDocParser(DirDocProvider):
 def create_doc_by_type(t: str, doc_id, filename) -> CharterDocument or ContractDocument or ProtocolDocument:
   # TODO: check type of res
 
-  if t in ('CONTRACT', 'ANNEX', 'SUPPLEMENTARY_AGREEMENT'):
+  if t in ('CONTRACT', 'ANNEX', 'SUPPLEMENTARY_AGREEMENT', 'AGREEMENT'):
     doc = ContractDocument('')
   elif t == 'PROTOCOL':
     doc = ProtocolDocument()
@@ -62,7 +62,7 @@ def create_doc_by_type(t: str, doc_id, filename) -> CharterDocument or ContractD
     doc = CharterDocument()
   else:
     logging.warning(f"Unsupported document type: {t}")
-    doc = LegalDocument('')
+    doc = GenericDocument('')
 
   doc._id = doc_id
   doc.filename = filename

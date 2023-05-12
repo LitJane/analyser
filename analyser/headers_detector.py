@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import TextMap
+from analyser.hyperparams import HyperParameters
 from analyser.hyperparams import models_path
 from analyser.legal_docs import PARAGRAPH_DELIMITER, make_headline_attention_vector
 from analyser.ml_tools import sum_probabilities, FixedVector
@@ -15,7 +16,7 @@ from analyser.text_tools import Tokens, _count_capitals, _count_digits
 popular_headers = pd.read_csv(os.path.join(models_path, 'headers_by_popularity.csv'))[2:50]
 popular_headers = list(popular_headers['text'])
 
-from analyser.hyperparams import HyperParameters
+
 
 if HyperParameters.headers_detector_use_regressor:
   model_path = os.path.join(models_path, 'rf_headers_detector_model.joblib')
@@ -113,6 +114,8 @@ def get_token_features(token: str):
 
 def get_tokens_features(tokens):
   doc_features = []
+
+
   for t in tokens:
     _features = get_token_features(t)
     doc_features.append(_features)
@@ -120,6 +123,10 @@ def get_tokens_features(tokens):
   doc_featuresX_data = pd.DataFrame.from_records(doc_features)
   doc_featuresX_data['_reserved'] = 0.0
   doc_featuresX_data['h'] = 0.0
+
+  position_enc = np.arange(1, 0, -0.0005)
+  max_pos = min (len(position_enc), len(doc_featuresX_data['h']))
+  doc_featuresX_data['h'][0:max_pos] = position_enc[0:max_pos]
 
   return doc_featuresX_data
 
