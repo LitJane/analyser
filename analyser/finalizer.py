@@ -726,7 +726,7 @@ def check_inside(document, additional_docs, insiders) -> []:
         if amount_netto['currency'] != 'RUB':
             amount_netto = convert_to_currency(amount_netto, 'RUB')
         if amount_netto['value'] > gpn_book_value['value'] * 0.1:
-            result.append({'type': 'InsiderControl', 'text': 'Крупная сделка(сумма договора более 10% балансовой стоимости ГПН)', 'reason': '', 'notes': [], 'inside_type': 'Deals'})
+            result.append({'type': 'InsiderControl', 'text': 'Крупная сделка (сумма договора более 10% балансовой стоимости ГПН)', 'reason': '', 'notes': [], 'inside_type': 'Deals'})
 
     if inside_info is not None:
         text = extract_text(inside_info['span'], document["analysis"]["tokenization_maps"]["words"], document["analysis"]["normal_text"])
