@@ -1,9 +1,8 @@
-import os.path
 from typing import Dict, List
 
 import mlflow
 import pandas as pd
-
+# noinspection PyUnresolvedReferences
 from analyser.dictionaries import integration_path, labels, label2id
 from utilits.utils import _env_var
 

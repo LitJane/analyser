@@ -1,3 +1,4 @@
-# Да, так нужно, не удалять
+# noinspection PyUnresolvedReferences
 from integration.classifier.classifier import PracticeClassifier
+# noinspection PyUnresolvedReferences
 from integration.classifier.text_utils import cleanup_all

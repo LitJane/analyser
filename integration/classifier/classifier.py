@@ -1,5 +1,4 @@
 from mlflow.pyfunc import PythonModel, PythonModelContext
-from typing import Dict
 import pandas as pd
 
 from integration.classifier.text_utils import cleanup_all
@@ -10,6 +9,7 @@ class PracticeClassifier(PythonModel):
         import os
         from transformers import AutoTokenizer, AutoConfig
         from transformers import TFAutoModelForSequenceClassification
+        # noinspection PyUnresolvedReferences
         import tensorflow as tf
 
         config_file = os.path.dirname(context.artifacts["config"])
