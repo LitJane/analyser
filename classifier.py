@@ -1,4 +1,6 @@
-# noinspection PyUnresolvedReferences
 from integration.classifier.classifier import PracticeClassifier
-# noinspection PyUnresolvedReferences
 from integration.classifier.text_utils import cleanup_all
+
+if __name__ == '__main__':
+  print(PracticeClassifier)
+  print(cleanup_all)
