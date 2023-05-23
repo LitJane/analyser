@@ -391,7 +391,7 @@ def doc_classification(audit):
     if classification_result:
         save_audit_practice(audit, classification_result, not main_doc, additional_classification_results)
         if audit['additionalFields']['external_source'] == 'email':
-          top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+          top_result = next(filter(lambda x: x['nn_id'] == classification_result[0]['label'], all_labels), None)
           attachments = []
           fs = gridfs.GridFS(get_mongodb_connection())
           for file_id in audit['additionalFields']['file_ids']:
