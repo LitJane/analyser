@@ -74,7 +74,7 @@ def _get_month_number(m):
     except Exception:
       pass
 
-  for p in range(len(months_short)):
-    if re.match(months_short[p], m):
+  for p, month in enumerate(months_short):
+    if re.match(month, m):
       return p + 1
   return -1

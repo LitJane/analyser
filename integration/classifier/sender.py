@@ -40,7 +40,7 @@ judicial_senders = {
 def estimate_judicial_patterns_similarity_threshold():
   all_patterns = []
 
-  for key, judicial_sender_val in judicial_senders.items():
+  for judicial_sender_val in judicial_senders.values():
     all_patterns += judicial_sender_val
 
   max_similarity = 0

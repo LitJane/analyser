@@ -201,7 +201,8 @@ class TestSchema(unittest.TestCase):
 
     self.assertIsNotNone(context.exception)
 
-  def test_date_correct(self):
+  @staticmethod
+  def test_date_correct():
     tree = {
       "contract": {
         "date": {
@@ -215,7 +216,8 @@ class TestSchema(unittest.TestCase):
 
     schema_validator.validate(tree)
 
-  def test_value_correct(self):
+  @staticmethod
+  def test_value_correct():
     tree = {
       "contract": {
         "price": {
@@ -263,7 +265,8 @@ class TestSchema(unittest.TestCase):
       schema_validator.validate(tree)
     self.assertIsNotNone(context.exception)
 
-  def test_subject_correct(self):
+  @staticmethod
+  def test_subject_correct():
     tree = {
       "contract": {
         "subject": {
@@ -291,7 +294,8 @@ class TestSchema(unittest.TestCase):
       schema_validator.validate(tree)
     self.assertIsNotNone(context.exception)
 
-  def test_org_correct(self):
+  @staticmethod
+  def test_org_correct():
     tree = {
       "contract": {"orgs": [{
         "name": {
@@ -356,11 +360,6 @@ class TestSchema(unittest.TestCase):
     aic.orgs[0].type = SemanticTagBase()
     aic.orgs[0].type.span = (110, 120)
     self.assertEqual(aic.span, (10, 120))
-
-    # print(aic.__dict__)
-    # a, _p = to_json(aic)
-    # print(a)
-    # print(a)
 
 
 unittest.main(argv=['-e utf-8'], verbosity=3, exit=False)
