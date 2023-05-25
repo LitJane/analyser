@@ -36,7 +36,6 @@ from integration.db import get_mongodb_connection
 from tf_support.embedder_elmo import ElmoEmbedder
 from tf_support.super_contract_model import get_semantic_map_new, make_att_model, losses, metrics
 from tf_support.tools import KerasTrainingContext
-from trainsets.trainset_tools import split_trainset_evenly
 
 matplotlib.use('Agg')
 logger = logging.getLogger('retrain_contract_uber_model')
@@ -263,57 +262,6 @@ class UberModelTrainsetManager:
     img_path = os.path.join(self.reports_dir, 'contracts-subjects-dist.png')
     plt.savefig(img_path, bbox_inches='tight')
 
-  def train(self, generator_factory_method):
-    self.stats: DataFrame = self.load_contract_trainset_meta()
-
-    '''
-    Phase I: frozen bottom 6 common layers
-    Phase 2: all unfrozen, entire trainset, low LR
-    :return:
-    '''
-
-    batch_size = 24  # TODO: make a param
-    train_indices, test_indices = split_trainset_evenly(self.stats, 'subject', seed=66)
-    model, ctx = self.init_model()
-    ctx.EVALUATE_ONLY = False
-
-    ######################
-    ## Phase I retraining
-    # frozen bottom layers
-    ######################
-
-    ctx.EPOCHS = 30
-    ctx.set_batch_size_and_trainset_size(batch_size, len(test_indices), len(train_indices))
-
-    test_gen = generator_factory_method(test_indices, batch_size)
-    train_gen = generator_factory_method(train_indices, batch_size, augment_samples=True)
-
-    ctx.train_and_evaluate_model(model, train_gen, test_gen, retrain=True)
-
-    ######################
-    ## Phase II finetuning
-    #  all unfrozen, entire trainset, low LR
-    ######################
-    ctx.unfreezeModel(model)
-    model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
-
-    ctx.EPOCHS *= 2
-    train_gen = generator_factory_method(train_indices + test_indices, batch_size)
-    test_gen = generator_factory_method(test_indices, batch_size)
-    ctx.train_and_evaluate_model(model, train_gen, test_generator=test_gen, retrain=False, lr=2e-5)
-
-    self.make_training_report(ctx, model)
-
-  def make_training_report(self, ctx: KerasTrainingContext, model: Model):
-    ## plot results
-    _log = ctx.get_log(model.name)
-    if _log is not None:
-      _metrics = _log.keys()
-      plot_compare_models(ctx, [model.name], _metrics, self.reports_dir)
-
-    _gen = self.make_generator(self.stats.index, 20)
-    plot_subject_confusion_matrix(self.reports_dir, model, steps=20, generator=_gen)
-
   def export_docs_to_json(self):
     self.stats: DataFrame = self.load_contract_trainset_meta()
 
@@ -347,9 +295,6 @@ class UberModelTrainsetManager:
     sm = _padded[2]
 
     return (emb, tok_f), (sm, subj), (sample_weight, subject_weight)
-
-  def run(self, gen):
-    self.train(gen)
 
 
 def export_updated_contracts_to_json(document_ids, work_dir):
@@ -403,8 +348,8 @@ def plot_subject_confusion_matrix(reports_path, model, steps=12, generator=None)
     text_file.write(report)
 
 
-def plot_compare_models(ctx, models: [str], metrics, image_save_path):
-  _metrics = [m for m in metrics if not m.startswith('val_')]
+def plot_compare_models(ctx, models: [str], mmetrics, image_save_path):
+  _metrics = [m for m in mmetrics if not m.startswith('val_')]
 
   for _, m in enumerate(models):
 

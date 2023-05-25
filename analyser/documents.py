@@ -190,7 +190,9 @@ class TextMap:
     return target_range
 
   def remap_slices(self, spans, target_map: 'TextMap'):
-    assert self._full_text == target_map._full_text
+    if self._full_text != target_map._full_text:
+      raise AssertionError("_full_text != target_map._full_text")
+
     ret = []
     for span in spans:
       char_range = self.char_range([span.start, span.stop])
@@ -321,7 +323,7 @@ class GTokenizer:
 class DefaultGTokenizer(GTokenizer):
 
   def __init__(self):
-    pass
+    pass #nothing in parent
 
   def span_tokenize(self, text):
     start_from = 0

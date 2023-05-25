@@ -25,8 +25,8 @@ date_regex_str = f'{_date_day}{_date_separator}{_date_month}{_date_separator}{_d
 date_regex_c = re.compile(date_regex_str, re.IGNORECASE | re.UNICODE)
 
 
-def find_document_date(doc: LegalDocument, tagname='date') -> SemanticTag or None:
-  head: LegalDocument = get_doc_head(doc)
+def find_document_date(ldoc: LegalDocument, tagname='date') -> SemanticTag or None:
+  head: LegalDocument = get_doc_head(ldoc)
   c_span, _date = find_date(head.text)
   if c_span is None:
     return None
@@ -48,13 +48,13 @@ def find_date(text: str) -> ([], datetime.datetime):
   return None, None
 
 
-def get_doc_head(doc: LegalDocument) -> LegalDocument:
-  if doc.paragraphs:
-    headtag: SemanticTag = doc.paragraphs[0].as_combination()
+def get_doc_head(ldoc: LegalDocument) -> LegalDocument:
+  if ldoc.paragraphs:
+    headtag: SemanticTag = ldoc.paragraphs[0].as_combination()
     if len(headtag) > 50:
-      return doc[headtag.as_slice()]
+      return ldoc[headtag.as_slice()]
   # fallback
-  return doc[0:HyperParameters.protocol_caption_max_size_words]
+  return ldoc[0:HyperParameters.protocol_caption_max_size_words]
 
 
 def parse_date(finding) -> ([], datetime.datetime):
@@ -78,12 +78,3 @@ def _get_month_number(m):
     if re.match(months_short[p], m):
       return p + 1
   return -1
-
-
-if __name__ == '__main__':
-  doc = LegalDocument(
-    'Договор пожертвования N 16-89/44 г. Санкт-Петербург                     «11» декабря 2018 год.\nМуниципальное бюджетное учреждение города Москвы «Радуга» именуемый в дальнейшем «Благополучатель»')
-  doc.parse()
-
-  tag = find_document_date(doc)
-  print(tag)
