@@ -63,12 +63,10 @@ protocol_caption_complete_re_ignore_case = re.compile(complete_re_str_org,
                                                       re.MULTILINE | re.UNICODE | re.IGNORECASE | re.DOTALL)
 
 # ----------------------------------
-
 org_pieces = ['type', 'name', 'human_name', 'alt_name', 'alias', 'type_ext']
 
 
 class ContractAgent(OrgItem):
-  # org_pieces = ['type', 'name', 'alt_name', 'alias', 'type_ext']
   def __init__(self):
 
     super().__init__()
@@ -223,7 +221,7 @@ def normalize_contract_agent(ca: ContractAgent or OrgItem) -> OrgItem:
 
 def find_closest_org_name(subsidiaries_: [dict], pattern: str,
                           threshold=HyperParameters.subsidiary_name_match_min_jaro_similarity):
-  if pattern is None or pattern=='':
+  if pattern is None or pattern == '':
     return None, 0
   best_similarity = 0
   finding = None

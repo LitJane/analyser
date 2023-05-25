@@ -21,7 +21,6 @@ _date_day = r'«?(?P<day>[1-2][0-9]|3[01]|0?[1-9])»?'
 _date_year = r'(?P<year>[1-2]\d{3})'
 _date_month = f'(?P<month>{_date_month_})'
 _date_separator = r'(\s*|\-|\.)'
-# date_regex_str = r"(?P<day>[1-2][0-9]|3[01]|0?[1-9]).\s*(?P<month>1[0-2]|0[1-9]|января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря).\s*(?P<year>[1-2]\d{3})"
 date_regex_str = f'{_date_day}{_date_separator}{_date_month}{_date_separator}{_date_year}'
 date_regex_c = re.compile(date_regex_str, re.IGNORECASE | re.UNICODE)
 
@@ -37,7 +36,6 @@ def find_document_date(doc: LegalDocument, tagname='date') -> SemanticTag or Non
 
 def find_date(text: str) -> ([], datetime.datetime):
   try:
-#     text = text.replace('_', '').replace("«", '').replace('»', '')
     findings = re.finditer(date_regex_c, text)
     if findings:
       finding = next(findings)

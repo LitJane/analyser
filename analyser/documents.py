@@ -15,11 +15,7 @@ from analyser.text_tools import Tokens, untokenize, replace_tokens, split_into_s
 
 nltk.data.path.append(os.path.join(models_path, 'nltk'))
 
-
 TEXT_PADDING_SYMBOL = ' '
-
-
-# nltk.download('punkt')
 
 
 class TextMap:
@@ -55,10 +51,7 @@ class TextMap:
   def __add__(self, other):
     off = len(self._full_text)
     self._full_text += other._full_text
-    # if len(self.map)>0:
-    #   off = self.map[-1][-1]
-    # else:
-    #   off=len(self._full_text)
+
     for span in other.map:
       self.map.append((span[0] + off, span[1] + off))
 
@@ -328,9 +321,6 @@ class GTokenizer:
 class DefaultGTokenizer(GTokenizer):
 
   def __init__(self):
-
-    # pth = os.path.join(os.path.dirname(__file__), 'nltk_data_download')
-    # nltk.download('punkt', download_dir=pth)
     pass
 
   def span_tokenize(self, text):

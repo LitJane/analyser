@@ -10,9 +10,6 @@ from analyser.log import logger
 from analyser.ml_tools import SemanticTag
 
 
-# from tf_support.embedder_elmo import ElmoEmbedder
-
-
 def estimate_distance_threshold(patterns_embeddings):
   distance_matrix = pairwise_distances(patterns_embeddings, patterns_embeddings, metric='cosine', n_jobs=1)
 
@@ -23,10 +20,6 @@ def estimate_distance_threshold(patterns_embeddings):
       distance_matrix_meaningful.append(distance_matrix[i][j])
   distance_matrix_meaningful = np.array(distance_matrix_meaningful)
   len(distance_matrix_meaningful)
-
-  # print("distance_matrix mean=", distance_matrix_meaningful.mean())
-  # print("distance_matrix max=", distance_matrix_meaningful.max())
-  # print("distance_matrix std=", distance_matrix_meaningful.std())
 
   # mean distance plus/minus tandart deviation .. estimating the max distance from clusters...
   threshold = distance_matrix_meaningful.mean() - distance_matrix_meaningful.std()
@@ -80,16 +73,9 @@ class InsidesFinder():
         sim_max = av[ii]
 
         logger.info(f"{k}=cluster \t {av[ii]}=similarity, \n {sentence_map.tokens[ii]} ")
-        # char_span = sample_doc.sentence_map.map[ii]
 
         _span = sentence_map.remap_span((ii, ii + 1), sample_doc.tokens_map)
-        # logger.info(f"span (chars):  {char_span}, {_span}")
+
         tag = SemanticTag('insideInformation', 'Unknown', span=_span, confidence=np.float(av[ii]))
 
         sample_doc.attributes_tree.insideInformation = tag
-        # setattr(sample_doc.attributes_tree, "insideInformation", tag)
-      # else:
-      #   _span = sample_doc.sentence_map.remap_span((ii, ii + 1), sample_doc.tokens_map)
-      #   s = sample_doc.sentence_map.text_range(_span)
-      #   logger.info(f'pattern {k}, hits {av[ii]}, span:{_span}, [{s}]')
-    # print(sim_max, i_max)

@@ -33,10 +33,8 @@ from analyser.persistence import DbJsonDoc
 from analyser.structures import ContractSubject
 from colab_support.renderer import plot_cm
 from integration.db import get_mongodb_connection
-from tf_support import super_contract_model
 from tf_support.embedder_elmo import ElmoEmbedder
-from tf_support.super_contract_model import get_semantic_map_new
-from tf_support.super_contract_model import make_att_model
+from tf_support.super_contract_model import get_semantic_map_new, make_att_model, losses, metrics
 from tf_support.tools import KerasTrainingContext
 from trainsets.trainset_tools import split_trainset_evenly
 
@@ -111,7 +109,6 @@ class UberModelTrainsetManager:
   def get_updated_contracts(self):
     self.lastdate = datetime(1900, 1, 1)
     if len(self.stats) > 0:
-      # self.stats.sort_values(["user_correction_date", 'analyze_date', 'export_date'], inplace=True, ascending=False)
       self.lastdate = self.stats[["user_correction_date", 'analyze_date']].max().max()
     logger.info(f'latest export_date: [{self.lastdate}]')
 
@@ -140,7 +137,7 @@ class UberModelTrainsetManager:
     # TODO: sorting fails in MONGO
     sorting = [('analysis.analyze_timestamp', ASCENDING),
                ('user.updateDate', ASCENDING)]
-    # sorting = None
+
     res = documents_collection.find(filter=query, sort=sorting, projection={'_id': True})
 
     res.limit(600)
@@ -202,8 +199,6 @@ class UberModelTrainsetManager:
     logger.info(f'TOTAL DATAPOINTS IN TRAINSET: {len(df)}')
     return df
 
-    # export_docs_to_single_json(docs, self.work_dir)
-
   def save_stats(self):
     self._save_stats()
 
@@ -234,7 +229,6 @@ class UberModelTrainsetManager:
     model_name = self.model_variant_fn.__name__
 
     model = self.model_variant_fn(name=model_name, ctx=ctx, trained=True)
-    # model.name = model_name
 
     weights_file_old = os.path.join(models_path, model_name + ".weights")
     weights_file_new = os.path.join(self.reports_dir, model_name + ".weights")
@@ -253,27 +247,9 @@ class UberModelTrainsetManager:
     for layer in model.layers[0:6]:
       layer.trainable = False
 
-    model.compile(loss=super_contract_model.losses, optimizer='Nadam', metrics=super_contract_model.metrics)
-    # model.summary()
+    model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
 
     return model, ctx
-
-  # def validate_trainset(self):
-  #   self.stats: DataFrame = self.load_contract_trainset_meta()
-  #
-  #   self.stats['valid'] = True
-  #   self.stats['error'] = ''
-  #
-  #   for i in self.stats.index:
-  #     try:
-  #       self.make_xyw(i)
-  #
-  #     except Exception as e:
-  #       logger.error(e)
-  #       self.stats.at[i, 'valid'] = False
-  #       self.stats.at[i, 'error'] = str(e)
-  #
-  #   self._save_stats()
 
   def describe_trainset(self):
     # TODO: report
@@ -319,8 +295,7 @@ class UberModelTrainsetManager:
     #  all unfrozen, entire trainset, low LR
     ######################
     ctx.unfreezeModel(model)
-    model.compile(loss=super_contract_model.losses, optimizer='Nadam', metrics=super_contract_model.metrics)
-    # model.summary()
+    model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
 
     ctx.EPOCHS *= 2
     train_gen = generator_factory_method(train_indices + test_indices, batch_size)
@@ -365,7 +340,6 @@ class UberModelTrainsetManager:
     if start_from > 0:
       _padded = [p[start_from:] for p in _padded]
 
-      # _padded = list(pad_things(_padded, maxlen - start_from, padding='pre'))
     _padded = list(pad_things(_padded, maxlen))
 
     emb = _padded[0]
@@ -374,20 +348,7 @@ class UberModelTrainsetManager:
 
     return (emb, tok_f), (sm, subj), (sample_weight, subject_weight)
 
-  def prepare_trainst(self):
-    '''
-    1. importing fresh docs
-    2. make train samples
-    3. validate & clean-up
-    :return:
-    '''
-    self.import_recent_contracts()
-    self.calculate_samples_weights()
-    self.validate_trainset()
-    self.describe_trainset()
-
   def run(self, gen):
-    self.prepare_trainst()
     self.train(gen)
 
 
@@ -396,14 +357,12 @@ def export_updated_contracts_to_json(document_ids, work_dir):
   n = 0
   for k, doc_id in enumerate(document_ids):
     d = get_doc_by_id(doc_id)
-    # if '_id' not in d['user']['author']:
-    #   print(f'error: user attributes doc {d["_id"]} is not linked to any user')
 
     if 'auditId' not in d:
       logger.warning(f'error: doc {d["_id"]} is not linked to any audit')
 
     arr[str(d['_id'])] = d
-    # arr.append(d)
+
     logger.debug(f"exporting JSON {k} {d['_id']}")
     n = k
 
@@ -428,7 +387,6 @@ def plot_subject_confusion_matrix(reports_path, model, steps=12, generator=None)
     orig_test_labels = onehots2labels(y[1])
 
     _preds = onehots2labels(model.predict(x)[1])
-    # _labels = sorted(np.unique(orig_test_labels + _preds))
 
     all_predictions += _preds
     all_originals += orig_test_labels
@@ -481,33 +439,3 @@ def plot_compare_models(ctx, models: [str], metrics, image_save_path):
 
     else:
       logger.error('cannot plot')
-
-
-if __name__ == '__main__':
-  ch = logging.StreamHandler()
-  ch.setLevel(logging.DEBUG)
-  formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-  ch.setFormatter(formatter)
-  logger.addHandler(ch)
-
-  '''
-  0. Read 'contract_trainset_meta.csv CSV, find the last datetime of export
-  1. Fetch recent docs from DB: update date > last datetime of export 
-  2. Embedd them, save embeddings, save other features
-  
-  '''
-
-  # os.environ['GPN_DB_NAME'] = 'gpn'
-  # os.environ['GPN_DB_HOST'] = '192.168.10.36'
-  # os.environ['GPN_DB_PORT'] = '27017'
-  # db = get_mongodb_connection()
-  #
-
-  umtm = UberModelTrainsetManager(default_work_dir)
-  umtm.run()
-
-  # umtm.import_recent_contracts()
-  # umtm.calculate_samples_weights()
-  #
-  # model, ctx = umtm.init_model()
-  # umtm.make_training_report(ctx, model)
