@@ -12,7 +12,8 @@ from analyser.structures import OrgStructuralLevel, ContractSubject, contract_su
 from gpn.gpn import subsidiaries
 from integration.db import get_mongodb_connection
 
-integration_path = Path(analyser.__file__).parent.parent / 'integration' / 'classifier'  # .parent/'integration/classifier'
+integration_path = Path(
+  analyser.__file__).parent.parent / 'integration' / 'classifier'  # .parent/'integration/classifier'
 
 with open(integration_path / 'practices.json', encoding='utf-8') as practice_json_file:
   all_labels = json.load(practice_json_file)
@@ -35,7 +36,7 @@ def contract_subject_as_db_json():
 
 
 def legal_entity_types_as_db_json():
-  for k in legal_entity_types.keys():
+  for k in legal_entity_types:
     yield {'_id': k, 'alias': legal_entity_types[k]}
 
 
@@ -43,8 +44,6 @@ def insert_schemas_to_db(db):
   collection_schemas = db['schemas']
 
   json_str = json.dumps(document_schemas, indent=4)
-  # print(json_str)
-  # print(type(json_str))
   key = f"documents_schema_{analyser.__version__}"
   collection_schemas.delete_many({"_id": key})
   collection_schemas.insert_one({"_id": key, 'json': json_str, "version": analyser.__version__})

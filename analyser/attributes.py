@@ -11,7 +11,6 @@ from bson.objectid import ObjectId
 from jsonschema import validate, FormatChecker
 
 import analyser
-# from analyser.log import logger
 from analyser.ml_tools import SemanticTagBase
 from analyser.schemas import document_schemas, ProtocolSchema, OrgItem, AgendaItem, AgendaItemContract, HasOrgs, \
   ContractPrice, ContractSchema, CharterSchema, CharterStructuralLevel, Competence
@@ -264,8 +263,6 @@ def convert_agenda_item(path, attr: {}, _item_node: AgendaItem):
 
   if attr_base_name in ['date', 'number']:
     copy_leaf_tag(attr_base_name, src=attr, dest=c_node)
-
-  # pass
 
 
 def copy_attr(src, dest: SemanticTagBase, skip_value=False) -> SemanticTagBase:
@@ -548,11 +545,7 @@ def _test_convert():
   # contract: 5f0bb4bd138e9184feef1fa8
 
   db = get_mongodb_connection()
-  # a = doc['user']['attributes']
   _test_protocol()
-  # j, json_str, doc = test_protocol()
-  # validate(instance=json_str, schema=document_schemas, format_checker=FormatChecker())
-  # db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"analysis.attributes_tree": j}})
 
   j, json_str, doc = _test_charter()
   validate(instance=json_str, schema=document_schemas, format_checker=FormatChecker())
@@ -561,16 +554,3 @@ def _test_convert():
   j, json_str, doc = _test_contract()
   validate(instance=json_str, schema=document_schemas, format_checker=FormatChecker())
   db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"analysis.attributes_tree": j}})
-
-  # coll = db["schemas"]
-  # coll.delete_many({})
-  # coll.insert_one( {"charter":charter_schema })
-
-  # db.create_collection("test_charters", {"validator": {"$jsonSchema": charter_schema}})
-
-
-if __name__ == '__main__':
-  # test_convert()
-  convert_all_docs()
-  # at = get_attributes_tree('5f64161009d100a445b7b0d6')
-  # print(at)
