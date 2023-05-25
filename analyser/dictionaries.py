@@ -35,7 +35,7 @@ def contract_subject_as_db_json():
 
 
 def legal_entity_types_as_db_json():
-  for k in legal_entity_types.keys():
+  for k in legal_entity_types:
     yield {'_id': k, 'alias': legal_entity_types[k]}
 
 

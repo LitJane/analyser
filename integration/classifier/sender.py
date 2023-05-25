@@ -39,7 +39,7 @@ judicial_senders = {
 
 def estimate_judicial_patterns_similarity_threshold():
   all_patterns = []
-  for k in judicial_senders.keys():
+  for k in judicial_senders:
     all_patterns += judicial_senders[k]
 
   max_similarity = 0
@@ -67,7 +67,7 @@ def get_sender_judicial_org(sender: str) -> str or None:
   sender_l = sender.lower()
   max_similarity_ratio = judicial_patterns_similarity_threshold
   similar_p = None
-  for k in judicial_senders.keys():
+  for k in judicial_senders:
     patterns = judicial_senders[k]
     for p in patterns:
       p_l = p.lower()
