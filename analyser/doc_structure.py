@@ -6,9 +6,9 @@ from analyser.text_tools import roman_might_be, Tokens, string_to_ip
 
 def _count_start_whitespace(tokens: Tokens) -> int:
   for i, token in enumerate(tokens):
-
-    if token != '.' and token != ' ' and token != '\t':
+    if token not in ('.', ' ', '\t'):
       return i
+
   return len(tokens)
 
 
