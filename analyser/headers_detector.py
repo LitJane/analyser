@@ -87,7 +87,7 @@ def line_features(tokens_map: TextMap, line_span: (int, int), line_number: int, 
   # TODO: add previous and next lines features
   txt: str = tokens_map.text_range(line_span)
 
-  numbers, span, k, s = get_tokenized_line_number(tokens, 0)
+  numbers, span, _, s = get_tokenized_line_number(tokens, 0)
   if not numbers:
     numbers = []
     number_minor = -2

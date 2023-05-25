@@ -315,7 +315,7 @@ class PatternMatch():
     warnings.warn("use SemanticTag", DeprecationWarning)
     if name is None:
       return self.parent.distances_per_pattern_dict[self.attention_vector_name][self.region]
-    
+
     return self.parent.distances_per_pattern_dict[name][self.region]
 
   def get_index(self):

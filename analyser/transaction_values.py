@@ -30,7 +30,7 @@ class ValueConstraint:
 
 
 complete_re = re.compile(
-  # r'(свыше|превыша[а-я]{2,4}|не превыша[а-я]{2,4})?\s+'
+
   r'('
   r'(?P<digits>\d+([\.,\= ]\d+)*)'  # digits #0
   r'(?:\s*\(.+?\)\s*(?:тыс[а-я]*|млн|милли[а-я]{0,4})\.?)?'  # bullshit like 'от 1000000 ( одного ) миллиона рублей'
@@ -91,7 +91,7 @@ def find_value_spans(_sentence: str, vat_percent=0.20) -> ([int], float, [int], 
 
     number: float = to_float(_sentence[number_span[0]:number_span[1]])
 
-    # NUMBER MULTIPLIER
+    # --NUMBER MULTIPLIER--
     qualifier_span = match.span('qualifier' + ix)
     qualifier = _sentence[qualifier_span[0]:qualifier_span[1]]
     if qualifier:
@@ -101,7 +101,7 @@ def find_value_spans(_sentence: str, vat_percent=0.20) -> ([int], float, [int], 
         if qualifier.startswith('м'):
           number *= 1e6
 
-    # FRACTION (CENTS, KOPs)
+    # --FRACTION-- (CENTS, KOPs)
     cents_span = match.span('cents' + ix)
     r_cents = _sentence[cents_span[0]:cents_span[1]]
     if r_cents:
@@ -109,7 +109,7 @@ def find_value_spans(_sentence: str, vat_percent=0.20) -> ([int], float, [int], 
       if frac == 0:
         number += to_float(r_cents) / 100.
 
-    # CURRENCY
+    # --CURRENCY--
     currency_span = match.span('currency' + ix)
     currency = _sentence[currency_span[0]:currency_span[1]]
     curr = currency[0:3]
@@ -128,7 +128,6 @@ def find_value_spans(_sentence: str, vat_percent=0.20) -> ([int], float, [int], 
         vat_percent = to_float(r_vat_percent) / 100
 
       number = number / (1. + vat_percent)
-      # number = int(number * 100.) / 100.  # dumned truncate!
       number = round(number, 2)  # not truncate, round!
       including_vat = True
 

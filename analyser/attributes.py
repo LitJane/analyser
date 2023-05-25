@@ -451,13 +451,13 @@ def convert_one(db, doc: dict):
 
     a_attr_tree['version'] = analyser.__version_ints__
     a_attr_tree['creation_date'] = datetime.now()
-    j, json_str = to_json(a_attr_tree)
+    j, _ = to_json(a_attr_tree)
     db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"analysis.attributes_tree": j}})
     migration_logger.debug(f'updated {kind} {doc["_id"]} analysis.attributes_tree')
     if u_attr_tree is not None:
       u_attr_tree['version'] = analyser.__version_ints__
       u_attr_tree['creation_date'] = datetime.now()
-      j, json_str = to_json(u_attr_tree)
+      j, _ = to_json(u_attr_tree)
       db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"user.attributes_tree": j}})
       migration_logger.debug(f'updated {kind} {doc["_id"]} user.attributes_tree')
 

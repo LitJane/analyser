@@ -1002,7 +1002,7 @@ def find_person_interest(result, beneficiary, interests):
     full_name = None
     reason_text = ''
     notes = []
-    for key, value in list(reversed(sorted(interests.items()))):
+    for _, value in list(reversed(sorted(interests.items()))):
         if value is not None:
             for person in value['stakeholders']:
                 if textdistance.jaro_winkler.normalized_distance(last_name, person['last_name']) < 0.1:
@@ -1182,7 +1182,7 @@ def exclude_same_charters(charters):
             else:
                 same_charters.append(charter)
 
-    for date, same_charters in date_map.items():
+    for same_charters in date_map.values():
         if len(same_charters) == 1:
             result.append(same_charters[0])
         else:

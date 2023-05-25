@@ -186,7 +186,6 @@ class HtmlRenderer(AbstractRenderer):
     if len(weights) != len(tokens):
       raise ValueError("number of weights differs weights={} tokens={}".format(len(weights), len(tokens)))
 
-    #   if()
     vmin = weights.min() - 0.00001
     vmax = weights.max() + 0.00001
 
@@ -325,7 +324,6 @@ def _to_color_text(_tokens, weights, colormap='coolwarm', _range=None, separator
   if len(weights) != len(tokens):
     raise ValueError("number of weights differs weights={} tokens={}".format(len(weights), len(tokens)))
 
-  #   if()
   vmin = weights.min() - 0.00001
   vmax = weights.max() + 0.00001
 
@@ -431,9 +429,7 @@ def render_token_clusters(tokens: Tokens, clusters: [int], pal: [str], weights=N
       word = '&nbsp;_ '
     token_color = pal[clusters[d]]
     if weights is not None:
-      # whiter(token_color, weights[d])
       _w = max(0.5, min(weights[d], 1))
-      # token_color =token_color +'{:02x}'.format(_w)
       token_color = whiter(token_color, _w)
 
     html += f'<span title="{d} {clusters[d]:.2f}" style="background-color:{token_color}">{word}{separator}</span>'

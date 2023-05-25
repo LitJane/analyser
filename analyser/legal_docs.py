@@ -374,7 +374,7 @@ class DocumentJson:
 
     attributes = []
     for t in _tags:
-      key, attr = t.as_json_attribute()
+      _, attr = t.as_json_attribute()
       attributes.append(attr)
 
     return attributes
