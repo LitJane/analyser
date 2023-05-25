@@ -1,58 +1,10 @@
-import os
-
 import numpy as np
 import pandas as pd
-from joblib import load
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import TextMap
-from analyser.hyperparams import HyperParameters
-from analyser.hyperparams import models_path
-from analyser.legal_docs import PARAGRAPH_DELIMITER, make_headline_attention_vector
-from analyser.ml_tools import sum_probabilities, FixedVector
+from analyser.legal_docs import PARAGRAPH_DELIMITER
 from analyser.text_tools import Tokens, _count_capitals, _count_digits
-
-popular_headers = pd.read_csv(os.path.join(models_path, 'headers_by_popularity.csv'))[2:50]
-popular_headers = list(popular_headers['text'])
-
-
-
-if HyperParameters.headers_detector_use_regressor:
-  model_path = os.path.join(models_path, 'rf_headers_detector_model.joblib')
-else:
-  model_path = os.path.join(models_path, 'rf_headers_detector_model_classifier.joblib')
-
-
-def load_model() -> RandomForestClassifier or RandomForestRegressor:
-  if 'rf_model' not in globals():
-    loaded_model = load(model_path)
-    globals()['rf_model'] = loaded_model
-  return globals()['rf_model']
-
-
-def make_predicted_headline_attention_vector(doc, return_components=False) -> FixedVector or (
-        FixedVector, FixedVector, FixedVector):
-  """
-  moved to headers_detector
-  """
-  parser_headline_attention_vector = make_headline_attention_vector(doc)
-  predicted_headline_attention_vector = np.zeros_like(parser_headline_attention_vector)
-
-  features, body_lines_ranges = doc_features(doc.tokens_map)
-  model = load_model()
-  predictions = model.predict(features)
-  for i in range(len(predictions)):
-    span = body_lines_ranges[i]
-    predicted_headline_attention_vector[span[0]:span[1]] = predictions[i]
-
-  headline_attention_vector = sum_probabilities(
-    [parser_headline_attention_vector * HyperParameters.parser_headline_attention_vector_denominator,
-     predicted_headline_attention_vector])
-  if return_components:
-    return headline_attention_vector, parser_headline_attention_vector, predicted_headline_attention_vector
-  else:
-    return headline_attention_vector
 
 
 def doc_features(tokens_map: TextMap):
@@ -82,11 +34,11 @@ def _onehot(x: bool or int) -> float:
     return 0.0
 
 
-def _has_symbols(txt: str, strange_symbols) -> int:
+def _has_symbols(txt: str, strange_symbols) -> float:
   for c in strange_symbols:
     if txt.count(c) > 0:
-      return 1.
-  return 0.
+      return 1.0
+  return 0.0
 
 
 def get_token_features(token: str):
@@ -115,7 +67,6 @@ def get_token_features(token: str):
 def get_tokens_features(tokens):
   doc_features = []
 
-
   for t in tokens:
     _features = get_token_features(t)
     doc_features.append(_features)
@@ -125,7 +76,7 @@ def get_tokens_features(tokens):
   doc_featuresX_data['h'] = 0.0
 
   position_enc = np.arange(1, 0, -0.0005)
-  max_pos = min (len(position_enc), len(doc_featuresX_data['h']))
+  max_pos = min(len(position_enc), len(doc_featuresX_data['h']))
   doc_featuresX_data['h'][0:max_pos] = position_enc[0:max_pos]
 
   return doc_featuresX_data
@@ -184,13 +135,6 @@ def line_features(tokens_map: TextMap, line_span: (int, int), line_number: int, 
     'quotes': _count_strange_symbols(txt, '«»"\'"'),
     'underscores': _count_strange_symbols(txt, '_')
   }
-
-  # if prev_features is None:
-  #   # features['prev-number_level'] = 0
-  #   features['prev-len_chars']=-1
-  # else:
-  #   # features['prev-number_level'] = prev_features['number_level']
-  #   features['prev-len_chars'] = prev_features['len_chars']
 
   return features
 
