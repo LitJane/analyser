@@ -452,7 +452,11 @@ def audit_phase_1_doc(document_id, ctx, _k=1, _total=1):
     logger.warning(f'unknown/unsupported doc type: {jdoc.documentType},  using just generic processor {document_id}')
     if is_well_parsed(jdoc):
       ##finding common things, like case numbers, etc...
-      document_processors.get('GENERIC').preprocess(jdoc=jdoc, context=ctx)
+      pp = document_processors.get('GENERIC')
+      if pp:
+        pp.preprocess(jdoc=jdoc, context=ctx)
+      else:
+        raise RuntimeError('no GENERIC processor')
   else:
     logger.info(f'......pre-processing {_k} of {_total}  {jdoc.documentType}:{document_id}')
     if need_analysis(jdoc) and jdoc.isNew():
