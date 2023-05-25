@@ -39,8 +39,9 @@ judicial_senders = {
 
 def estimate_judicial_patterns_similarity_threshold():
   all_patterns = []
-  for k in judicial_senders.keys():
-    all_patterns += judicial_senders[k]
+
+  for judicial_sender_val in judicial_senders.values():
+    all_patterns += judicial_sender_val
 
   max_similarity = 0
   for a in all_patterns:
@@ -49,11 +50,9 @@ def estimate_judicial_patterns_similarity_threshold():
         similarity_ratio = fuzz.ratio(a.lower(), b.lower())
         if similarity_ratio > max_similarity:
           max_similarity = similarity_ratio
-          # print(a, '====', b, jaro_d)
+
   similarity_thresold = (100.0 + max_similarity) * 0.5
 
-  # print(all_patterns)
-  # print("similarity_thresold", similarity_thresold)
   return similarity_thresold
 
 
@@ -67,8 +66,8 @@ def get_sender_judicial_org(sender: str) -> str or None:
   sender_l = sender.lower()
   max_similarity_ratio = judicial_patterns_similarity_threshold
   similar_p = None
-  for k in judicial_senders.keys():
-    patterns = judicial_senders[k]
+
+  for k, patterns in judicial_senders.items():
     for p in patterns:
       p_l = p.lower()
 
@@ -80,7 +79,6 @@ def get_sender_judicial_org(sender: str) -> str or None:
         print(similarity_ratio, sender_l, ' ||AND|| ', p_l)
         max_similarity_ratio = similarity_ratio
         similar_p = k
-        # return k
 
   return similar_p
 

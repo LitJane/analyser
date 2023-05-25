@@ -12,6 +12,7 @@ from analyser.structures import OrgStructuralLevel, ContractSubject, InsiderInfo
 
 tag_value_field_name = "value"
 
+
 def merge_spans(tags: [SemanticTagBase]) -> (int, int):
   arr = []
   for attr in tags:
@@ -82,9 +83,6 @@ class ContractPrice(SemanticTagBase):
     return self
 
 
-
-
-
 class AgendaItemContract(HasOrgs, SemanticTagBase):
   number: SemanticTagBase = None
   date: SemanticTagBase = None
@@ -136,10 +134,7 @@ class OrgItem():
     return [getattr(self, key) for key in ["type", "name", "alias", "alt_name"] if getattr(self, key) is not None]
 
   def is_valid(self):
-    for child in self.as_list():
-      if child is not None:
-        return True
-    return False
+    return any(item is not None for item in self.as_list())
 
 
 class GenericDocSchema(DocumentSchema):
@@ -147,9 +142,9 @@ class GenericDocSchema(DocumentSchema):
     super().__init__()
     self.case_number: SemanticTagBase or None = None
 
+
 class ContractSchema(DocumentSchema, HasOrgs):
   price: ContractPrice = None
-
 
   def __init__(self):
     super().__init__()
@@ -163,13 +158,6 @@ class ProtocolSchema(DocumentSchema):
     self.org: OrgItem = OrgItem()
     self.structural_level: SemanticTagBase or None = None
     self.agenda_items: [AgendaItem] = []
-
-
-
-# class CharterConstraint:
-#   def __init__(self):
-#     super().__init__()
-#     self.margins: [ContractPrice] = []
 
 
 class Competence(SemanticTagBase):
@@ -675,11 +663,6 @@ document_schemas = {
 }
 
 
-# ---------------------------
-# self test
-# validate(instance={"date":{}}, schema=charter_schema)
-
-
 class Schema2LegacyListConverter:
 
   def __init__(self):
@@ -752,10 +735,9 @@ class Schema2LegacyListConverter:
       full_key = f'{parent_key}/{self_key}'
     else:
       full_key = self_key
-    # full_key = self_key
 
-    ret = {}
-    ret['value'] = v
+    ret = {'value': v}
+
     if hasattr(tag, "confidence"):
       ret['confidence'] = tag.confidence
     if hasattr(tag, "span"):
@@ -772,7 +754,6 @@ class Schema2LegacyListConverter:
       return
 
     if isinstance(d, SemanticTagBase):
-      # print("\t\t\t >>> TAG", d.value, type(d))
       _key, v = self.tag_to_attr(d, attr_name, parent_key, index)
       dest[_key] = v
 
@@ -780,12 +761,8 @@ class Schema2LegacyListConverter:
     for a_name, attr_value in vars(d).items():
 
       if isinstance(attr_value, list):
-        # print(f"\t\t\t\n [{attr}]...")
         for i, itm in enumerate(attr_value):
           self.schema2list(dest, itm, attr_name=a_name, parent_key=_key, index=i)
 
       elif isinstance(attr_value, object) and not a_name.startswith('_'):
-        # print("OBJET", a_name, type(attr_value), type(d))
         self.schema2list(dest, attr_value, attr_name=a_name, parent_key=_key)
-      # elif isinstance(v, dict):
-      #   pass
