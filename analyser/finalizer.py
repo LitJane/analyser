@@ -902,10 +902,7 @@ def get_reason(affiliate, contract_date):
 
 
 def contains_same_name(result, name):
-    for elem in result:
-        if elem['text'] == name:
-            return True
-    return False
+    return any( elem['text'] == name for elem in result)
 
 
 def get_persons_from_chain(beneficiaries, name):

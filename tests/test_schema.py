@@ -133,10 +133,7 @@ class TestSchema(unittest.TestCase):
     cp3 = ContractPrice()
     cp3.amount = SemanticTagBase()
 
-    comp.constraints = []
-    comp.constraints.append(cp1)
-    comp.constraints.append(cp2)
-    comp.constraints.append(cp3)
+    comp.constraints = [cp1, cp2, cp3]
 
     converter = Schema2LegacyListConverter()
     dest = {}

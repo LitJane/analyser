@@ -89,10 +89,7 @@ class ContractAgent(OrgItem):
     return confidence / 3.0
 
   def is_valid(self):
-    for child in self.as_list():
-      if child is not None:
-        return True
-    return False
+    return any(item is not None for item in self.as_list())
 
 
 def clean_value(x: str) -> str or None:
