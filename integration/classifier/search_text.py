@@ -2,7 +2,7 @@ from typing import Dict, List
 
 import mlflow
 import pandas as pd
-# noinspection PyUnresolvedReferences
+#TODO: why importing it here?
 from analyser.dictionaries import integration_path, labels, label2id
 from utilits.utils import _env_var
 
@@ -44,3 +44,10 @@ def concat_paragraphs_to_string(document: Dict[str, List]) -> str:
         text += ' ' + par['paragraphHeader']['text']
         text += ' ' + par['paragraphBody']['text']
     return text.strip()
+
+
+if __name__ == '__main__':
+    # TODO: remove it
+    print(integration_path)
+    print(labels)
+    print(label2id)

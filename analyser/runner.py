@@ -123,8 +123,10 @@ class BaseProcessor:
 
     # date must be ok
     # TODO: rename: -> is_eligible
+
     if audit.get('pre-check'):
       return True
+
     _date = db_document.get_date_value()
     if _date is not None:
       try:
@@ -253,7 +255,6 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
       res.append(doc)
   return res
 
-
 def validate_json_schema(db_document):
   try:
     json_str = json.dumps(db_document.analysis['attributes_tree'], ensure_ascii=False,
@@ -267,6 +268,7 @@ def validate_json_schema(db_document):
 def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_number: int = 0) -> DbJsonDoc:
   # TODO: does not save attributes
   analyse_json_obj: dict = doc.to_json_obj()
+ 
   db = get_mongodb_connection()
   documents_collection = db['documents']
   db_document.analysis = analyse_json_obj
@@ -296,7 +298,6 @@ def save_errors(audit, errors):
 def change_doc_state(doc, state):
   db = get_mongodb_connection()
   db['documents'].update_one({'_id': doc.get_id()}, {"$set": {"state": state}})
-
 
 def change_audit_status(audit, status):
   db = get_mongodb_connection()
@@ -416,6 +417,7 @@ def apply_judical_practice(classification_result, sender_judicial_org):
 
     classification_result.insert(0, _result)
   return classification_result
+ 
 
 
 def audit_phase_1(audit, kind=None):
