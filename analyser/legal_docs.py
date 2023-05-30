@@ -29,6 +29,7 @@ from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.text_tools import find_token_before_index
 from analyser.transaction_values import _re_greather_then, _re_less_then, _re_greather_then_1, VALUE_SIGN_MIN_TOKENS, \
   ValueSpansFinder
+from __init__ import __version__
 
 REPORTED_DEPRECATED = {}
 
@@ -343,7 +344,7 @@ class DocumentJson:
     return c
 
   def __init__(self, doc: LegalDocument):
-    self.version = analyser.__version__
+    self.version = __version__
 
     self._id: str = None
     self.original_text = None
