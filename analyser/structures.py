@@ -42,7 +42,7 @@ class EnumExt(Enum):
 
 
 class DisplayStringEnumMeta(EnumMeta):
-  def __new__(mcs, name, bases, attrs):
+  def __new__(mcs, name, bases, attrs, **kwds):
     obj = super().__new__(mcs, name, bases, attrs)
     obj._value2member_map_ = {}
     for m in obj:

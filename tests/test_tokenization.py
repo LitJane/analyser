@@ -79,8 +79,8 @@ class TokenisationTestCase(unittest.TestCase):
 
     self.assertEqual(doc.tokens_map.text.lower(), doc.tokens_map_norm.text.lower())
 
-    for i in range(len(doc.tokens)):
-      self.assertEqual(doc.tokens[i].lower(), doc.tokens_cc[i].lower())
+    for i, token in enumerate(doc.tokens):
+      self.assertEqual(doc.token.lower(), doc.tokens_cc[i].lower())
 
   def test_subdoc_slice(self):
     doc_text = """аслово бслово цслово"""
@@ -219,8 +219,6 @@ class TokenisationTestCase(unittest.TestCase):
   def test_sentence_at_index_return_delimiters(self):
 
     tm = TextMap('стороны Заключили\n  договор  ПРЕДМЕТ \nДОГОВОРА')
-    for i in range(len(tm)):
-      print(i, tm[i])
 
     bounds = tm.sentence_at_index(0)
     print(bounds)
@@ -240,8 +238,6 @@ class TokenisationTestCase(unittest.TestCase):
   def test_sentence_at_index_no_delimiters(self):
 
     tm = TextMap('стороны Заключили\n  договор  ПРЕДМЕТ \nДОГОВОРА')
-    for i in range(len(tm)):
-      print(i, tm[i])
 
     bounds = tm.sentence_at_index(0, return_delimiters=False)
     print(bounds)

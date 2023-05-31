@@ -940,7 +940,8 @@ def find_contract_amount_netto(contract, additional_docs):
 
 def is_already_added(result, beneficiary):
     for elem in result:
-        if elem['name'] == beneficiary['name'] and elem['namePerson'] == beneficiary['namePerson']:
+        if elem['name'] == beneficiary['name'] and \
+                elem['namePerson'] == beneficiary['namePerson']:
             return True
     return False
 

@@ -30,7 +30,7 @@ def contract_subject_as_db_json():
       'number': cs.value,
       'alias': cs.display_string,
       'supportedInContracts': cs in contract_subjects,
-      'supportedInCharters': cs in CharterParser.strs_subjects_patterns.keys()
+      'supportedInCharters': cs in CharterParser.strs_subjects_patterns
     }
     yield item
 

@@ -1,4 +1,5 @@
-default working dir, used for temp files, etc.
-do not commit contents to github
+### default working dir
+used for temp files, etc.
+do not commit its contents to github
 
-set ENV var GPN_WORK_DIR to override this path
+- Set `GPN_WORK_DIR` env var to override this path

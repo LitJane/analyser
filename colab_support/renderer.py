@@ -288,14 +288,14 @@ def to_multicolor_text(tokens, vectors, colormap, min_color=None, _slice=None) -
 
   _colors = mixclr(colormap, vectors, min_color=min_color, _slice=_slice)
   html = ''
-  for i in range(len(tokens)):
+  for i, token in enumerate(tokens):
     c = _colors[i]
     r = int(255 * c[0])
     g = int(255 * c[1])
     b = int(255 * c[2])
-    if tokens[i] == '\n':
+    if token == '\n':
       html += '<br>'
-    html += f'<span style="background:rgb({r},{g},{b})">{tokens[i]} </span>'
+    html += f'<span style="background:rgb({r},{g},{b})">{token} </span>'
   return html
 
 
