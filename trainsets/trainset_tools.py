@@ -24,49 +24,6 @@ def get_feature_log_weights(trainset_rows, category_column_name):
   return subjects_weights
 
 
-def split_trainset_evenly(df: DataFrame,
-                          category_column_name: str,
-                          test_proportion=VALIDATION_SET_PROPORTION,
-                          no_intersections=False, seed=42) -> ([int], [int]):
-  warnings.warn('use sklearn.model_selection . train_test_split', DeprecationWarning)
-  np.random.seed(seed)
-
-  cat_count = df[category_column_name].value_counts()  # distribution by category
-
-  _bags = {key: [] for key in cat_count.index}
-
-  for index, row in df.iterrows():
-    subj_code = row[category_column_name]
-    _bags[subj_code].append(index)
-
-
-  train_indices = []
-  test_indices = []
-
-  for subj_code in _bags:
-    bag = _bags[subj_code]
-    split_index: int = int(len(bag) * test_proportion)
-
-    train_indices += bag[split_index:]
-    test_indices += bag[:split_index]
-
-    if(len(bag)==1): #just to manage small very small outlier classes
-      test_indices.append( bag[0])
-
-
-  # remove instesection
-  intersection = np.intersect1d(test_indices, train_indices)
-  print('test and train samples itersection: ', intersection)
-  if no_intersections:
-    test_indices = [e for e in test_indices if e not in intersection]
-
-  # shuffle
-
-  np.random.shuffle(test_indices)
-  np.random.shuffle(train_indices)
-
-  return train_indices, test_indices
-
 
 class TrainsetBalancer:
 
@@ -134,7 +91,6 @@ class SubjectTrainsetManager:
     self.noise_amount = SubjectTrainsetManager.EMB_NOISE_AMOUNT
 
     self.embeddings_cache = {}
-    # self.subj_count = {}
 
     self.csv_path = trainset_description_csv
 
@@ -284,7 +240,7 @@ class SubjectTrainsetManager:
         batch_output.append(label)
 
       # Return a tuple of (input, output) to feed the network
-      # batch_x = np.array(batch_input)
+
       # TODO: "randomize" MAX_SEQUENCE_LENGTH
       maxlen = random.choice([700, 800, 900, 1000, 1100])
       batch_x = np.array(
@@ -297,7 +253,7 @@ class SubjectTrainsetManager:
   def remove_duplicate_docs(self, len_threshold=5):
     print(f'sorting by len, {len(self.trainset_rows)}')
     sorted_by_len = self.trainset_rows.sort_values(['confidence', 'len'])
-    # sorted_by_len = sorted_by_len [ ['confidence', 'len'] ]
+
 
     duplicates = []
     last_row = sorted_by_len.iloc[0]
@@ -305,7 +261,7 @@ class SubjectTrainsetManager:
       row = sorted_by_len.iloc[i]
       deltalen = abs(row.len - last_row.len)
       if deltalen < len_threshold:
-        # print(f'{row.header} is similar to {last_row.header}')
+
         duplicates.append(row._id)
 
       last_row = row
@@ -316,28 +272,3 @@ class SubjectTrainsetManager:
 
     print(f'new len, {len(self.trainset_rows)}')
     return duplicates
-
-    # pass
-
-
-if __name__ == '__main__':
-  try_generator = False
-
-  fn = '/Users/artem/Google Drive/GazpromOil/trainsets/meta_info/contracts.subjects-manually-filtered.csv'
-  tsm: SubjectTrainsetManager = SubjectTrainsetManager(fn)
-  # tsm.remove_duplicate_docs()
-
-  if try_generator:
-    tsm.pickle_resolver = lambda \
-        f: '/Users/artem/work/nemo/goil/nlp_tools/tests/Договор _2_.docx.pickle'  # hack for tests
-
-    gen = tsm.get_generator(batch_size=50, all_indices=[0, 1], randomize=True)
-
-    x, y = next(gen)
-    print('X->Y :', x.shape, '-->', y.shape)
-    print("subject_bags", len(tsm.train_indices), len(tsm.test_indices))
-    print("number_of_classes", tsm.number_of_classes)
-
-  # model = load_subject_detection_trained_model()
-
-  # load_subject_detection_trained_model()
