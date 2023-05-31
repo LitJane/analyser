@@ -1304,7 +1304,7 @@ def send_notifications():
             additional_fields = audit['additionalFields']
             if additional_fields.get('classification_result_user'):
                 class_id = audit['additionalFields']['classification_result_user']['id']
-                top_result = next(filter(lambda x: x['_id'] == class_id, all_labels), None)
+                top_result = next(filter(lambda x, cs_id=class_id: x['_id'] == cs_id, all_labels), None)
                 attachments = []
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
@@ -1314,7 +1314,7 @@ def send_notifications():
                 logging.info('Retry send email message')
                 top_classification_result = audit['classification_result'][0]
                 attachments = []
-                top_result = next(filter(lambda x: x['_id'] == top_classification_result['id'], all_labels), None)
+                top_result = next(filter(lambda x, tcr =top_classification_result['id']: x['_id'] == tcr, all_labels), None)
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
