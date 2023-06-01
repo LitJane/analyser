@@ -80,7 +80,7 @@ class TokenisationTestCase(unittest.TestCase):
     self.assertEqual(doc.tokens_map.text.lower(), doc.tokens_map_norm.text.lower())
 
     for i, token in enumerate(doc.tokens):
-      self.assertEqual(doc.token.lower(), doc.tokens_cc[i].lower())
+      self.assertEqual(token.lower(), doc.tokens_cc[i].lower())
 
   def test_subdoc_slice(self):
     doc_text = """аслово бслово цслово"""
