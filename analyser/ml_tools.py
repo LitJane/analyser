@@ -138,7 +138,8 @@ def smooth(x: FixedVector, window_len=11, window='hanning'):
   if window == 'flat':  # moving average
     w = np.ones(window_len, 'd')
   else:
-    w = eval('np.' + window + '(window_len)')
+    _func = getattr(np, window)
+    w = _func(window_len)
 
   y = np.convolve(w / w.sum(), s, mode='valid')
   halflen = int(window_len / 2)
