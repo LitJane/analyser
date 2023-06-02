@@ -24,7 +24,6 @@ def get_feature_log_weights(trainset_rows, category_column_name):
   return subjects_weights
 
 
-
 class TrainsetBalancer:
 
   def __init__(self):
@@ -94,8 +93,6 @@ class SubjectTrainsetManager:
 
     self.csv_path = trainset_description_csv
 
-    self.pickle_resolver = None  # hack for tests
-
     # -------
     self.trainset_rows: DataFrame = self._read_trainset_meta()
     self.remove_duplicate_docs()
@@ -145,8 +142,6 @@ class SubjectTrainsetManager:
   def get_embeddings_raw(self, _filename):
     # TODO:::
     filename = _filename
-    if callable(self.pickle_resolver):  ## unit tests hack
-      filename = self.pickle_resolver(_filename)
 
     if filename not in self.embeddings_cache:
       with open(filename, "rb") as pickle_in:
@@ -156,17 +151,6 @@ class SubjectTrainsetManager:
         # todo: do not overload!!
 
     return self.embeddings_cache[filename]
-
-  def get_embeddings(self, filename: str, subj: str, randomize=False):
-    warnings.warn('use just get_embeddings_raw& this is noisy', DeprecationWarning)
-    embedding = self.get_embeddings_raw(filename)
-
-    if randomize:
-      if random.random() < self.noisy_samples_amount:
-        _var = self.noise_amount * self._noise_amount(subj)
-        embedding = self.noise_embedding(embedding, var=_var)
-
-    return embedding
 
   def make_fake_outlier(self, emb):
     warnings.warn('use pre-selected real doc outlies', DeprecationWarning)
@@ -185,75 +169,9 @@ class SubjectTrainsetManager:
     elif _mode == 4:
       return np.zeros_like(emb), label
 
-  def get_evaluation_generator(self, batch_size):
-    while True:
-      # Select files (paths/indices) for the batch
-      batch_indices = np.random.choice(a=[] + self.test_indices + self.train_indices, size=batch_size)
-
-      batch_input = []
-      batch_output = []
-
-      # Read in each input, perform preprocessing and get labels
-      for i in batch_indices:
-        _row = self.trainset_rows.iloc[i]
-        _subj = _row['subject']
-        _filename = _row['pickle']
-
-        _emb = self.get_embeddings_raw(_filename)
-        label = self.subject_name_1hot_map[_subj]
-
-        batch_input.append(_emb)
-        batch_output.append(label)
-
-      # Return a tuple of (input, output) to feed the network
-
-      maxlen = 1000  # random.choice([700, 800, 900, 1000, 1100])
-      batch_y = np.array(batch_output)
-      batch_x = np.array(
-        pad_sequences(batch_input, maxlen=maxlen, padding='post', truncating='post', dtype='float32')).reshape(
-        (batch_size, maxlen, 1024))
-
-      yield (batch_x, batch_y)
-
-  def get_generator(self, batch_size, all_indices, randomize=False):
-    while True:
-      # Select files (paths/indices) for the batch
-      batch_indices = np.random.choice(a=all_indices, size=batch_size)
-      __split = int(self.outliers_percent * batch_size)
-
-      batch_input = []
-      batch_output = []
-
-      # Read in each input, perform preprocessing and get labels
-      for pos, i in enumerate(batch_indices):
-        _row = self.trainset_rows.iloc[i]
-        _subj = _row['subject']
-        _filename = _row['pickle']
-
-        _emb = self.get_embeddings(_filename, _subj, randomize=randomize)
-        label = self.subject_name_1hot_map[_subj]
-
-        if pos < __split:
-          _emb, _ = self.make_fake_outlier(_emb)
-
-        batch_input.append(_emb)
-        batch_output.append(label)
-
-      # Return a tuple of (input, output) to feed the network
-
-      # TODO: "randomize" MAX_SEQUENCE_LENGTH
-      maxlen = random.choice([700, 800, 900, 1000, 1100])
-      batch_x = np.array(
-        pad_sequences(batch_input, maxlen=maxlen, padding='post', truncating='post', dtype='float32')).reshape(
-        (batch_size, maxlen, 1024))
-      batch_y = np.array(batch_output)
-
-      yield (batch_x, batch_y)
-
   def remove_duplicate_docs(self, len_threshold=5):
     print(f'sorting by len, {len(self.trainset_rows)}')
     sorted_by_len = self.trainset_rows.sort_values(['confidence', 'len'])
-
 
     duplicates = []
     last_row = sorted_by_len.iloc[0]
@@ -261,7 +179,6 @@ class SubjectTrainsetManager:
       row = sorted_by_len.iloc[i]
       deltalen = abs(row.len - last_row.len)
       if deltalen < len_threshold:
-
         duplicates.append(row._id)
 
       last_row = row
