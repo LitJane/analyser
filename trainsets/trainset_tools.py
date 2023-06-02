@@ -1,13 +1,9 @@
-import pickle
 import random
-import warnings
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
-from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
-from analyser.legal_docs import LegalDocument
 from analyser.structures import ContractSubject
 
 VALIDATION_SET_PROPORTION = 0.25
@@ -102,11 +98,6 @@ class SubjectTrainsetManager:
 
     self.number_of_classes = len(list(self.subject_name_1hot_map.values())[0])
 
-  def print_parameters(self):
-    print(f'outliers_percent={self.outliers_percent}')
-    print(f'noisy_samples_amount={self.noisy_samples_amount}')
-    print(f'noise_amount={self.noise_amount}')
-
   @staticmethod
   def balance_trainset(trainset_dataframe: DataFrame):
     tb = TrainsetBalancer()
@@ -125,49 +116,6 @@ class SubjectTrainsetManager:
   @staticmethod
   def _encode_1_hot():
     return ContractSubject.encode_1_hot()
-
-  def noise_embedding(self, emb, var=0.1):
-    warnings.warn('must be noised by keras model', DeprecationWarning)
-    _mean = 0
-    sigma = var ** 0.5
-    gauss = np.random.normal(_mean, sigma, emb.shape)
-    return emb + gauss
-
-  def _noise_amount(self, subj):
-    warnings.warn('must be noised by keras model', DeprecationWarning)
-    subj_popularity = self.subj_count[subj]
-    max_pop = max(self.subj_count.values)
-    return 1 - subj_popularity / max_pop
-
-  def get_embeddings_raw(self, _filename):
-    # TODO:::
-    filename = _filename
-
-    if filename not in self.embeddings_cache:
-      with open(filename, "rb") as pickle_in:
-        self.load = pickle.load  # TODO: wtf?
-        doc: LegalDocument = self.load(pickle_in)
-        self.embeddings_cache[filename] = doc.embeddings
-        # todo: do not overload!!
-
-    return self.embeddings_cache[filename]
-
-  def make_fake_outlier(self, emb):
-    warnings.warn('use pre-selected real doc outlies', DeprecationWarning)
-    label = self.subject_name_1hot_map['Other']
-    _mode = np.random.choice([1, 2, 3, 4])
-
-    if _mode == 1:
-      return emb * -1, label
-
-    elif _mode == 2:
-      return self.noise_embedding(emb, 3), label
-
-    elif _mode == 3:
-      return emb * -0.5, label
-
-    elif _mode == 4:
-      return np.zeros_like(emb), label
 
   def remove_duplicate_docs(self, len_threshold=5):
     print(f'sorting by len, {len(self.trainset_rows)}')
