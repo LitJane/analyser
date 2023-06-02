@@ -41,9 +41,8 @@ def remove_empty_lines(original_text):
 
 def dist_cosine_to_point(text_emb, pt):
   t_distances = np.zeros(len(text_emb))
-  for i in range(len(text_emb)):
-
-    d = distance.cosine(text_emb[i], pt)
+  for i, v in enumerate(text_emb):
+    d = distance.cosine(v, pt)
     if d > 1:
       d = 1
     t_distances[i] = d
@@ -163,10 +162,10 @@ def hot_quotes(tokens: Tokens) -> (np.ndarray, np.ndarray):
   _quotes_closing = np.zeros(len(tokens))
 
   quotes_attention = 1
-  for i in range(len(tokens)):
-    if tokens[i][0] in q_re_open:
+  for i, token in enumerate(tokens):
+    if token[0] in q_re_open:
       _quotes_open[i] = quotes_attention
-    if tokens[i][0] in q_re_close:
+    if token[0] in q_re_close:
       _quotes_closing[i] = quotes_attention
 
   return _quotes_open, _quotes_closing
@@ -175,8 +174,8 @@ def hot_quotes(tokens: Tokens) -> (np.ndarray, np.ndarray):
 def hot_punkt(tokens: Tokens) -> np.ndarray:
   _hot_punkt = np.zeros(len(tokens))
 
-  for i in range(len(tokens)):
-    if tokens[i][0] in my_punctuation + '–«»()[] ':
+  for i, token in enumerate(tokens):
+    if token[0] in my_punctuation + '–«»()[] ':
       _hot_punkt[i] = 1
 
   return _hot_punkt

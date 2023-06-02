@@ -53,7 +53,6 @@ class ProtocolDocument(LegalDocumentExt):
     super().__init__(doc)
 
     if doc is not None:
-      # self.__dict__ = {**super().__dict__, **doc.__dict__}
       self.__dict__.update(doc.__dict__)
 
     self.attributes_tree = ProtocolSchema()
@@ -153,8 +152,6 @@ class ProtocolParser(ParsingContext):
   def embedd(self, doc: ProtocolDocument):
 
     ### ⚙️🔮 SENTENCES embedding
-    # if doc.sentence_map is None:
-    #   doc.sentence_map = tokenize_doc_into_sentences_map(doc, HyperParameters.charter_sentence_max_len)
     doc.sentences_embeddings = self.get_sentence_embedder().embedd_strings(doc.sentence_map.tokens)
 
     ### ⚙️🔮 WORDS Embedding
@@ -173,12 +170,10 @@ class ProtocolParser(ParsingContext):
     :param charter:
     :return:
     """
-    # doc.sentence_map = tokenize_doc_into_sentences_map(doc, 250)
 
     doc.org_level = max_confident_tag(list(find_org_structural_level(doc)))
     doc.attributes_tree.org = find_protocol_org_obj(doc)
     doc.date = find_document_date(doc)
-    # doc.attributes_tree.case_number=find_case_number(doc)
 
     if doc.attributes_tree.org is not None:
       if doc.attributes_tree.org.name is None:
@@ -222,7 +217,6 @@ class ProtocolParser(ParsingContext):
       _all: [ContractAgent] = find_org_names_raw(_subdoc, max_names=10, parent=None, decay_confidence=False)
       all: [ContractAgent] = sorted(_all, key=lambda a: a.name.value != audit_subsidiary_name)
 
-      # ai.contract.orgs = all
       for k, v in enumerate(all):
         agenda_item.get_contract_at(k).orgs.append(v)
         # TODO: one contract have several orgs!!
@@ -252,7 +246,6 @@ class ProtocolParser(ParsingContext):
 
         for k, v in enumerate(subdoc_values):
           v *= confidence
-          # v.parent.kind = SemanticTag.number_key(v.parent.kind, k)
 
       for k, v in enumerate(subdoc_values):
         agenda_item.get_contract_at(k).price = v

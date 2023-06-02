@@ -248,7 +248,7 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
     # known subsidiary goes first
     contract_agents = sorted(contract_agents, key=lambda a: not audit_ctx.is_same_org(_name_val_safe(a)))
   else:
-    contract_agents = sorted(contract_agents, key=lambda a: _name_val_safe(a))
+    contract_agents = sorted(contract_agents, key=_name_val_safe)
     contract_agents = sorted(contract_agents, key=lambda a: not a.is_known_subsidiary)
 
   check_org_intersections(contract_agents)  # mutator
