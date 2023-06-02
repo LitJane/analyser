@@ -145,7 +145,7 @@ class SubjectTrainsetManager:
   def get_embeddings_raw(self, _filename):
     # TODO:::
     filename = _filename
-    if self.pickle_resolver:  ## unit tests hack
+    if callable(self.pickle_resolver):  ## unit tests hack
       filename = self.pickle_resolver(_filename)
 
     if filename not in self.embeddings_cache:
