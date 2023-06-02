@@ -1,19 +1,8 @@
-![action_release](https://github.com/nemoware/analyser/workflows/Publish%20new%20release/badge.svg)
+ 
 
 # Analyser core & nlp_tools
 
-## Интерактивный анализ
-для быстрой проверки анализатора документов и экспорта в JSON используйте эти инструменты:
-### Протоколы:
-https://colab.research.google.com/github/nemoware/analyser/blob/master/notebooks/dev_Protocols.ipynb
-
-### Договоры:
-https://colab.research.google.com/github/nemoware/analyser/blob/master/notebooks/dev_Contracts.ipynb
  
-### Уставы:
-https://colab.research.google.com/github/nemoware/analyser/blob/master/notebooks/dev_Charters.ipynb
-
-
 
 ___
 ## Miscl. commands
@@ -47,7 +36,7 @@ pip install --no-index --find-links=tmp/wheelhouse SomePackage
     > pip install virtualenv
     ```
 1. Download ``` nemoware_analyzer-X.X.X-py3-none-any.whl ``` to working dir (e.g. ```analyser_home```)     
-1. Go to working dir:
+1. Change to the work dir:
     ```
     > cd analyser_home
     ```

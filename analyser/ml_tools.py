@@ -76,7 +76,6 @@ def normalize(x: FixedVector, out_range=(0, 1)):
   if (domain[1] - domain[0]) == 0:
     # all same
     return np.full(len(x), out_range[0])
-    # raise ValueError('all elements are same')
 
   y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
   return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
@@ -139,19 +138,16 @@ def smooth(x: FixedVector, window_len=11, window='hanning'):
   if window == 'flat':  # moving average
     w = np.ones(window_len, 'd')
   else:
-    w = eval('np.' + window + '(window_len)')
+    _func = getattr(np, window)
+    w = _func(window_len)
 
   y = np.convolve(w / w.sum(), s, mode='valid')
-  #     return y
   halflen = int(window_len / 2)
-  #     return y[0:len(x)]
   return y[(halflen - 1):-halflen]
 
 
 def relu(x: np.ndarray, relu_th: float = 0.0) -> np.ndarray:
   """deprecated: use np.maximum( )"""
-  # assert type(x) is np.ndarray
-
   _relu = x * (x > relu_th)
   return _relu
 
@@ -671,9 +667,6 @@ def calc_distances_to_pattern(sentences_embeddings_: FixedVectors, pattern_embed
     _distances[word_index] = max(0, min(1, 1.0 - dist_func(sentences_embeddings_[word_index], pattern_embedding)))
 
   return _distances
-
-
-
 
 
 def calc_distances_per_pattern(sentences_embeddings_: [], patterns_named_embeddings: DataFrame) -> DataFrame:

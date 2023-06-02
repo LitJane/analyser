@@ -141,7 +141,6 @@ class LegalDocument:
     self.sentence_map = tokenize_doc_into_sentences_map(self.tokens_map.get_full_text(),
                                                         sentence_max_len)
 
-
   def __len__(self):
     return self.tokens_map.get_len()
 
@@ -219,7 +218,6 @@ class LegalDocument:
   def find_sentence_beginnings(self, indices):
     return [find_token_before_index(self.tokens, i, '\n', 0) for i in indices]
 
-  # @profile
   def calculate_distances_per_pattern(self, pattern_factory: AbstractPatternFactory, dist_function=DIST_FUNC,
                                       verbosity=1, merge=False, pattern_prefix=None):
     if self.embeddings is None:
@@ -304,7 +302,6 @@ class LegalDocumentExt(LegalDocument):
     super().__init__('')
 
     if doc is not None:
-      # self.__dict__ = doc.__dict__
       self.__dict__.update(doc.__dict__)
 
     self.sentences_embeddings: Embeddings = None
@@ -314,7 +311,6 @@ class LegalDocumentExt(LegalDocument):
     super().parse(txt)
     self.split_into_sentenses()
     return self
-
 
   def subdoc_slice(self, __s: slice, name='undef'):
     sub = super().subdoc_slice(__s, name)
@@ -378,7 +374,7 @@ class DocumentJson:
 
     attributes = []
     for t in _tags:
-      key, attr = t.as_json_attribute()
+      _, attr = t.as_json_attribute()
       attributes.append(attr)
 
     return attributes
@@ -536,7 +532,6 @@ def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> Contrac
 def tokenize_doc_into_sentences_map(txt: str, max_len_chars=150) -> TextMap:
   tm = TextMap('', [])
 
-  # body_lines = doc.tokens_map._full_text.splitlines(True)
   body_lines = txt.splitlines(True)
   for line in body_lines:
     tm += split_sentences_into_map(line, max_len_chars)
