@@ -210,7 +210,6 @@ def _find_most_relevant_paragraph(section: LegalDocument,
     next_span = section.sentence_at_index(span[1] + 1, return_delimiters)
     span = (span[0], next_span[1])
 
-  # confidence = paragraph_attention_vector[top_index]
   confidence_region = attention_vector[span[0]:span[1]]
   confidence = estimate_confidence_by_mean_top_non_zeros(confidence_region)
   return span, confidence, paragraph_attention_vector

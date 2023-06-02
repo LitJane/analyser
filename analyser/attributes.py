@@ -104,7 +104,7 @@ def convert_org(attr_name: str,
 
   name_parts = attr_name.split('-')
   _index = int(name_parts[1]) - 1
-  org = array_set_or_get_at(dest.orgs, _index, lambda: OrgItem())
+  org = array_set_or_get_at(dest.orgs, _index, OrgItem)
 
   field_name = name_parts[-1]
 
@@ -184,7 +184,7 @@ def convert_competence(path_s: [str], attr, competence_node: Competence):
     constraint_margin_index = int(constraint[2]) - 1
 
   # extending array
-  margin_node = array_set_or_get_at(competence_node.constraints, constraint_margin_index, lambda: ContractPrice())
+  margin_node = array_set_or_get_at(competence_node.constraints, constraint_margin_index, ContractPrice)
 
   if len(path_s) == 1:
     copy_attr(attr, dest=margin_node)
@@ -329,7 +329,7 @@ def convert_protocol_db_attributes_to_tree(attrs) -> ProtocolSchema:
     attr_name: str = paths[0]
     attr_name_clean, _i = index_of_key(attr_name)
     if ("agenda_item" == attr_name_clean):
-      agenda_item_node = array_set_or_get_at(tree.agenda_items, _i, lambda: AgendaItem())
+      agenda_item_node = array_set_or_get_at(tree.agenda_items, _i, AgendaItem)
       if len(paths) == 1:
         copy_attr(v, dest=agenda_item_node)
       else:
@@ -451,13 +451,13 @@ def convert_one(db, doc: dict):
 
     a_attr_tree['version'] = analyser.__version_ints__
     a_attr_tree['creation_date'] = datetime.now()
-    j, json_str = to_json(a_attr_tree)
+    j, _ = to_json(a_attr_tree)
     db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"analysis.attributes_tree": j}})
     migration_logger.debug(f'updated {kind} {doc["_id"]} analysis.attributes_tree')
     if u_attr_tree is not None:
       u_attr_tree['version'] = analyser.__version_ints__
       u_attr_tree['creation_date'] = datetime.now()
-      j, json_str = to_json(u_attr_tree)
+      j, _ = to_json(u_attr_tree)
       db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"user.attributes_tree": j}})
       migration_logger.debug(f'updated {kind} {doc["_id"]} user.attributes_tree')
 

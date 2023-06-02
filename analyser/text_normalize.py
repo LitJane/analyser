@@ -30,7 +30,7 @@ def morphology_agnostic_re(x):
 
 def ru_cap(xx):
   ret = r'\s+'.join(morphology_agnostic_re(x) for x in xx.split(' '))
-  return ret  # // r'\s+'.join([f'[{x[0].upper()}{x[0].lower()}]{x[1:-2]}[а-я]{{0,3}}' for x in xx.split(' ')])+'|'+xx.upper()
+  return ret
 
 
 def r_bracketed(x, name=None):
@@ -41,8 +41,7 @@ r_few_words_s = r'\s+[А-Яа-я\-, ]{0,80}'
 
 r_capitalized_ru = r'([А-Я][a-яА-Я–\-]{0,25})'
 r_capitalized = r_group(r'[A-ZА-Я][a-zA-Za-яА-Я–\-]{0,25}')
-# _r_name = r'[А-ЯA-Z][А-Яа-яA-Za-z\-–\[\]. ]{0,40}[а-яa-z.]'
-# _r_name_ru_having_quote = r'«([А-Я][А-Яа-я\-–\[\].\s«]{0,40}[А-Яа-я.,])»'
+
 _r_name_ru = r'[А-Я][№А-Яа-я\-–\[\].\s«]{0,50}[А-Яа-я.,]'
 _r_name_ru_with_number = r'[А-Я][0-9А-Яа-я\-–\[\].\s«]{0,85}[0-9А-Яа-я.,]'
 _r_name_lat = r'[A-Z][№A-Za-z\-–\[\].\s]{0,50}[A-Za-z,]'
@@ -55,12 +54,13 @@ r_human_name_part = r_capitalized
 r_human_name_part_norm = r_group(r'\b[А-ЯA-Z]\B[а-яa-z]{1,25}')
 r_human_name_part_cap = r_group(r'[A-ZА-Я-]{0,25}')
 
-
-r_human_full_name = r_group(r_human_name_part_norm + r'\s*' + r_human_name_part_norm + r'\s*' + r_human_name_part_norm + r'?\w')
+r_human_full_name = r_group(
+  r_human_name_part_norm + r'\s*' + r_human_name_part_norm + r'\s*' + r_human_name_part_norm + r'?\w')
 r_human_abbr_name = r_group(r_human_name_part_norm + r'\s*' + r'([А-ЯA-Z][.]\s?){1,2}')
 r_human_name = r_group(r_human_full_name + '|' + r_human_abbr_name, 'human_name')
 
 r_human_name_compilled = re.compile(r'\W' + r_human_name, re.MULTILINE)
+
 
 def r_quoted(x):
   if x is None:
@@ -78,8 +78,7 @@ spaces_regex = [
   (re.compile(r' '), ' '),  # this is not just space char! this is weird invisible symbol
 
   (re.compile(r'№(?=\S)'), '№ ')
-  # ,
-  # (re.compile(r'\n{2}'), '\n')
+
 ]
 
 abbreviation_regex = [
@@ -125,9 +124,6 @@ syntax_regex = [
   (re.compile(r'«\s'), '«'),
   (re.compile(r'\s»'), '»'),
 
-  # (re.compile(r"[']{2}"), '\"'),
-  # (re.compile(r"``"), '"')
-
 ]
 
 cleanup_regex = [
@@ -137,7 +133,6 @@ cleanup_regex = [
 
   (re.compile(r'с одной стороны и\s*\n'), 'с одной стороны и '),
 
-  # (re.compile(r'\n\s*(\d{1,2}[\.|)]?\.?\s?)+'), '.\n — '),  # remove paragraph numbers
   (re.compile(r'\.\s*\.'), '.')
 
 ]
@@ -171,12 +166,7 @@ fixtures_regex = [
 ]
 
 formatting_regex = [
-  # (re.compile(r'\n\s{2,5}'), ' ')
   (re.compile(r'(?<=\d)+[(]'), ' (')
-]
-
-tables_regex = [
-  #     (re.compile(r'\|'), ' '),
 ]
 
 table_of_contents_regex = [

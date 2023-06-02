@@ -940,7 +940,8 @@ def find_contract_amount_netto(contract, additional_docs):
 
 def is_already_added(result, beneficiary):
     for elem in result:
-        if elem['name'] == beneficiary['name'] and elem['namePerson'] == beneficiary['namePerson']:
+        if elem['name'] == beneficiary['name'] and \
+                elem['namePerson'] == beneficiary['namePerson']:
             return True
     return False
 
@@ -1002,7 +1003,7 @@ def find_person_interest(result, beneficiary, interests):
     full_name = None
     reason_text = ''
     notes = []
-    for key, value in list(reversed(sorted(interests.items()))):
+    for _, value in list(reversed(sorted(interests.items()))):
         if value is not None:
             for person in value['stakeholders']:
                 if textdistance.jaro_winkler.normalized_distance(last_name, person['last_name']) < 0.1:
@@ -1182,7 +1183,7 @@ def exclude_same_charters(charters):
             else:
                 same_charters.append(charter)
 
-    for date, same_charters in date_map.items():
+    for same_charters in date_map.values():
         if len(same_charters) == 1:
             result.append(same_charters[0])
         else:
@@ -1303,7 +1304,7 @@ def send_notifications():
             additional_fields = audit['additionalFields']
             if additional_fields.get('classification_result_user'):
                 class_id = audit['additionalFields']['classification_result_user']['id']
-                top_result = next(filter(lambda x: x['_id'] == class_id, all_labels), None)
+                top_result = next(filter(lambda x, cs_id=class_id: x['_id'] == cs_id, all_labels), None)
                 attachments = []
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
@@ -1313,7 +1314,7 @@ def send_notifications():
                 logging.info('Retry send email message')
                 top_classification_result = audit['classification_result'][0]
                 attachments = []
-                top_result = next(filter(lambda x: x['_id'] == top_classification_result['id'], all_labels), None)
+                top_result = next(filter(lambda x, tcr =top_classification_result['id']: x['_id'] == tcr, all_labels), None)
                 fs = gridfs.GridFS(db)
                 for file_id in audit['additionalFields'].get('file_ids') or []:
                     attachments.append(fs.get(file_id))
