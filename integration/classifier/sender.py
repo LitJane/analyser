@@ -1,4 +1,3 @@
-# from pyjarowinkler import distance as jaro
 from fuzzywuzzy import fuzz
 
 judicial_senders = {

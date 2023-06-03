@@ -151,7 +151,6 @@ class ContractParser(GenericParser):
     # -------------------------------
     # repeat phase 1
 
-    # self.find_org_date_number(contract, ctx)
     semantic_map, subj_1hot = nn_predict(self.subject_prediction_model, _contract_cut)
 
     if not contract.attributes_tree.number:
@@ -253,7 +252,7 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
 
   check_org_intersections(contract_agents)  # mutator
 
-  return contract_agents  # _swap_org_tags(cas)
+  return contract_agents
 
 
 def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: AuditContext):

@@ -71,7 +71,7 @@ class BaseProcessor:
         self.parser.find_org_date_number(legal_doc, context)
 
       jdoc = save_analysis(jdoc, legal_doc, state=DocumentState.Preprocessed.value)
-      # print(jdoc.analysis)
+
     return jdoc
 
   def process(self, db_document: DbJsonDoc, audit, context: AuditContext) -> LegalDocument or None:
@@ -87,9 +87,7 @@ class BaseProcessor:
     legal_doc = db_document.asLegalDoc()
     try:
 
-      # self.parser.find_org_date_number(legal_doc, context) # todo: remove this call
       # todo: make sure it is done in phase 1, BUT phase 1 is deprecated ;-)
-      # save_analysis(db_document, legal_doc, state=DocumentState.InWork.value)
 
       if audit is None or self.is_valid(audit, db_document):
 
@@ -166,7 +164,6 @@ class BaseProcessor:
 class GenericProcessor(BaseProcessor):
   def __init__(self):
     self.parser = None
-    # Runner.get_instance().generic_parser
 
 
 class ProtocolProcessor(BaseProcessor):
@@ -209,7 +206,9 @@ def get_audits_for_notification() -> [dict]:
   db = get_mongodb_connection()
   audits_collection = db['audits']
 
-  cursor = audits_collection.find({'toBeApproved': True, 'additionalFields.external_source': 'email', 'additionalFields.compliance_protocol_praparation_email_sent':{'$ne': True}}).sort([("createDate", pymongo.ASCENDING)])
+  cursor = audits_collection.find({'toBeApproved': True, 'additionalFields.external_source': 'email',
+                                   'additionalFields.compliance_protocol_praparation_email_sent': {'$ne': True}}).sort(
+    [("createDate", pymongo.ASCENDING)])
   res = []
   for audit in cursor:
     res.append(audit)
@@ -230,7 +229,6 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
       {'auditId': id},
       {"parserResponseCode": 200},
       {"$or": [{"analysis.version": None},
-               # {"analysis.version": {"$ne": analyser.__version__}},
                {"state": None}]}
     ]
   }
@@ -255,6 +253,7 @@ def get_docs_by_audit_id(id: str or None, states=None, kind=None, id_only=False)
       res.append(doc)
   return res
 
+
 def validate_json_schema(db_document):
   try:
     json_str = json.dumps(db_document.analysis['attributes_tree'], ensure_ascii=False,
@@ -268,7 +267,7 @@ def validate_json_schema(db_document):
 def save_analysis(db_document: DbJsonDoc, doc: LegalDocument, state: int, retry_number: int = 0) -> DbJsonDoc:
   # TODO: does not save attributes
   analyse_json_obj: dict = doc.to_json_obj()
- 
+
   db = get_mongodb_connection()
   documents_collection = db['documents']
   db_document.analysis = analyse_json_obj
@@ -299,6 +298,7 @@ def change_doc_state(doc, state):
   db = get_mongodb_connection()
   db['documents'].update_one({'_id': doc.get_id()}, {"$set": {"state": state}})
 
+
 def change_audit_status(audit, status):
   db = get_mongodb_connection()
   db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"status": status}})
@@ -321,7 +321,8 @@ def get_doc4classification(audit):
   if audit.get('additionalFields', '').get('main_document_id') is not None:
     main_doc = finalizer.get_doc_by_id(audit['additionalFields']['main_document_id'])
     main_doc_type = main_doc['documentType']
-    if main_doc['parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
+    if main_doc[
+      'parserResponseCode'] == 200 and main_doc_type != 'SUPPLEMENTARY_AGREEMENT' and main_doc_type != 'ANNEX':
       return main_doc, True
   document_ids = get_docs_by_audit_id(audit["_id"], id_only=True, states=[0, 5, 10, 15])
   for document_id in document_ids:
@@ -359,7 +360,8 @@ def doc_classification(audit):
         mail.send_compliance_error_email(audit, errors, compliance_mapping['email'])
 
       if len(violations) > 0:
-        additional_classification_results.append({'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0})
+        additional_classification_results.append(
+          {'id': compliance_mapping['_id'], 'label': compliance_mapping['label'], 'score': 1.0})
 
     # detecting judicial organisation in sender (email_from) field
     doc_headline = get_doc_headline_safely(doc4classification['parse'])
@@ -389,14 +391,16 @@ def doc_classification(audit):
         classification_result = response.json()
 
     if classification_result:
-        save_audit_practice(audit, classification_result, not main_doc, additional_classification_results)
-        if audit['additionalFields']['external_source'] == 'email':
-          top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
-          attachments = []
-          fs = gridfs.GridFS(get_mongodb_connection())
-          for file_id in audit['additionalFields']['file_ids']:
-            attachments.append(fs.get(file_id))
-          save_email_classification(mail.send_classifier_email(audit, top_result, attachments, all_labels, convert_to_mapping(additional_classification_results)), audit)
+      save_audit_practice(audit, classification_result, not main_doc, additional_classification_results)
+      if audit['additionalFields']['external_source'] == 'email':
+        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
+        attachments = []
+        fs = gridfs.GridFS(get_mongodb_connection())
+        for file_id in audit['additionalFields']['file_ids']:
+          attachments.append(fs.get(file_id))
+        save_email_classification(mail.send_classifier_email(audit, top_result, attachments, all_labels,
+                                                             convert_to_mapping(additional_classification_results)),
+                                  audit)
   except Exception as ex:
     logger.exception(ex)
 
@@ -417,7 +421,6 @@ def apply_judical_practice(classification_result, sender_judicial_org):
 
     classification_result.insert(0, _result)
   return classification_result
- 
 
 
 def audit_phase_1(audit, kind=None):
@@ -451,7 +454,7 @@ def audit_phase_1_doc(document_id, ctx, _k=1, _total=1):
   if processor is None:
     logger.warning(f'unknown/unsupported doc type: {jdoc.documentType},  using just generic processor {document_id}')
     if is_well_parsed(jdoc):
-      ##finding common things, like case numbers, etc...
+      # finding common things, like case numbers, etc...
       pp = document_processors.get('GENERIC')
       if pp:
         pp.preprocess(jdoc=jdoc, context=ctx)
@@ -464,10 +467,6 @@ def audit_phase_1_doc(document_id, ctx, _k=1, _total=1):
 
 
 def audit_phase_2(audit, kind=None):
-  # if audit.get('pre-check') and audit.get('checkTypes') is not None and len(audit['checkTypes']) == 0:
-  #   change_audit_status(audit, "Finalizing")
-  #   return
-
   if audit.get('subsidiary') is None:
     ctx = AuditContext()
   else:
@@ -563,7 +562,8 @@ def run(run_pahse_2=True, kind=None):
   db = get_mongodb_connection()
   for audit in get_audits_for_notification():
     result = mail.send_compliance_protocol_preparation_email(audit)
-    db["audits"].update_one({'_id': audit["_id"]}, {"$set": {"additionalFields.compliance_protocol_praparation_email_sent": result}})
+    db["audits"].update_one({'_id': audit["_id"]},
+                            {"$set": {"additionalFields.compliance_protocol_praparation_email_sent": result}})
 
 
 if __name__ == '__main__':
