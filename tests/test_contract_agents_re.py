@@ -120,8 +120,6 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     x = r.search(
       'некое Общество с ограниченной ответственностью «НЕ БЕЗ НАЗВАНИЯ» ( или "Иначе"), как бе именуемое в дальнейшем "Как-то так"')
-    # for c in range(13):
-    #   print(c, x[c])
 
     self.assertEqual('Общество с ограниченной ответственностью', x['type'])
     self.assertEqual('НЕ БЕЗ НАЗВАНИЯ', x['name'])
@@ -174,7 +172,7 @@ class TestContractAgentsSearch(unittest.TestCase):
          'услуг (далее – «Договор»)  о нижеследующем:'
 
     t1 = n(t1)
-    # r = re.compile(r_types, re.MULTILINE)
+
     r = complete_re_ignore_case
     x = r.search(t1)
     print('===r_alias_prefix=', x['r_alias_prefix'])
@@ -643,8 +641,7 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     r = re.compile(r_alter + r_alias, re.MULTILINE)
     x = r.search(t)
-    # for c in x.groups():
-    #   print(c)
+
     print('r_alias_prefix=', x['r_alias_prefix'])
     self.assertEqual('Исполнитель', x['alias'])
 
@@ -663,7 +660,6 @@ class TestContractAgentsSearch(unittest.TestCase):
     self.assertEqual('Заказчик', x['alias'])
 
   def test_r_quoted_name(self):
-    # 'Фонд поддержки социальных инициатив «Лингвистическая школа «Слово», именуемый'
 
     t = n("""
         ООО «Газпромнефть-Региональные продажи» в дальнейшем «Благотворитель», с другой стороны
@@ -684,7 +680,7 @@ class TestContractAgentsSearch(unittest.TestCase):
     self.assertEqual('Лингвистическая школа «Слово', x1['name'])
 
   def test_r_quoted_name_alias(self):
-    # 'Фонд поддержки социальных инициатив «Лингвистическая школа «Слово», именуемый'
+
     rgc = re.compile(r_quoted_name_alias, re.MULTILINE)
 
     x = rgc.search('что-то именуемое в дальнейшем " Абралябмда филорна", и ')
@@ -753,8 +749,6 @@ class TestContractAgentsSearch(unittest.TestCase):
     x = r.search(t1)
     self.assertEqual('являющаяся гражданинкой', x['citizen'])
 
-    # self.assertEqual('Фамильный Имен Отчестыч', x['human_name'])
-
   def test_find_agents_personz_1(self):
     t0 = """с одной \
     стороны, и Базедов Недуг Бледнович, являющийся гражданином Российской Федерации, действующий \
@@ -773,12 +767,6 @@ class TestContractAgentsSearch(unittest.TestCase):
     стороны, и Базедов Недуг Бледнович, являющийся гражданином Российской Федерации, действующий \
     от собственного имени, именуемый в дальнейшем «Исполнитель», с другой стороны, совместно \
     именуемые «Стороны», и каждая в отдельности «Сторона», заключили настоящий """
-
-    # r = re.compile(complete_re_str, re.MULTILINE)
-    # x = r.search(t0)
-    # for t in x.groups():
-    #   print(t)
-    # self.assertEqual('Базедов Недуг Бледнович', x['human_name'])
 
     tags: List[SemanticTag] = find_org_names(LegalDocument(t0).parse())
     self._validate_org(tags, 2, ('Общество с ограниченной ответственностью', 'Кишки Бога', 'Заказчик'))
@@ -814,10 +802,8 @@ class TestContractAgentsSearch(unittest.TestCase):
     self.assertEqual(None, x)
 
   def test_r_human_name(self):
-    # r = re.compile(r'\W' + r_human_name, re.MULTILINE)
+
     r = re.compile(r'\W' + r_group(r_human_abbr_name, 'human_name'), re.MULTILINE)
-    # r_human_full_name
-    # r_human_abbr_name
 
     x = r.search('что-то Газпромнефть-Омский НПЗ, который был')
     self.assertIsNone(x)

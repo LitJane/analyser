@@ -67,7 +67,6 @@ def wrapper(document):
             model = TFAutoModelForSequenceClassification.from_pretrained(
                 str(path_to_model), num_labels=len(labels), from_pt=False
             )
-            # tokenizer = AutoTokenizer.from_pretrained(str(model_checkpoint2))
             if Path('./tokenizer').is_dir():
                 tokenizer = AutoTokenizer.from_pretrained(str('./tokenizer/'))
             else:
@@ -103,9 +102,6 @@ def get_text(document, filename: str = "", path: str = ""):
     text = remove_equal(text)
 
     list_of_tokenize_words: [str] = WhitespaceTokenizer().tokenize(text)
-    # if len(list_of_tokenize_words) >= 300 and not is_cut_off:
-    #     text = ' '.join(list_of_tokenize_words[50:450])
-    # else:
     text = ' '.join(list_of_tokenize_words[:450])
 
     validation, length, words_length = basic_text_validation(text)

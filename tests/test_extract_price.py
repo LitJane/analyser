@@ -18,7 +18,6 @@ from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.transaction_values import ValueSpansFinder
 
 data = [
-  # (0, 41752.62, 'RUB',
 
   (0, 833333.33, 'RUB', True,
    'Указанное в пункт 1.1. настоящего Договора имущество продается Покупателю по цене 1000000 ( один миллион ) рублей 00 копеек , в том числе НДС 30 %'),
@@ -88,7 +87,6 @@ data = [
   (-1, 490000.0, 'RUB', False,
    'с лимитом 490 000 (четыреста девяносто тысяч) рублей на ДТ, топливо АИ-92 и АИ-95 сроком до 31.12.2018 года  '),
 
-  # (999.44, 'RUB', 'Стоимость 999 рублей 44 копейки'),
   (0, 1999.44, 'RUB', False, 'Стоимость 1 999 (тысяча девятьсот) руб 44 (сорок четыре) коп'),
   (0, 1999.44, 'RUB', False, '1 999 (тысяча девятьсот) руб. 44 (сорок четыре) коп. и что-то 34'),
   (1, 25000000.0, 'USD', False, 'в размере более 25 млн . долларов сша'),
@@ -100,7 +98,6 @@ data = [
    'Стоимость Услуг включает в себя стоимость учебных, справочных, методических и иных материалов, передаваемых Работникам.'),
   # (0, 80000,'RUB', 'Стоимость оборудования 80 000,00 (восемьдесят тысяч рублей рублей 00 копеек) рублей,'),#TODO
   (0, 80000, 'RUB', False, 'Стоимость оборудования 80000,00 (восемьдесят тысяч рублей рублей 00 копеек) рублей,'),
-  # TODO
 
   (1, 1000000.0, 'RUB', False,
    'взаимосвязанных сделок в совокупности составляет от 1000000( одного ) миллиона рублей  '),  # до 50000000
@@ -136,13 +133,6 @@ data = [
    ' с неизменным Порядком определения Договорной цены (Приложение №1А к Договору) на весь период действия Договора.'),
 
 ]
-
-
-# numerics = """
-#     один два три четыре пять шесть семь восемь девять десять
-#     одиннадцать двенадцать тринадцать
-#
-# """
 
 
 class PriceExtractTestCase(unittest.TestCase):
@@ -191,18 +181,16 @@ class PriceExtractTestCase(unittest.TestCase):
     for (_, value, currency, vat, text) in data:
 
       normal_text = normalize_text(text, replacements_regex)  # TODO: fix nltk problem, use d.parse()
-      # print(f'text:            {text}')
-      # print(f'normalized text: {normal_text}')
-      # f = None
+
       val = None
       try:
         val = ValueSpansFinder(normal_text)
-        # f = extract_sum(normal_text)
+
         self.assertEqual(currency, val.currencly_name)
         self.assertEqual(vat, val.including_vat)
         self.assertEqual(value, val.value)
         # TODO: test value
-        # print(f"\033[1;32m{f}\u2713")
+
 
       except Exception:
         print("\033[1;35;40m FAILED: Expected:", value, currency, normal_text, '\n actual=', val)
@@ -232,8 +220,6 @@ class PriceExtractTestCase(unittest.TestCase):
     # =========================================
     r: [ContractPrice] = find_value_sign_currency(doc)
     # =========================================
-
-    # for sum, sign, currency in r:
 
     print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
 
@@ -290,7 +276,6 @@ class PriceExtractTestCase(unittest.TestCase):
       for t in tokens:
         ff = number_re.findall(t)
         print(len(ff) > 0, ff)
-        # self.assertTrue(len(ff)>0 )
 
   def test_conditional_p_sum(self):
     v = [0.9, 0.9]

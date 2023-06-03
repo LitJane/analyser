@@ -137,8 +137,6 @@ def find_org_names_raw(doc: LegalDocument, max_names=2, parent=None, decay_confi
                                            parent=parent,
                                            decay_confidence=decay_confidence)
 
-  # if len(all) < 200:
-  # falling back to case-agnostic regexp
   all_org_names += find_org_names_raw_by_re(doc,
                                             regex=re_ignore_case,  # case-agnostic
                                             confidence_base=0.75,

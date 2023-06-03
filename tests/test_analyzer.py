@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # coding=utf-8
 
-# os.environ['GPN_DB_HOST']='192.168.10.36'
 
 import unittest
 
@@ -21,21 +20,12 @@ class AnalyzerTestCase(unittest.TestCase):
 
   @unittest.skip
   def test_analyse_acontract(self):
-    # {_id:ObjectId('5de8a3fd1b3453848224a9d5')}
+
     doc = get_doc_by_id(ObjectId('60b7a509061c76d775454b51'))
-    # _db_client = MongoClient(f'mongodb://192.168.10.36:27017/')
-    # _db_client.server_info()
 
-    # db = _db_client['gpn']
-
-    # documents_collection = db['documents']
-
-    # doc = documents_collection.find_one({"_id": ObjectId('5fdb213f542ce403c92b4530')} )
-    # audit = db['audits'].find_one({'_id': doc['auditId']})
     audit = get_audit_by_id(doc['auditId'])
     jdoc = DbJsonDoc(doc)
     logger.info(f'......pre-processing {jdoc._id}')
-    # _audit_subsidiary: str = audit["subsidiary"]["name"]
 
     ctx = AuditContext(None)
     processor: BaseProcessor = document_processors[CONTRACT]
@@ -55,13 +45,11 @@ class AnalyzerTestCase(unittest.TestCase):
     processor: BaseProcessor = document_processors["GENERIC"]
 
     doc = get_doc_by_id(uid)
-    # GPN_DB_HOST=192.168.10.36
-    #
+
     if doc is None:
       raise RuntimeError(f"Please fix unit test, doc with given UID {uid} is not in test DB")
 
     audit = get_audit_by_id(doc['auditId'])
-    # print(audit)
 
     jdoc = DbJsonDoc(doc)
     logger.info(f'......pre-processing {jdoc._id}')
@@ -75,14 +63,13 @@ class AnalyzerTestCase(unittest.TestCase):
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_analyze_contract(self):
     processor: BaseProcessor = document_processors[CONTRACT]
-    # doc = get_doc_by_id(ObjectId('638f0a81b1363747e929f304'))
-    doc = get_doc_by_id(ObjectId('63ac1faa862ea92bf713c50d'))
-    #
+
+    doc = get_doc_by_id(ObjectId('63ac1faa862ea92bf713c50d'))  # 638f0a81b1363747e929f304
+
     if doc is None:
       raise RuntimeError("fix unit test please, doc with given UID is not in test DB")
 
     audit = get_audit_by_id(doc['auditId'])
-    # print(audit)
 
     jdoc = DbJsonDoc(doc)
     logger.info(f'......pre-processing {jdoc._id}')
@@ -113,18 +100,13 @@ class AnalyzerTestCase(unittest.TestCase):
     if doc is None:
       raise RuntimeError("fix unit test please, doc with given UID is not in test DB")
 
-    audit = None  # get_audit_by_id(doc['auditId'])
+    audit = None
 
     jdoc = DbJsonDoc(doc)
     logger.info(f'......pre-processing {jdoc._id}')
     ctx = AuditContext()
     processor.preprocess(jdoc, context=ctx)
     doc = processor.process(jdoc, audit, ctx)
-
-    # print(doc)
-
-
-#
 
 
 if __name__ == '__main__':

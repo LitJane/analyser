@@ -16,8 +16,6 @@ from analyser.documents import TextMap
 from analyser.legal_docs import DocumentJson
 from analyser.ml_tools import SemanticTag
 from analyser.parsing import AuditContext
-# 5ded4e284ddc27bcf92dd6cf
-# 5ded4e284ddc27bcf92dd6ce
 from analyser.schemas import ContractSchema
 
 
@@ -31,9 +29,8 @@ class TestJsonExport(unittest.TestCase):
     with open(pth + '/contract_pattern_factory.pickle', 'rb') as handle:
       factory = pickle.load(handle)
 
-    # self.assertEqual(2637, doc.embeddings.shape[-2])
     self.assertEqual(1024, doc.embeddings.shape[-1])
-    # print(doc._normal_text)
+
     return doc, factory
 
   def _get_doc_factory_ctx(self):
@@ -78,14 +75,6 @@ class TestJsonExport(unittest.TestCase):
     for key in restored.__dict__:
       print(key)
       self.assertIn(key, json_struct.__dict__.keys())
-
-    # for key in restored.attributes:
-    #   self.assertIn(key, json_struct.attributes.keys())
-    #
-    # for key in json_struct.attributes:
-    #   self.assertIn(key, restored.attributes.keys())
-
-    # self.assertDictEqual(json_struct.attributes, restored.attributes)
 
     # TODO: compare with file
 
