@@ -57,7 +57,7 @@ def wrapper(document):
     global model
     global tokenizer
 
-    json_from_text, sheet = get_text(document, path='There\\is\\nothing\\here')
+    json_from_text, _ = get_text(document, path='There\\is\\nothing\\here')
 
     if json_from_text is None or json_from_text['text'] == '':
         return None
@@ -97,7 +97,7 @@ def get_text(document, filename: str = "", path: str = ""):
 
     text = clear_text(text)
     text = remove_signature(text)
-    text, is_cut_off = remove_header(text)
+    text, _ = remove_header(text)
     text = remove_footer(text)
     text = remove_equal(text)
 

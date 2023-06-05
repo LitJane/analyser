@@ -45,17 +45,17 @@ class DocumentStructureTestCase(unittest.TestCase):
     self.assertEqual(r, [1, 5])
 
   def test_get_tokenized_line_number(self):
-    n, span, level, roman = get_tokenized_line_number('2. correct'.split(' '), 0)
+    n, _, level, roman = get_tokenized_line_number('2. correct'.split(' '), 0)
     self.assertEqual([2], n)
     self.assertEqual(1, level)
     self.assertEqual(False, roman)
 
-    n, span, level, roman = get_tokenized_line_number('22. correct'.split(' '), 0)
+    n, _, level, roman = get_tokenized_line_number('22. correct'.split(' '), 0)
     self.assertEqual([22], n)
     self.assertEqual(1, level)
     self.assertEqual(False, roman)
 
-    n, span, level, roman = get_tokenized_line_number('II correct Roman II	'.split(' '), 0)
+    n, _, level, roman = get_tokenized_line_number('II correct Roman II	'.split(' '), 0)
     self.assertEqual([2], n)
     self.assertEqual(0, level)
     self.assertEqual(True, roman)

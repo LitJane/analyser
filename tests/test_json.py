@@ -45,7 +45,7 @@ class TestJsonExport(unittest.TestCase):
     print('print_semantic_tag:', tag, f"[{map.text_range(tag.span)}]")
 
   def test_to_json(self):
-    doc, factory, ctx = self._get_doc_factory_ctx()
+    doc, _, ctx = self._get_doc_factory_ctx()
 
     doc.__dict__['number'] = None  # hack for old pickles
     doc.__dict__['date'] = None  # hack for old pickles

@@ -153,20 +153,20 @@ class PriceExtractTestCase(unittest.TestCase):
   def test_find_value_sign_a(self):
     text = """стоимость, равную или превышающую 2000000 ( два миллиона ) долларов сша"""
     tm = TextMap(text)
-    sign, span = find_value_sign(tm)
+    _, span = find_value_sign(tm)
     quote = tm.text_range(span)
     self.assertEqual('превышающую', quote)
 
   def test_find_value_sign_b(self):
     text = """стоимость, равную или превышающую 2000000 ( два миллиона ) долларов сша, но менее"""
     tm = TextMap(text)
-    sign, span = find_value_sign(tm)
+    _, span = find_value_sign(tm)
     quote = tm.text_range(span)
     self.assertEqual('менее', quote)
 
   def test_find_value_sign_c(self):
 
-    for (sign_expected, price, currency, _, text) in data:
+    for (sign_expected, _, _, _, text) in data:
       tm = TextMap(text)
       sign, span = find_value_sign(tm)
       if sign_expected:
@@ -245,7 +245,7 @@ class PriceExtractTestCase(unittest.TestCase):
     print(f'{r[0].value}, {r[0].sign}, {r[0].currency} {sign_exp}')
 
   def test_find_all_value_sign_currency_a(self):
-    for (sign_exp, price, currency_exp, vat, text) in data:
+    for (_, price, currency_exp, _, text) in data:
       doc = ContractDocument(text)
       doc.parse()
       r: List = find_value_sign_currency(doc)

@@ -33,9 +33,9 @@ class TestContractParser(unittest.TestCase):
 
   def test_find_value_sign_currency(self):
 
-    contract, factory, ctx = self._get_doc_factory_ctx('Договор _2_.docx.pickle')
+    contract, _, ctx = self._get_doc_factory_ctx('Договор _2_.docx.pickle')
     contract.__dict__['warnings'] = []  # hack for old pickles
-    semantic_map, subj_1hot = nn_predict(ctx.subject_prediction_model, contract)
+    semantic_map, _ = nn_predict(ctx.subject_prediction_model, contract)
     r: [ContractPrice] = nn_find_contract_value(contract.tokens_map, semantic_map)
     # r = ctx.find_contract_value_NEW(doc)
     print(len(r))
@@ -59,7 +59,7 @@ class TestContractParser(unittest.TestCase):
     print(pr.__dict__['date'])
 
   def test_contract_analyze(self):
-    doc, factory, ctx = self._get_doc_factory_ctx()
+    doc, _, ctx = self._get_doc_factory_ctx()
     doc.__dict__['number'] = None  # hack for old pickles
     doc.__dict__['date'] = None  # hack for old pickles
     doc.__dict__['attributes_tree'] = ContractSchema()  # hack for old pickles

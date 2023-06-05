@@ -107,7 +107,7 @@ def make_xyw(doc_id: str, meta: DataFrame):
 
 def validate_datapoint(id: str, meta: DataFrame):
   try:
-    (emb, tok_f), (sm, subj), (sample_weight, subject_weight) = make_xyw(id, meta)
+    (_, _), (sm, subj), (_, _) = make_xyw(id, meta)
     if sm.shape[1] != len(semantic_map_keys_contract):
       mxs = f'semantic map shape is {sm.shape[1]}, expected is {len(semantic_map_keys_contract)} source={meta.at[id, "source"]}'
       raise ValueError(mxs)
@@ -154,42 +154,7 @@ def get_base_model(factory, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, load_
   return base_model, [in1, in2]
 
 
-def uber_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
-  """
-  Evaluation:
-  > 0.0030140 	loss
-  > 0.0100294 	O1_tagging_loss
-  > 0.0059756 	O2_subject_loss
 
-
-  :param name:
-  :return:
-  """
-  warnings.warn("not in use, to be removed", DeprecationWarning)
-  base_model, base_model_inputs = get_base_model(structure_detection_model_001, ctx=ctx, load_weights=not trained)
-
-  _out_d = Dropout(0.1, name='alzheimer')(base_model)  # small_drops_of_poison
-  _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh", name='paranoia')(_out_d)
-  _out = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging_tanh')(_out)
-  _out = ReLU(name='O1_tagging')(_out)
-
-  # OUT 2: subject detection
-  #
-  pool_size = 2
-  _out2 = MaxPooling1D(pool_size=pool_size, name='emotions')(_out_d)
-  _out_mp = MaxPooling1D(pool_size=pool_size, name='insights')(_out)
-  _out2 = concatenate([_out2, _out_mp], axis=-1, name='bipolar_disorder')
-  _out2 = Bidirectional(LSTM(16, return_sequences=False, name='narcissism'), name='self_reflection')(_out2)
-
-  _out2 = Dense(CLASSES, activation='softmax', name='O2_subject')(_out2)
-
-  _losses = {
-    "O1_tagging": sigmoid_focal_crossentropy,
-    "O2_subject": "binary_crossentropy",
-  }
-  model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
-  model.compile(loss=_losses, optimizer='adam', metrics=metrics)
-  return model
 
 
 def uber_detection_model_003(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
