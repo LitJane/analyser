@@ -5,6 +5,7 @@ from pathlib import Path
 from pymongo import DESCENDING
 
 import analyser
+from __init__ import __version__
 from analyser.charter_parser import CharterParser
 from analyser.schemas import document_schemas
 from analyser.structures import OrgStructuralLevel, ContractSubject, contract_subjects, \
@@ -44,9 +45,9 @@ def insert_schemas_to_db(db):
   collection_schemas = db['schemas']
 
   json_str = json.dumps(document_schemas, indent=4)
-  key = f"documents_schema_{analyser.__version__}"
+  key = f"documents_schema_{__version__}"
   collection_schemas.delete_many({"_id": key})
-  collection_schemas.insert_one({"_id": key, 'json': json_str, "version": analyser.__version__})
+  collection_schemas.insert_one({"_id": key, 'json': json_str, "version": __version__})
 
 
 def update_db_dictionaries():
@@ -73,7 +74,7 @@ def update_db_dictionaries():
 
   coll = db["analyser"]
   coll.delete_many({})
-  coll.insert_one({'version': analyser.__version__})
+  coll.insert_one({'version': __version__})
 
   coll = db['practices']
   coll.delete_many({})
