@@ -76,7 +76,6 @@ class KerasTrainingContext:
 
   def resave_model_h5(self, model_factory_fn):
     model = self.init_model(model_factory_fn, load_weights=False)
-    # model.summary()
     model_name = model_factory_fn.__name__
     ch_fn_old = os.path.join(self.model_checkpoint_path, f"{model_name}.weights")
     model.load_weights(ch_fn_old)
@@ -103,14 +102,12 @@ class KerasTrainingContext:
       model_name = model_name_override
 
     model = model_factory_fn(name=model_name, ctx=self, trained=trained)
-    # model.name = model_name
     if verbose > 1:
       model.summary()
 
-
-    ch_fn =  self.model_checkpoint_path / f"{model_name}.h5"
+    ch_fn = self.model_checkpoint_path / f"{model_name}.h5"
     if weights_file_override is not None:
-      ch_fn =  self.model_checkpoint_path / f"{weights_file_override}.h5"
+      ch_fn = self.model_checkpoint_path / f"{weights_file_override}.h5"
     if weights is not None:
       ch_fn = weights
 
@@ -121,7 +118,6 @@ class KerasTrainingContext:
       except Exception as e:
         msg = f'cannot load  {model_name} from {ch_fn}; {e}'
         logger.warning(msg)
-        # warnings.warn(msg)
         if trained:
           raise FileExistsError(msg)
 
@@ -143,7 +139,7 @@ class KerasTrainingContext:
     for layer in model.layers:
       layer.trainable = True
 
-  def train_and_evaluate_model(self, model:Model, generator, test_generator, retrain=False, lr=None):
+  def train_and_evaluate_model(self, model: Model, generator, test_generator, retrain=False, lr=None):
     print(f'model.name == {model.name}')
     self.trained_models[model.name] = model.name
     if self.EVALUATE_ONLY:
@@ -172,7 +168,6 @@ class KerasTrainingContext:
 
     print(f'continue: lr:{K.get_value(model.optimizer.lr)}, epoch:{epoch}')
 
-
     history = model.fit_generator(
       generator=generator,
       epochs=self.EPOCHS,
@@ -186,6 +181,3 @@ class KerasTrainingContext:
     self.save_stats(model.name)
 
     return history
-
-    # plot_training_history(history)
-    # plot_compare_models()

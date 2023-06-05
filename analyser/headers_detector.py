@@ -65,13 +65,13 @@ def get_token_features(token: str):
 
 
 def get_tokens_features(tokens):
-  doc_features = []
+  _doc_features = []
 
   for t in tokens:
     _features = get_token_features(t)
-    doc_features.append(_features)
+    _doc_features.append(_features)
 
-  doc_featuresX_data = pd.DataFrame.from_records(doc_features)
+  doc_featuresX_data = pd.DataFrame.from_records(_doc_features)
   doc_featuresX_data['_reserved'] = 0.0
   doc_featuresX_data['h'] = 0.0
 
@@ -87,7 +87,7 @@ def line_features(tokens_map: TextMap, line_span: (int, int), line_number: int, 
   # TODO: add previous and next lines features
   txt: str = tokens_map.text_range(line_span)
 
-  numbers, span, k, s = get_tokenized_line_number(tokens, 0)
+  numbers, span, _, s = get_tokenized_line_number(tokens, 0)
   if not numbers:
     numbers = []
     number_minor = -2

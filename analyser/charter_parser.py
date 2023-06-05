@@ -3,7 +3,6 @@ import os
 import warnings
 
 import pandas as pd
-# from overrides import overrides
 from pandas import DataFrame
 
 from analyser.attributes import to_json
@@ -61,7 +60,6 @@ class CharterDocument(LegalDocumentExt):
   date = property(get_date, set_date)
   number = property(get_number, set_number)
 
-  #   @overrides
   def to_json_obj(self) -> dict:
     j: dict = super().to_json_obj()
     _attributes_tree_dict, _ = to_json(self.attributes_tree)
@@ -122,12 +120,6 @@ class CharterParser(ParsingContext):
       'оказание обществу информационных юридических услуг'
     ],
 
-    # CharterSubject.Other: [
-    #   'решения о взыскании с Генерального директора убытков',
-    #   'заключение договоров об отступном, новации или прощении долга, договоров об уступке права требования и переводе долга',
-    #   'нецелевое расходование Обществом денежных средств'
-    # ],
-
     ContractSubject.Loans: [
       'получение или предоставление займов, кредитов (в том числе вексельных)',
       'предоставление гарантий и поручительств по обязательствам',
@@ -177,7 +169,8 @@ class CharterParser(ParsingContext):
 
     ### ⚙️🔮 SENTENCES embedding
 
-    charter.sentences_embeddings = embedd_sentences(charter.sentence_map, self.get_sentence_embedder(), log_addon=str(charter.get_id()))
+    charter.sentences_embeddings = embedd_sentences(charter.sentence_map, self.get_sentence_embedder(),
+                                                    log_addon=str(charter.get_id()))
     charter.distances_per_sentence_pattern_dict = calc_distances_per_pattern(charter.sentences_embeddings,
                                                                              self.get_patterns_named_embeddings())
 
@@ -188,9 +181,7 @@ class CharterParser(ParsingContext):
     :param charter:
     :return:
     """
-    # charter.sentence_map = tokenize_doc_into_sentences_map(charter, HyperParameters.charter_sentence_max_len)
 
-    # doc.org_tags = find_charter_org(doc)
     doc.attributes_tree.org = find_charter_org_obj(doc)
     if doc.attributes_tree.org:
       doc.attributes_tree.org.alias = None
@@ -209,7 +200,7 @@ class CharterParser(ParsingContext):
       self._embedd(_charter)
 
     # --------------
-    # (('Pattern name', 16), 0.8978644013404846),
+
     patterns_by_headers = map_headlines_to_patterns(_charter,
                                                     self.get_patterns_named_embeddings(), self.get_sentence_embedder())
 
@@ -243,7 +234,6 @@ class CharterParser(ParsingContext):
 
     # finding Values(amounts)
     values: [ContractPrice] = find_value_sign_currency_attention(subdoc, None, absolute_spans=False)
-    # self._rename_margin_values_tags(values)
     valued_sentence_spans: Spans = collect_sentences_having_constraint_values(subdoc, values, merge_spans=True)
 
     _united_spans: Spans = []

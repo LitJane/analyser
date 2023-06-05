@@ -12,7 +12,6 @@ from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
-
 from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
@@ -89,11 +88,9 @@ class ContractParser(GenericParser):
     if INSIDES_FINDER_ENABLED:
       self.insides_finder = InsidesFinder()
 
-
   def find_org_date_number(self, contract: ContractDocument, ctx: AuditContext) -> ContractDocument:
 
     # GenericParser is called an all documents before this
-    # super().find_org_date_number(contract, ctx)
 
     _head = contract[0:300]  # warning, trimming doc for analysis phase 1
     if _head.embeddings is None:
@@ -109,7 +106,6 @@ class ContractParser(GenericParser):
     check_orgs_natural_person(contract.attributes_tree.orgs, contract.get_headline(), ctx)  # mutator
 
     # TODO: maybe move contract.tokens_map into text map
-    # contract.attributes_tree.case_number = find_case_number(contract)
     contract.attributes_tree.number = nn_get_contract_number(_head.tokens_map, semantic_map)
     contract.attributes_tree.date = nn_get_contract_date(_head.tokens_map, semantic_map)
 
@@ -155,7 +151,6 @@ class ContractParser(GenericParser):
     # -------------------------------
     # repeat phase 1
 
-    # self.find_org_date_number(contract, ctx)
     semantic_map, subj_1hot = nn_predict(self.subject_prediction_model, _contract_cut)
 
     if not contract.attributes_tree.number:
@@ -252,12 +247,12 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
     # known subsidiary goes first
     contract_agents = sorted(contract_agents, key=lambda a: not audit_ctx.is_same_org(_name_val_safe(a)))
   else:
-    contract_agents = sorted(contract_agents, key=lambda a: _name_val_safe(a))
+    contract_agents = sorted(contract_agents, key=_name_val_safe)
     contract_agents = sorted(contract_agents, key=lambda a: not a.is_known_subsidiary)
 
   check_org_intersections(contract_agents)  # mutator
 
-  return contract_agents  # _swap_org_tags(cas)
+  return contract_agents
 
 
 def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: AuditContext):
@@ -404,7 +399,6 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     region_map = TextMap(region)
     results = ValueSpansFinder(region)
 
-    # if results.including_vat:
     cp.amount = SemanticTag('amount')
     cp.amount.span = region_map.token_indices_by_char_range(results.number_span)
     cp.amount.value = results.original_sum
@@ -430,20 +424,17 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
       cp.amount.value = to_float(cp.amount.value)
     except Exception:
       logger.error(f'amount is {cp.amount}')
-    # logger.error(e)
 
   if cp.vat:
     try:
       cp.vat.value = to_float(cp.vat.value)
     except Exception:
-      # logger.error(e)
       logger.error(f'vat is {cp.vat.value}, cannot cast to float')
 
   if cp.amount_netto:
     try:
       cp.amount_netto.value = to_float(cp.amount_netto.value)
     except Exception:
-      # logger.error(e)
       logger.error(f'amount_netto is {cp.amount_netto}')
 
   if cp.amount_brutto:
@@ -518,14 +509,12 @@ def nn_get_contract_number(textmap: TextMap, semantic_map: DataFrame) -> Semanti
     return tag
 
 
-def nn_get_contract_date(textmap: TextMap, semantic_map: DataFrame) -> SemanticTag:
+def nn_get_contract_date(textmap: TextMap, semantic_map: DataFrame) -> SemanticTag or None:
   tag_name = 'date'
   date_index = semantic_map[f'{tag_name}-begin'].argmax()
   confidence = float(semantic_map[f'{tag_name}-begin'][date_index])
   sentense_span = textmap.sentence_at_index(date_index)
   date_sentence = textmap.text_range(sentense_span)
-
-  #       print(f'{date_sentence=}')
 
   _charspan, dt = find_date(date_sentence)
   if dt is not None and confidence > 0.01:  # TODO:
@@ -535,6 +524,7 @@ def nn_get_contract_date(textmap: TextMap, semantic_map: DataFrame) -> SemanticT
     tag = SemanticTag(tag_name, dt, span)
     tag.confidence = confidence
     return tag
+
   return None
 
 
@@ -569,7 +559,6 @@ def nn_get_tag_values(tag_name: str,
   # collecting hits--------
   for i, v in enumerate(attention):
     if v >= threshold:
-      #             print ('---',i,f'{v:.2}', a_doc_from_json.get_tokens_map_unchaged()[i])
       if seq is None:
         seq = []
         sequences.append(seq)
@@ -591,8 +580,6 @@ def nn_get_tag_values(tag_name: str,
       quote = textmap.text_range(span)
       tag = SemanticTag(tag_name, quote, span)
       tag.confidence = float(attention[span[0]:span[1]].mean())
-
-      #         print(span, quote, tag)
       tags.append(tag)
 
   # sorting spans--------

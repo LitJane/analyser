@@ -11,7 +11,6 @@ from bson.objectid import ObjectId
 from jsonschema import validate, FormatChecker
 
 import analyser
-# from analyser.log import logger
 from analyser.ml_tools import SemanticTagBase
 from analyser.schemas import document_schemas, ProtocolSchema, OrgItem, AgendaItem, AgendaItemContract, HasOrgs, \
   ContractPrice, ContractSchema, CharterSchema, CharterStructuralLevel, Competence
@@ -106,7 +105,7 @@ def convert_org(attr_name: str,
 
   name_parts = attr_name.split('-')
   _index = int(name_parts[1]) - 1
-  org = array_set_or_get_at(dest.orgs, _index, lambda: OrgItem())
+  org = array_set_or_get_at(dest.orgs, _index, OrgItem)
 
   field_name = name_parts[-1]
 
@@ -186,7 +185,7 @@ def convert_competence(path_s: [str], attr, competence_node: Competence):
     constraint_margin_index = int(constraint[2]) - 1
 
   # extending array
-  margin_node = array_set_or_get_at(competence_node.constraints, constraint_margin_index, lambda: ContractPrice())
+  margin_node = array_set_or_get_at(competence_node.constraints, constraint_margin_index, ContractPrice)
 
   if len(path_s) == 1:
     copy_attr(attr, dest=margin_node)
@@ -266,8 +265,6 @@ def convert_agenda_item(path, attr: {}, _item_node: AgendaItem):
   if attr_base_name in ['date', 'number']:
     copy_leaf_tag(attr_base_name, src=attr, dest=c_node)
 
-  # pass
-
 
 def copy_attr(src, dest: SemanticTagBase, skip_value=False) -> SemanticTagBase:
   _list = ['span', 'span_map', 'confidence', "value"]
@@ -333,7 +330,7 @@ def convert_protocol_db_attributes_to_tree(attrs) -> ProtocolSchema:
     attr_name: str = paths[0]
     attr_name_clean, _i = index_of_key(attr_name)
     if ("agenda_item" == attr_name_clean):
-      agenda_item_node = array_set_or_get_at(tree.agenda_items, _i, lambda: AgendaItem())
+      agenda_item_node = array_set_or_get_at(tree.agenda_items, _i, AgendaItem)
       if len(paths) == 1:
         copy_attr(v, dest=agenda_item_node)
       else:
@@ -455,13 +452,13 @@ def convert_one(db, doc: dict):
 
     a_attr_tree['version'] = __version_ints__
     a_attr_tree['creation_date'] = datetime.now()
-    j, json_str = to_json(a_attr_tree)
+    j, _ = to_json(a_attr_tree)
     db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"analysis.attributes_tree": j}})
     migration_logger.debug(f'updated {kind} {doc["_id"]} analysis.attributes_tree')
     if u_attr_tree is not None:
       u_attr_tree['version'] = __version_ints__
       u_attr_tree['creation_date'] = datetime.now()
-      j, json_str = to_json(u_attr_tree)
+      j, _ = to_json(u_attr_tree)
       db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"user.attributes_tree": j}})
       migration_logger.debug(f'updated {kind} {doc["_id"]} user.attributes_tree')
 
@@ -549,11 +546,7 @@ def _test_convert():
   # contract: 5f0bb4bd138e9184feef1fa8
 
   db = get_mongodb_connection()
-  # a = doc['user']['attributes']
   _test_protocol()
-  # j, json_str, doc = test_protocol()
-  # validate(instance=json_str, schema=document_schemas, format_checker=FormatChecker())
-  # db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"analysis.attributes_tree": j}})
 
   j, json_str, doc = _test_charter()
   validate(instance=json_str, schema=document_schemas, format_checker=FormatChecker())
@@ -562,16 +555,3 @@ def _test_convert():
   j, json_str, doc = _test_contract()
   validate(instance=json_str, schema=document_schemas, format_checker=FormatChecker())
   db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"analysis.attributes_tree": j}})
-
-  # coll = db["schemas"]
-  # coll.delete_many({})
-  # coll.insert_one( {"charter":charter_schema })
-
-  # db.create_collection("test_charters", {"validator": {"$jsonSchema": charter_schema}})
-
-
-if __name__ == '__main__':
-  # test_convert()
-  convert_all_docs()
-  # at = get_attributes_tree('5f64161009d100a445b7b0d6')
-  # print(at)

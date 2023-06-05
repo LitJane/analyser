@@ -4,9 +4,6 @@
 from enum import Enum, unique, EnumMeta
 
 import numpy as np
-# from keras.utils import to_categorical
-
-# from tensorflow.keras.utils.np_utils import to_categorical
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
 legal_entity_types = {
@@ -45,7 +42,7 @@ class EnumExt(Enum):
 
 
 class DisplayStringEnumMeta(EnumMeta):
-  def __new__(mcs, name, bases, attrs):
+  def __new__(mcs, name, bases, attrs, **kwds):
     obj = super().__new__(mcs, name, bases, attrs)
     obj._value2member_map_ = {}
     for m in obj:
@@ -83,8 +80,7 @@ ORG_LEVELS_names: [str] = [
 
 @unique
 class Currencies(EnumExt):
-  RUB = 0
-  # RUR = 0
+  RUB = 0  # before: RUR = 0
   USD = 1
   EUR = 2
   KZT = 3
@@ -116,7 +112,6 @@ class Currencies(EnumExt):
   TRY = 949
   TMT = 934
   UZS = 860
-  # UAH	= 	980
   CZK = 203
   SEK = 752
   CHF = 756
@@ -190,19 +185,6 @@ class ContractTags(Enum, metaclass=DisplayStringEnumMeta):
   Sign = 2, 'sign'
 
 
-# @unique
-# class ContractSubject(Enum, metaclass=DisplayStringEnumMeta):
-#   '''
-#   TODO: rename ContractSubject->DocumentSubject, because contract subjects are only a subset of this
-#   '''
-#   Other = -1, 'Другое'
-#
-#   Deal = 0, 'Сделка'
-#   Charity = 1, 'Благотворительность'
-#   RealEstate = 4, 'Сделки с недвижимым имуществом'
-#   Loans = 7, 'Займы, кредиты и др. обязательста'
-
-
 @unique
 class InsiderInfoType(EnumExt):
   Bankruptcy = 0
@@ -226,22 +208,13 @@ class ContractSubject(EnumExt, metaclass=DisplayStringEnumMeta):
   Charity = 1, 'Благотворительность'
   RealEstate = 4, 'Сделки с недвижимым имуществом'
   Loans = 7, 'Займы, кредиты и др. обязательста'
-
-  # Other = 2, 'Другое'
   Lawsuit = 3, 'Судебные издержки'
-
   Insurance = 5, 'Страхование'
   Consulting = 6, 'Консультационные услуги'
   RentingOut = 8, 'Передача в аренду'
   Renting = 9, 'Получение в аренду недвижимого имущества'
   BigDeal = 10, ' Крупная сделка'
   Deal = 11, 'Сделка'
-  # 12
-  # 13
-  # 14
-  # 15
-  # 16
-  # 17
   AgencyContract = 21, 'Агентский договор'
   BankGuarantees = 22, ''
   RelatedTransactions = 23, ''
@@ -252,7 +225,6 @@ class ContractSubject(EnumExt, metaclass=DisplayStringEnumMeta):
   Service = 28, ''
   CashPayments = 29, ''
   RefusalToLeaseLand = 30, ''
-
   DealGeneralBusiness = 31, ''
   RevisionCommission = 32, ''
   Reorganization = 33, ''
@@ -263,7 +235,6 @@ class ContractSubject(EnumExt, metaclass=DisplayStringEnumMeta):
   RealEstateTransactions = 38, ''
   SecuritiesTransactions = 39, ''
   RegisteredCapital = 40, ''
-
   ParticipationInOtherOrganizations = 41, ''
   DecisionsForSubsidiary = 42, ''
 
