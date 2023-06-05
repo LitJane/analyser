@@ -10,7 +10,6 @@ from bson import json_util
 from bson.objectid import ObjectId
 from jsonschema import validate, FormatChecker
 
-import analyser
 from analyser.ml_tools import SemanticTagBase
 from analyser.schemas import document_schemas, ProtocolSchema, OrgItem, AgendaItem, AgendaItemContract, HasOrgs, \
   ContractPrice, ContractSchema, CharterSchema, CharterStructuralLevel, Competence

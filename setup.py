@@ -5,8 +5,6 @@ from pip._internal.req import parse_requirements
 from setuptools import setup, find_namespace_packages
 from __init__ import __version__
 
-import analyser
-
 with open("README.md", "r") as fh:
   long_description = fh.read()
 

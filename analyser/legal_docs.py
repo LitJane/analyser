@@ -13,7 +13,6 @@ import numpy as np
 from bson import json_util
 from overrides import final
 
-import analyser
 from analyser.attributes import to_json
 from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import split_sentences_into_map, TextMap, CaseNormalizer
