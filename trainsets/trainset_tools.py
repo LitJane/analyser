@@ -1,10 +1,7 @@
 import random
 
 import numpy as np
-import pandas as pd
 from pandas import DataFrame
-
-from analyser.structures import ContractSubject
 
 VALIDATION_SET_PROPORTION = 0.25
 
@@ -65,4 +62,3 @@ class TrainsetBalancer:
     random.shuffle(train_indices)
 
     return train_indices, test_indices
-
