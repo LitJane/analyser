@@ -101,7 +101,7 @@ class KerasTrainingContext:
     if model_name_override is not None:
       model_name = model_name_override
 
-    model = model_factory_fn(name=model_name, ctx=self, trained=trained)
+    model = model_factory_fn(name=model_name )
     if verbose > 1:
       model.summary()
 
