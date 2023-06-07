@@ -391,16 +391,14 @@ def doc_classification(audit):
         classification_result = response.json()
 
     if classification_result:
-      save_audit_practice(audit, classification_result, not main_doc, additional_classification_results)
-      if audit['additionalFields']['external_source'] == 'email':
-        top_result = next(filter(lambda x: x['_id'] == classification_result[0]['id'], all_labels), None)
-        attachments = []
-        fs = gridfs.GridFS(get_mongodb_connection())
-        for file_id in audit['additionalFields']['file_ids']:
-          attachments.append(fs.get(file_id))
-        save_email_classification(mail.send_classifier_email(audit, top_result, attachments, all_labels,
-                                                             convert_to_mapping(additional_classification_results)),
-                                  audit)
+        save_audit_practice(audit, classification_result, not main_doc, additional_classification_results)
+        if audit['additionalFields']['external_source'] == 'email':
+          top_result = next(filter(lambda x: x['nn_id'] == classification_result[0]['label'], all_labels), None)
+          attachments = []
+          fs = gridfs.GridFS(get_mongodb_connection())
+          for file_id in audit['additionalFields']['file_ids']:
+            attachments.append(fs.get(file_id))
+          save_email_classification(mail.send_classifier_email(audit, top_result, attachments, all_labels, convert_to_mapping(additional_classification_results)), audit)
   except Exception as ex:
     logger.exception(ex)
 
