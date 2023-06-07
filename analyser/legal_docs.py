@@ -61,9 +61,9 @@ class Paragraph:
 
 class LegalDocument:
 
-  def __init__(self, original_text=None, name="legal_doc"):
+  def __init__(self, original_text=None, name="legal_doc", id=None):
 
-    self._id = None  # TODO
+    self._id = id
 
     self.attributes_tree: DocumentSchema or None = DocumentSchema()
     # self.date: SemanticTag or None = None
@@ -178,9 +178,6 @@ class LegalDocument:
     _json_tree['attributes_tree'] = {}
     return _json_tree
 
-  def to_json(self) -> str:
-    j = DocumentJson(self)
-    return json.dumps(j.__dict__, indent=4, ensure_ascii=False, default=lambda o: '<not serializable>')
 
   def get_tokens_cc(self):
     return self.tokens_map.tokens
@@ -282,8 +279,8 @@ class LegalDocument:
 
 class GenericDocument(LegalDocument):
 
-  def __init__(self, original_text):
-    LegalDocument.__init__(self, original_text)
+  def __init__(self, original_text, id=None):
+    LegalDocument.__init__(self, original_text, id=id)
     self.attributes_tree = GenericDocSchema()
 
   def to_json_obj(self) -> dict:
@@ -295,8 +292,8 @@ class GenericDocument(LegalDocument):
 
 class LegalDocumentExt(LegalDocument):
 
-  def __init__(self, doc: LegalDocument):
-    super().__init__('')
+  def __init__(self, doc: LegalDocument, id=None):
+    super().__init__('', id=id)
 
     if doc is not None:
       self.__dict__.update(doc.__dict__)
@@ -327,15 +324,6 @@ class LegalDocumentExt(LegalDocument):
 
 
 class DocumentJson:
-
-  @staticmethod
-  def from_json_str(json_string: str) -> 'DocumentJson':
-    jsondata = json.loads(json_string, object_hook=json_util.object_hook)
-
-    c = DocumentJson(None)
-    c.__dict__ = jsondata
-
-    return c
 
   def __init__(self, doc: LegalDocument):
     self.version = analyser.__version__

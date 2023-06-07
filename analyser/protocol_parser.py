@@ -49,8 +49,8 @@ class ProtocolAV(Enum):
 
 class ProtocolDocument(LegalDocumentExt):
 
-  def __init__(self, doc: LegalDocument = None):
-    super().__init__(doc)
+  def __init__(self, doc: LegalDocument = None, id=None):
+    super().__init__(doc, id=id)
 
     if doc is not None:
       self.__dict__.update(doc.__dict__)

@@ -29,8 +29,8 @@ INSIDES_FINDER_ENABLED = 'GPN_DISABLE_INSIDES' not in os.environ
 
 class ContractDocument(LegalDocument):
 
-  def __init__(self, original_text):
-    LegalDocument.__init__(self, original_text)
+  def __init__(self, original_text, id=None):
+    LegalDocument.__init__(self, original_text, id=id)
 
     self.attributes_tree = ContractSchema()
 
