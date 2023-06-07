@@ -14,7 +14,8 @@ class DocumentStructureTestCase(unittest.TestCase):
     a = []
     w = []
 
-    remove_similar_indexes_considering_weights(a, w)
+    r = remove_similar_indexes_considering_weights(a, w)
+    self.assertEqual(r, [])
 
   def test_remove_similar_indexes_considering_weights_2(self):
     a = [1, 2]

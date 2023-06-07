@@ -107,7 +107,7 @@ def make_xyw(doc_id: str, meta: DataFrame):
 
 def validate_datapoint(id: str, meta: DataFrame):
   try:
-    (_, _), (sm, subj), (_, _) = make_xyw(id, meta)
+    (_, _), (sm, _), (_, _) = make_xyw(id, meta)
     if sm.shape[1] != len(semantic_map_keys_contract):
       mxs = f'semantic map shape is {sm.shape[1]}, expected is {len(semantic_map_keys_contract)} source={meta.at[id, "source"]}'
       raise ValueError(mxs)
@@ -135,11 +135,11 @@ def structure_detection_model_001(name, ctx: KerasTrainingContext = DEFAULT_TRAI
   _out = LSTM(FEATURES * 4, return_sequences=True, activation="tanh")(_out)
   _out = LSTM(FEATURES, return_sequences=True, activation='tanh')(_out)
 
-  model = Model(inputs=[input_text_emb, token_features], outputs=_out, name=name)
+  _model = Model(inputs=[input_text_emb, token_features], outputs=_out, name=name)
 
-  model.compile(loss=sigmoid_focal_crossentropy, optimizer='Nadam',
-                metrics=['mse', 'kullback_leibler_divergence', 'acc'])
-  return model
+  _model.compile(loss=sigmoid_focal_crossentropy, optimizer='Nadam',
+                 metrics=['mse', 'kullback_leibler_divergence', 'acc'])
+  return _model
 
 
 def get_base_model(factory, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, load_weights=True):
@@ -152,9 +152,6 @@ def get_base_model(factory, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, load_
   in2 = model_001.get_layer(name='input_headlines_att').input
 
   return base_model, [in1, in2]
-
-
-
 
 
 def uber_detection_model_003(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
@@ -182,9 +179,9 @@ def uber_detection_model_003(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
     "O1_tagging": sigmoid_focal_crossentropy,
     "O2_subject": "binary_crossentropy",
   }
-  model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
-  model.compile(loss=_losses, optimizer='adam', metrics=metrics)
-  return model
+  _model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
+  _model.compile(loss=_losses, optimizer='adam', metrics=metrics)
+  return _model
 
 
 def uber_detection_model_005_1_1(name="uber_detection_model_005_1_1", ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX,
@@ -211,9 +208,9 @@ def uber_detection_model_005_1_1(name="uber_detection_model_005_1_1", ctx: Keras
   _out2 = Dense(CLASSES, activation='softmax', name='O2_subject')(_out2)
 
   _out = LeakyReLU(name='O1_tagging')(_out_l)
-  model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
-  model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
-  return model
+  _model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
+  _model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
+  return _model
 
 
 def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
@@ -248,9 +245,9 @@ def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX
 
   _out2 = Dense(CLASSES, activation='softmax', name='O2_subject')(_out2)
 
-  model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
-  model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
-  return model
+  _model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
+  _model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
+  return _model
 
 
 @dataclass
@@ -336,14 +333,14 @@ class PositionEmbedding(layers.Layer):
     self.initializer = keras.initializers.get(initializer)
 
   def get_config(self):
-    config = super().get_config()
-    config.update(
+    _config = super().get_config()
+    _config.update(
       {
         "sequence_length": self.sequence_length,
         "initializer": keras.initializers.serialize(self.initializer),
       }
     )
-    return config
+    return _config
 
   def build(self, input_shape):
     feature_size = input_shape[-1]
@@ -417,13 +414,13 @@ class SinePositionEncoding(layers.Layer):
     return tf.broadcast_to(positional_encodings, input_shape)
 
   def get_config(self):
-    config = super().get_config()
-    config.update(
+    _config = super().get_config()
+    _config.update(
       {
         "max_wavelength": self.max_wavelength,
       }
     )
-    return config
+    return _config
 
 
 def make_att_model_02(name='make_att_model_02', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
@@ -479,7 +476,7 @@ def make_att_model_02(name='make_att_model_02', ctx: KerasTrainingContext = DEFA
   return model
 
 
-def make_att_model_03(name='make_att_model_03', ctx=None, trained=False):
+def make_att_model_03(name='make_att_model_03'):
   input_text_emb = layers.Input(shape=[None, config.EMBED_DIM], dtype='float32', name="input_text_emb")
   input_text_emb_n = layers.LayerNormalization(epsilon=1e-6, name="input_text_emb_norm")(input_text_emb)
 
@@ -615,5 +612,4 @@ def get_semantic_map_new(doc) -> DataFrame:
 
 
 if __name__ == '__main__':
-  model = make_att_model()
-  model.summary()
+  make_att_model().summary()
