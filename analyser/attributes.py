@@ -10,13 +10,13 @@ from bson import json_util
 from bson.objectid import ObjectId
 from jsonschema import validate, FormatChecker
 
+import analyser
 from analyser.ml_tools import SemanticTagBase
 from analyser.schemas import document_schemas, ProtocolSchema, OrgItem, AgendaItem, AgendaItemContract, HasOrgs, \
   ContractPrice, ContractSchema, CharterSchema, CharterStructuralLevel, Competence
 from analyser.structures import OrgStructuralLevel, ContractSubject
 from integration.db import get_doc_by_id
 from integration.db import get_mongodb_connection
-from __init__ import __version_ints__
 
 migration_logger = logging.getLogger('db_migration')
 
@@ -449,13 +449,13 @@ def convert_one(db, doc: dict):
     if u is not None:
       u_attr_tree = {kind: kind2method[kind](u)}
 
-    a_attr_tree['version'] = __version_ints__
+    a_attr_tree['version'] = analyser.__version_ints__
     a_attr_tree['creation_date'] = datetime.now()
     j, _ = to_json(a_attr_tree)
     db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"analysis.attributes_tree": j}})
     migration_logger.debug(f'updated {kind} {doc["_id"]} analysis.attributes_tree')
     if u_attr_tree is not None:
-      u_attr_tree['version'] = __version_ints__
+      u_attr_tree['version'] = analyser.__version_ints__
       u_attr_tree['creation_date'] = datetime.now()
       j, _ = to_json(u_attr_tree)
       db["documents"].update_one({'_id': doc["_id"]}, {"$set": {"user.attributes_tree": j}})

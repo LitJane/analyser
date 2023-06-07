@@ -3,7 +3,8 @@
 # coding=utf-8
 from pip._internal.req import parse_requirements
 from setuptools import setup, find_namespace_packages
-from __init__ import __version__
+
+import analyser
 
 with open("README.md", "r") as fh:
   long_description = fh.read()
@@ -23,7 +24,7 @@ for ir in install_reqs:
 
 setup(
   name="nemoware-analyzer",
-  version=__version__,
+  version=analyser.__version__,
 
   description="GPN Audit: NLP analyser",
   long_description=long_description,

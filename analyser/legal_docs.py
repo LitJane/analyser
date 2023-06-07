@@ -13,6 +13,7 @@ import numpy as np
 from bson import json_util
 from overrides import final
 
+import analyser
 from analyser.attributes import to_json
 from analyser.doc_structure import get_tokenized_line_number
 from analyser.documents import split_sentences_into_map, TextMap, CaseNormalizer
@@ -28,7 +29,6 @@ from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.text_tools import find_token_before_index
 from analyser.transaction_values import _re_greather_then, _re_less_then, _re_greather_then_1, VALUE_SIGN_MIN_TOKENS, \
   ValueSpansFinder
-from __init__ import __version__
 
 REPORTED_DEPRECATED = {}
 
@@ -341,7 +341,7 @@ class DocumentJson:
     return c
 
   def __init__(self, doc: LegalDocument):
-    self.version = __version__
+    self.version = analyser.__version__
 
     self._id: str = None
     self.original_text = None
