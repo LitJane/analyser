@@ -160,7 +160,7 @@ def find_org_names_raw_by_re(doc: LegalDocument, regex, confidence_base: float, 
                              decay_confidence=True) -> [ContractAgent]:
   all_: [ContractAgent] = []
 
-  iter = [m for m in re.finditer(regex, doc.text)]
+  iter = list(re.finditer(regex, doc.text))
 
   for m in iter:
     ca = ContractAgent()

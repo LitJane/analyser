@@ -148,8 +148,6 @@ class TokenisationTestCase(unittest.TestCase):
     tm3 = tm0.slice(slice(1, 3))
     self.assertEqual('мамаэтилен', tm3.text)
 
-
-
   def test_char_range(self):
     text = 'этилен мама ಶ್ರೀರಾಮ'
     tm = TextMap(text)
@@ -436,7 +434,7 @@ class TokenisationTestCase(unittest.TestCase):
     text = '1 2 3\nмама\nಶ್ರೀರಾಮ'
     tm = TextMap(text)
 
-    spans = [s for s in tm.split_spans('\n', add_delimiter=False)]
+    spans = list(tm.split_spans('\n', add_delimiter=False))
     for k in spans:
       print(tm.text_range(k))
 
@@ -528,7 +526,6 @@ class TokenisationTestCase(unittest.TestCase):
     expected_tokens = len(tm1.tokens) + N * len(tm2.tokens)
     for _ in range(N):
       tm1 += tm2
-
 
     self.assertEqual(expected_tokens, len(tm1.tokens))
 

@@ -61,5 +61,5 @@ class ClassifierTestCase(unittest.TestCase):
     classification_result = None
     classification_result = apply_judical_practice(classification_result, "sender_judicial_org")
     print(classification_result)
-    self.assertEquals("sender_judicial_org", classification_result[0]['sender_judicial_org'])
-    self.assertEquals("Практика судебной защиты", classification_result[0]['label'])
+    self.assertEqual("sender_judicial_org", classification_result[0]['sender_judicial_org'])
+    self.assertEqual("Практика судебной защиты", classification_result[0]['label'])

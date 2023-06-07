@@ -10,9 +10,8 @@ import nltk
 
 from analyser.contract_parser import ContractDocument
 from analyser.documents import TextMap
-from analyser.legal_docs import find_value_sign
 from analyser.ml_tools import conditional_p_sum
-from analyser.parsing import find_value_sign_currency
+from analyser.parsing import find_value_sign_currency, find_value_sign
 from analyser.schemas import ContractPrice
 from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.transaction_values import ValueSpansFinder

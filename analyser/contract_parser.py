@@ -12,10 +12,10 @@ from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
-from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
+from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
-from analyser.parsing import ParsingContext, AuditContext
+from analyser.parsing import ParsingContext, AuditContext, find_value_sign
 from analyser.patterns import AV_SOFT, AV_PREFIX
 from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled

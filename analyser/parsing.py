@@ -9,10 +9,12 @@ from analyser.contract_agents import find_closest_org_name
 from analyser.contract_patterns import ContractPatternFactory
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
-from analyser.legal_docs import LegalDocument, ContractValue, extract_sum_sign_currency
-from analyser.ml_tools import estimate_confidence_by_mean_top_non_zeros, FixedVector, smooth_safe, relu
+from analyser.legal_docs import LegalDocument, ContractValue
+from analyser.ml_tools import estimate_confidence_by_mean_top_non_zeros, FixedVector, smooth_safe, relu, SemanticTag
 from analyser.schemas import ContractPrice
-from analyser.transaction_values import complete_re as transaction_values_re
+from analyser.structures import ContractTags
+from analyser.transaction_values import complete_re as transaction_values_re, VALUE_SIGN_MIN_TOKENS, ValueSpansFinder, \
+  _re_greather_then_1, _re_less_then, _re_greather_then
 from gpn.gpn import subsidiaries
 from tf_support.embedder_elmo import ElmoEmbedder
 
@@ -68,8 +70,7 @@ class AuditContext:
       self.fixed_audit_subsidiary_name = known_org_name['_id']
 
   def is_same_org(self, name: str) -> bool:
-    ret = self.audit_subsidiary_name == name or self.fixed_audit_subsidiary_name == name
-    return ret
+    return name in [self.audit_subsidiary_name, self.fixed_audit_subsidiary_name]
 
 
 class ParsingContext(ParsingSimpleContext):
@@ -236,3 +237,58 @@ def find_most_relevant_paragraphs(section: TextMap,
         spans.append(span)
 
   return spans, paragraph_attention_vector
+
+
+def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> ContractValue or None:
+  subdoc: LegalDocument = doc[region[0] - VALUE_SIGN_MIN_TOKENS: region[1]]
+
+  _sign, _sign_span = find_value_sign(subdoc.tokens_map)
+
+  # ======================================
+  try:
+    results = ValueSpansFinder(subdoc.text)
+  except TypeError:
+    results = None
+  # ======================================
+
+  if results:
+    value_span = subdoc.tokens_map.token_indices_by_char_range(results.number_span)
+    currency_span = subdoc.tokens_map.token_indices_by_char_range(results.currency_span)
+
+    group = SemanticTag('sign_value_currency', value=None, span=region)
+
+    sign = SemanticTag(ContractTags.Sign.display_string, _sign, _sign_span, parent=group)
+    sign.offset(subdoc.start)
+
+    value_tag = SemanticTag(ContractTags.Value.display_string, results.value, value_span, parent=group)
+    value_tag.offset(subdoc.start)
+
+    currency = SemanticTag(ContractTags.Currency.display_string, results.currencly_name, currency_span,
+                           parent=group)
+    currency.offset(subdoc.start)
+
+    groupspan = [0, 0]
+    groupspan[0] = min(sign.span[0], value_tag.span[0], currency.span[0], group.span[0])
+    groupspan[1] = max(sign.span[1], value_tag.span[1], currency.span[1], group.span[1])
+    group.span = groupspan
+
+    # TODO: return ContractPrice
+    return ContractValue(sign, value_tag, currency, group)
+  else:
+    return None
+
+
+def find_value_sign(txt: TextMap) -> (int, (int, int)):
+  a = next(txt.finditer(_re_greather_then_1), None)  # не менее, не превышающую
+  if a:
+    return +1, a
+
+  a = next(txt.finditer(_re_less_then), None)  # менее
+  if a:
+    return -1, a
+  else:
+    a = next(txt.finditer(_re_greather_then), None)  # более
+    if a:
+      return +1, a
+
+  return 0, None
