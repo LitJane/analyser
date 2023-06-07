@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # coding=utf-8
 
-import json
 import logging
 import os
 import pathlib
@@ -15,23 +14,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from bson import json_util
 from packaging import version
 from pandas import DataFrame
 from pymongo import ASCENDING
-from sklearn.metrics import classification_report
 from tensorflow.keras import Model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 from analyser.documents import TextMap
-from analyser.finalizer import get_doc_by_id
 from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
 from analyser.hyperparams import work_dir as default_work_dir
 from analyser.legal_docs import embedd_tokens
 from analyser.persistence import DbJsonDoc
 from analyser.structures import ContractSubject
-from colab_support.renderer import plot_cm
 from integration.db import get_mongodb_connection
 from tf_support.embedder_elmo import ElmoEmbedder
 from tf_support.super_contract_model import get_semantic_map_new, make_att_model, losses, metrics
@@ -262,12 +257,6 @@ class UberModelTrainsetManager:
     img_path = os.path.join(self.reports_dir, 'contracts-subjects-dist.png')
     plt.savefig(img_path, bbox_inches='tight')
 
-  def export_docs_to_json(self):
-    self.stats: DataFrame = self.load_contract_trainset_meta()
-
-    docs_ids = [i["_id"] for i in self.get_updated_contracts()]  # Cursor, not list
-    export_updated_contracts_to_json(docs_ids, self.work_dir)
-
   def _dp_fn(self, doc_id, suffix):
     return os.path.join(self.work_dir, 'datasets', f'{doc_id}-datapoint-{suffix}.npy')
 
@@ -297,90 +286,6 @@ class UberModelTrainsetManager:
     return (emb, tok_f), (sm, subj), (sample_weight, subject_weight)
 
 
-def export_updated_contracts_to_json(document_ids, work_dir):
-  arr = {}
-  n = 0
-  for k, doc_id in enumerate(document_ids):
-    d = get_doc_by_id(doc_id)
-
-    if 'auditId' not in d:
-      logger.warning(f'error: doc {d["_id"]} is not linked to any audit')
-
-    arr[str(d['_id'])] = d
-
-    logger.debug(f"exporting JSON {k} {d['_id']}")
-    n = k
-
-  with open(os.path.join(work_dir, 'contracts_mongo.json'), 'w', encoding='utf-8') as outfile:
-    json.dump(arr, outfile, indent=2, ensure_ascii=False, default=json_util.default)
-
-  logger.info(f'EXPORTED {n} docs')
-
-
 def onehots2labels(preds):
   _x = np.argmax(preds, axis=-1)
   return [ContractSubject(k).name for k in _x]
-
-
-def plot_subject_confusion_matrix(reports_path, model, steps=12, generator=None):
-  all_predictions = []
-  all_originals = []
-
-  for _ in range(steps):
-    x, y, _ = next(generator)
-
-    orig_test_labels = onehots2labels(y[1])
-
-    _preds = onehots2labels(model.predict(x)[1])
-
-    all_predictions += _preds
-    all_originals += orig_test_labels
-
-  plot_cm(all_originals, all_predictions)
-
-  img_path = os.path.join(reports_path, f'subjects-confusion-matrix-{model.name}.png')
-  plt.savefig(img_path, bbox_inches='tight')
-
-  report = classification_report(all_originals, all_predictions, digits=3)
-
-  print(report)
-  with open(os.path.join(reports_path, f'subjects-classification_report-{model.name}.txt'), "w") as text_file:
-    text_file.write(report)
-
-
-def plot_compare_models(ctx, models: [str], mmetrics, image_save_path):
-  _metrics = [m for m in mmetrics if not m.startswith('val_')]
-
-  for _, m in enumerate(models):
-
-    data: pd.DataFrame = ctx.get_log(m)
-
-    if data is not None:
-      data.set_index('epoch')
-
-      for metric in _metrics:
-        plt.figure(figsize=(16, 6))
-        plt.grid()
-        plt.title(f'{metric}')
-        for metric_variant in ['', 'val_']:
-          key = metric_variant + metric
-          if key in data:
-
-            x = data['epoch'][-100:]
-            y = data[key][-100:]
-
-            c = 'red'  # plt.cm.jet_r(i * colorstep)
-            if metric_variant == '':
-              c = 'blue'
-            plt.plot(x, y, label=f'{key}', alpha=0.2, color=c)
-
-            y = y.rolling(4, win_type='gaussian').mean(std=4)
-            plt.plot(x, y, label=f'{key} SMOOTH', color=c)
-
-            plt.legend(loc='upper right')
-
-        img_path = os.path.join(image_save_path, f'{m}-{metric}.png')
-        plt.savefig(img_path, bbox_inches='tight')
-
-    else:
-      logger.error('cannot plot')
