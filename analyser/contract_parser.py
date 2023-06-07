@@ -1,5 +1,4 @@
 import os
-from enum import Enum
 
 import pandas as pd
 from overrides import overrides
@@ -16,7 +15,6 @@ from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
 from analyser.parsing import ParsingContext, AuditContext, find_value_sign
-from analyser.patterns import AV_SOFT, AV_PREFIX
 from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import to_float, span_len
@@ -203,11 +201,6 @@ def max_value(vals: [ContractValue]) -> ContractValue or None:
   return max(vals, key=lambda a: a.value.value)
 
 
-def _sub_attention_names(subj: Enum):
-  a = f'x_{subj}'
-  b = AV_PREFIX + f'x_{subj}'
-  c = AV_SOFT + a
-  return a, b, c
 
 
 def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,

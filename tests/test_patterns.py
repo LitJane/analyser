@@ -16,7 +16,6 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     self.assertTrue(np.allclose(m, np.array([[3, mask, mask], [mask, 3, 5]])))
 
   def test_exclusive_find(self):
-    point1 = [1, 3]
     point2 = [1, 7]
     point3 = [1, 6]
 
@@ -26,30 +25,11 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     fp2 = FuzzyPattern(None)
     fp2.set_embeddings(np.array([point3]))
 
-    cp = ExclusivePattern()
-    cp.add_pattern(fp1)
-    cp.add_pattern(fp2)
-
-    text_emb = np.array([point1, point2, point3, point3, point1])
-    distances_per_pattern, ranges, winning_patterns = cp.calc_exclusive_distances(text_emb)
-
-    print("distances_per_pattern")
-    print(distances_per_pattern[0])
-    print(distances_per_pattern[1])
-
-    print("winning_patterns")
-    print(winning_patterns)
-
-    print("ranges")
-    print(ranges)
-
   def test_eval_distances(self):
     point1 = [1, 3]
     point2 = [1, 7]
 
     embedding_point = [1, 6]
-
-    # fp1 = FuzzyPattern(np.array([[point3], [point2]]))
 
     fp1 = FuzzyPattern(None)
     fp1.set_embeddings(np.array([embedding_point]))
@@ -62,8 +42,6 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     self.assertEqual(len(text_emb), len(sums))
 
     line0 = sums
-    # print(line0)
-    # print(sums[:,1])
 
     self.assertAlmostEqual(line0[2], 0)
 
@@ -77,8 +55,6 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
 
     embedding_point = [1, 6]
     embedding_point2 = [1, 6.01]
-
-    # fp1 = FuzzyPattern(np.array([[point3], [point2]]))
 
     pattern = FuzzyPattern(None)
     pattern.set_embeddings(np.array([embedding_point, embedding_point2]))
@@ -107,8 +83,6 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     embedding_point = [1, 6]
     embedding_point2 = [1, 6.01]
 
-    # fp1 = FuzzyPattern(np.array([[point3], [point2]]))
-
     pattern = FuzzyPattern(None, _name='test pattern of len 2')
     pattern.set_embeddings(np.array([embedding_point, embedding_point2, embedding_point2, embedding_point2]))
 
@@ -117,17 +91,6 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     distances = pattern._eval_distances(text_emb)
     # ----------------
     print('sums=', distances)
-    # print ('sums.shape=', distances.shape, 'len of shape=', len(distances.shape))
-    # self.assertEqual(1, len(distances.shape))
-    # self.assertEqual(len(text_emb), len(distances))
-    #
-    # self.assertAlmostEqual(distances[2], 0)
-    #
-    # self.assertGreater(distances[0], distances[1])
-    # self.assertGreater(distances[1], distances[2])
-    # self.assertGreater(distances[0], distances[2])
-    #
-    # self.assertEqual(2, np.argmin(distances))
 
   def test_etimate_confidence(self):
     from analyser.ml_tools import estimate_confidence

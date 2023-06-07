@@ -5,18 +5,13 @@
 import logging
 import os
 import pathlib
-import random
 import warnings
-from datetime import datetime
 
 import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from packaging import version
 from pandas import DataFrame
-from pymongo import ASCENDING
 from tensorflow.keras import Model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
@@ -26,8 +21,6 @@ from analyser.hyperparams import models_path
 from analyser.hyperparams import work_dir as default_work_dir
 from analyser.legal_docs import embedd_tokens
 from analyser.persistence import DbJsonDoc
-from analyser.structures import ContractSubject
-from integration.db import get_mongodb_connection
 from tf_support.embedder_elmo import ElmoEmbedder
 from tf_support.super_contract_model import get_semantic_map_new, make_att_model, losses, metrics
 from tf_support.tools import KerasTrainingContext
@@ -99,46 +92,6 @@ class UberModelTrainsetManager:
     pathlib.Path(self.reports_dir).mkdir(parents=True, exist_ok=True)
 
     self.stats: DataFrame = self.load_contract_trainset_meta()
-
-  def get_updated_contracts(self):
-    self.lastdate = datetime(1900, 1, 1)
-    if len(self.stats) > 0:
-      self.lastdate = self.stats[["user_correction_date", 'analyze_date']].max().max()
-    logger.info(f'latest export_date: [{self.lastdate}]')
-
-    logger.debug('obtaining DB connection...')
-    db = get_mongodb_connection()
-    documents_collection = db['documents']
-
-    # TODO: filter by version
-    query = {
-      '$and': [
-        {"parse.documentType": "CONTRACT"},
-        {"state": 15},
-        {'$or': [
-          {"analysis.attributes": {"$ne": None}},
-          {"user.attributes": {"$ne": None}}
-        ]},
-
-        {'$or': [
-          {'analysis.analyze_timestamp': {'$gt': self.lastdate}},
-          {'user.updateDate': {'$gt': self.lastdate}}
-        ]}
-      ]
-    }
-
-    logger.debug(f'running DB query {query}')
-    # TODO: sorting fails in MONGO
-    sorting = [('analysis.analyze_timestamp', ASCENDING),
-               ('user.updateDate', ASCENDING)]
-
-    res = documents_collection.find(filter=query, sort=sorting, projection={'_id': True})
-
-    res.limit(600)
-
-    logger.info('running DB query: DONE')
-
-    return res
 
   @staticmethod
   def _remove_obsolete_datapoints(df: DataFrame):
@@ -245,26 +198,8 @@ class UberModelTrainsetManager:
 
     return model, ctx
 
-  def describe_trainset(self):
-    # TODO: report
-    self.stats: DataFrame = self.load_contract_trainset_meta()
-    subj_count = self.stats['subject'].value_counts()
-
-    # plot subj distribution---------------------
-    sns.barplot(subj_count.values, subj_count.index)
-    plt.title('Frequency Distribution of subjects')
-    plt.xlabel('Number of Occurrences')
-    img_path = os.path.join(self.reports_dir, 'contracts-subjects-dist.png')
-    plt.savefig(img_path, bbox_inches='tight')
-
   def _dp_fn(self, doc_id, suffix):
     return os.path.join(self.work_dir, 'datasets', f'{doc_id}-datapoint-{suffix}.npy')
-
-  def augment_datapoint(self, dp):
-    maxlen = 128 * random.choice([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
-    cutoff = 16 * random.choice([0, 0, 0, 1, 1, 2, 3])
-
-    return self.trim_maxlen(dp, cutoff, maxlen)
 
   @staticmethod
   def trim_maxlen(dp, start_from, maxlen):
@@ -284,8 +219,3 @@ class UberModelTrainsetManager:
     sm = _padded[2]
 
     return (emb, tok_f), (sm, subj), (sample_weight, subject_weight)
-
-
-def onehots2labels(preds):
-  _x = np.argmax(preds, axis=-1)
-  return [ContractSubject(k).name for k in _x]

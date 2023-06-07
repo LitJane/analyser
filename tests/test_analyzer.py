@@ -106,7 +106,7 @@ class AnalyzerTestCase(unittest.TestCase):
     logger.info(f'......pre-processing {jdoc._id}')
     ctx = AuditContext()
     processor.preprocess(jdoc, context=ctx)
-    doc = processor.process(jdoc, audit, ctx)
+    _ = processor.process(jdoc, audit, ctx)
 
 
 if __name__ == '__main__':
