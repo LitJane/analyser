@@ -57,6 +57,7 @@ def sigmoid_focal_crossentropy(
 class ThresholdLayer(layers.Layer):
   def __init__(self, **kwargs):
     super(ThresholdLayer, self).__init__(**kwargs)
+    self.kernel = None
 
   def build(self, input_shape):
     self.kernel = self.add_weight(name="threshold", shape=(1,), initializer="uniform",
@@ -83,6 +84,8 @@ class PositionEmbedding(layers.Layer):
       raise ValueError(
         "`sequence_length` must be an Integer, received `None`."
       )
+
+    self.position_embeddings = None
     self.sequence_length = int(sequence_length)
     self.initializer = keras.initializers.get(initializer)
 
