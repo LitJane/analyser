@@ -3,4 +3,4 @@
 # coding=utf-8
 
 # kept for pickes compatibility only
-# TODO: remvove
+# TODO: remove
