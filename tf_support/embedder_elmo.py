@@ -38,9 +38,9 @@ class ElmoEmbedderWrapper(AbstractEmbedder):
 
 class ElmoEmbedderImpl(AbstractEmbedder):
 
+  #TODO: move this to external config
   def __init__(self, module_url: str = 'https://storage.googleapis.com/az-nlp/elmo_ru-news_wmt11-16_1.5M_steps.tar.gz'):
     self.module_url = module_url
-    # self.elmo = None
     self.session = None
 
   def _build_session_and_graph(self):

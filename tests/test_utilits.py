@@ -13,7 +13,6 @@ from analyser.text_tools import Tokens
 def load_json_sample(fn: str) -> dict:
   pth = os.path.dirname(__file__)
   with open(os.path.join(pth, fn), 'rb') as handle:
-    # jsondata = json.loads(json_string, object_hook=json_util.object_hook)
     data = json.load(handle, object_hook=json_util.object_hook)
 
   return data
@@ -40,13 +39,9 @@ class FakeEmbedder(AbstractEmbedder):
     return ret
 
   def embedd_tokenized_text(self, tokenized_sentences_list, lens):
-    # def get_embedding_tensor(self, tokenized_sentences_list):
     tensor = []
     for sent in tokenized_sentences_list:
-      sentense_emb = []
-      for token in sent:
-        token_emb = self.default_point
-        sentense_emb.append(token_emb)
+      sentense_emb = [self.default_point] * len(sent)
       tensor.append(sentense_emb)
 
     return np.array(tensor)

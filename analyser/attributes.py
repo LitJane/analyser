@@ -121,7 +121,6 @@ def has_non_blanc_attr(dest, field_name: str) -> bool:
 def copy_leaf_tag(field_name: str, src, dest, attr_name=None):
   if has_non_blanc_attr(dest, field_name):
     v = getattr(dest, field_name)
-    # setattr(v, "warning", "ambiguity: multiple values, see 'alternatives' field")
     migration_logger.warning(f"{field_name} has multiple values")
 
     alternatives = []

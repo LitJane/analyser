@@ -1,10 +1,7 @@
 import random
 
 import numpy as np
-import pandas as pd
 from pandas import DataFrame
-
-from analyser.structures import ContractSubject
 
 VALIDATION_SET_PROPORTION = 0.25
 
@@ -65,75 +62,3 @@ class TrainsetBalancer:
     random.shuffle(train_indices)
 
     return train_indices, test_indices
-
-
-class SubjectTrainsetManager:
-  EMB_NOISE_AMOUNT = 0.05
-  OUTLIERS_PERCENT = 0.05
-  NOISY_SAMPLES_AMOUNT = 0.5
-
-  def __init__(self, trainset_description_csv: str):
-    self.outliers_percent = SubjectTrainsetManager.OUTLIERS_PERCENT
-
-    '''
-    percentange of samples to add noise
-    '''
-    self.noisy_samples_amount = SubjectTrainsetManager.NOISY_SAMPLES_AMOUNT
-
-    '''
-    amount of noise
-    '''
-    self.noise_amount = SubjectTrainsetManager.EMB_NOISE_AMOUNT
-
-    self.embeddings_cache = {}
-
-    self.csv_path = trainset_description_csv
-
-    # -------
-    self.trainset_rows: DataFrame = self._read_trainset_meta()
-    self.remove_duplicate_docs()
-
-    self.train_indices, self.test_indices = self.balance_trainset(self.trainset_rows)
-    self.subject_name_1hot_map = self._encode_1_hot()
-
-    self.number_of_classes = len(list(self.subject_name_1hot_map.values())[0])
-
-  @staticmethod
-  def balance_trainset(trainset_dataframe: DataFrame):
-    tb = TrainsetBalancer()
-    return tb.get_indices_split(trainset_dataframe, 'subject')
-
-  def _read_trainset_meta(self) -> DataFrame:
-    _trainset_meta = pd.read_csv(self.csv_path, encoding='utf-8')
-    self._trainset_meta = _trainset_meta
-    trainset_rows: DataFrame = _trainset_meta[_trainset_meta['valid']]
-
-    self.subj_count = trainset_rows['subject'].value_counts()
-
-    print(trainset_rows.info())
-    return trainset_rows
-
-  @staticmethod
-  def _encode_1_hot():
-    return ContractSubject.encode_1_hot()
-
-  def remove_duplicate_docs(self, len_threshold=5):
-    print(f'sorting by len, {len(self.trainset_rows)}')
-    sorted_by_len = self.trainset_rows.sort_values(['confidence', 'len'])
-
-    duplicates = []
-    last_row = sorted_by_len.iloc[0]
-    for i in range(1, len(sorted_by_len)):
-      row = sorted_by_len.iloc[i]
-      deltalen = abs(row.len - last_row.len)
-      if deltalen < len_threshold:
-        duplicates.append(row._id)
-
-      last_row = row
-
-    cleaned_up = self.trainset_rows[~self.trainset_rows['_id'].isin(duplicates)]
-    cleaned_up = cleaned_up.sort_values(['_id'])
-    self.trainset_rows = cleaned_up
-
-    print(f'new len, {len(self.trainset_rows)}')
-    return duplicates

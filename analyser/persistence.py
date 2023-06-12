@@ -45,7 +45,7 @@ class DbJsonDoc:
       return self.analysis['version']
 
   def isPreprocessed(self):
-    return self.state == DocumentState.Preprocessed.value or self.state == DocumentState.Error.value
+    return self.state in [DocumentState.Preprocessed.value, DocumentState.Error.value]
 
   def isNew(self):
     return self.state == DocumentState.New.value or self.state is None or self.state == DocumentState.Unknown.value
