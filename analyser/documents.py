@@ -323,7 +323,7 @@ class GTokenizer:
 class DefaultGTokenizer(GTokenizer):
 
   def __init__(self):
-    pass #nothing in parent
+    pass  # nothing in parent
 
   def span_tokenize(self, text):
     start_from = 0
@@ -359,7 +359,7 @@ class DefaultGTokenizer(GTokenizer):
       if text[i] == '\n':
         result.append([i, i + 1])
 
-    result += [s for s in self.span_tokenize(text)]
+    result += list(self.span_tokenize(text))
 
     result.sort(key=lambda x: x[0])
     return result

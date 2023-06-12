@@ -30,8 +30,8 @@ number_key = SemanticTag.number_key
 
 class CharterDocument(LegalDocumentExt):
 
-  def __init__(self, doc: LegalDocument = None):
-    super().__init__(doc)
+  def __init__(self, doc: LegalDocument = None, id=None):
+    super().__init__(doc, id=id)
     if doc is not None:
       self.__dict__.update(doc.__dict__)
     self.attributes_tree = CharterSchema()

@@ -219,8 +219,6 @@ def momentum_t(x: FixedVector, half_decay: int = 10, left=False) -> np.ndarray:
 
 
 def momentum_p(x, half_decay: int = 10, left=False) -> np.ndarray:
-  # assert half_decay > 0
-
   decay = math.pow(2, -1 / half_decay)
   innertia = np.zeros(len(x))
   m = 0
@@ -312,8 +310,6 @@ def rectifyed_sum(vectors: FixedVectors, relu_th: float = 0.0) -> np.ndarray:
       _sum = np.zeros(len(x))
     _sum += relu(x, relu_th)
 
-  # assert _sum is not None
-
   return _sum
 
 
@@ -367,7 +363,7 @@ def subtract_probability(a: FixedVector, b: FixedVector) -> FixedVector:
 class TokensWithAttention:
   def __init__(self, tokens: Tokens, attention: FixedVector):
     warnings.warn("TokensWithAttention is deprecated, use ...", DeprecationWarning)
-    # assert len(tokens) == len(attention)
+
     self.tokens = tokens
     self.attention = attention
 
@@ -586,14 +582,6 @@ def combined_attention_vectors(vectors_dict, vector_names):
 sum_probabilities_by_name = combined_attention_vectors
 
 
-# def find_non_zero_spans(tokens_map, attention_vector_relu):
-#   nonzeros = np.argwhere(attention_vector_relu > 0.001)[:, 0]
-#   return np.unique([tokens_map.sentence_at_index(i) for i in nonzeros], axis=0)
-#
-#
-# find_sentences_with_attention = find_non_zero_spans
-
-
 def find_first_gt(indx: int, indices) -> int or None:
   gts = [i for i in indices if i > indx]
   if gts:
@@ -615,12 +603,6 @@ def remove_colliding_spans(spans, eps=0):
   ret.append(spans[-1])
   return np.array(ret)
 
-
-# def merge_colliding_spans(spans: Spans, eps=0) -> Spans:
-#
-#   sorted_spans = sorted(spans, lambda x:x[0])
-
-# def span_intersect
 
 def merge_colliding_spans(spans: Spans, eps=0) -> Spans:
   sorted_spans = sorted(spans, key=lambda x: x[0])
@@ -647,21 +629,8 @@ def merge_colliding_spans(spans: Spans, eps=0) -> Spans:
   return np.array(ret)
 
 
-#
-# def per_token_similarity_cosine(text_emb, pattern_emb):
-#   a_distances = np.zeros(len(text_emb))
-#   for p in pattern_emb:
-#     t_distances = 1 - dist_cosine_to_point(text_emb, p)
-#     a_distances = sum_probabilities([t_distances, a_distances])
-#   return a_distances
-
-
 def calc_distances_to_pattern(sentences_embeddings_: FixedVectors, pattern_embedding: FixedVector,
                               dist_func=distance.cosine) -> FixedVector:
-  # assert len(pattern_embedding.shape) == 1
-  # assert len(sentences_embeddings_.shape) == 2
-  # assert sentences_embeddings_.shape[1] == pattern_embedding.shape[0]
-
   _distances = np.ones(len(sentences_embeddings_))
   for word_index in range(0, len(sentences_embeddings_)):
     _distances[word_index] = max(0, min(1, 1.0 - dist_func(sentences_embeddings_[word_index], pattern_embedding)))
@@ -673,9 +642,8 @@ def calc_distances_per_pattern(sentences_embeddings_: [], patterns_named_embeddi
   # TODO: see https://keras.io/layers/merge/#dot
 
   distances_per_pattern_dict = pd.DataFrame()
-  # print(distances_per_pattern_dict)
+
   for i, col in patterns_named_embeddings.iteritems():
-    # print(col.name, col.values)
     _distances = calc_distances_to_pattern(sentences_embeddings_, col.values)
     distances_per_pattern_dict[col.name] = _distances
 
@@ -686,7 +654,7 @@ def calc_distances_per_pattern_dict(sentences_embeddings_: [], patterns_names: [
   # TODO: see https://keras.io/layers/merge/#dot
   # TODO: use pandas dataframes
   warnings.warn("use calc_distances_per_pattern", DeprecationWarning)
-  # assert len(patterns_names) == len(patterns_embeddings)
+
   distances_per_pattern_dict = {}
   for i in range(len(patterns_names)):
     _distances = calc_distances_to_pattern(sentences_embeddings_, patterns_embeddings[i])
@@ -709,7 +677,6 @@ def spans_between_non_zero_attention(attention_v: FixedVector):
     ## add last segment
     q_sent_spans.append(slice(q_sent_indices[-1], None))
 
-  # print(q_sent_spans)
   return q_sent_spans
 
 
@@ -753,10 +720,9 @@ def _find_max_xy_in_matrix(vals):
 def attribute_patternmatch_to_index(header_to_pattern_distances_: pd.DataFrame,
                                     threshold=HyperParameters.header_topic_min_confidence):
   vals = header_to_pattern_distances_.values
-  # print(header_to_pattern_distances_)
-  headers_n = vals.shape[0]
-  # print('headers_n', headers_n)
 
+  headers_n = vals.shape[0]
+   
   pairs = []
   for __header_index in range(headers_n):
 

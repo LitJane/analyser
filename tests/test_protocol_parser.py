@@ -31,11 +31,9 @@ class TestProtocolParser(unittest.TestCase):
     jdoc = DbJsonDoc(json_doc)
     legal_doc = jdoc.asLegalDoc()
 
-    # print (doc)
-
     pp = Runner.get_instance().protocol_parser
-    # pp.find_org_date_number(legal_doc, AuditContext())
-    legal_doc:ProtocolDocument = pp.find_attributes(legal_doc, AuditContext())
+
+    legal_doc: ProtocolDocument = pp.find_attributes(legal_doc, AuditContext())
 
     orgtags = legal_doc.org_tags
     for t in orgtags:
@@ -122,7 +120,6 @@ class TestProtocolParser(unittest.TestCase):
     doc = self.get_doc('Протокол_СД_ 3.docx.pickle')
     x = protocol_votes_re.search(doc.text)
 
-    # for f in x:
     print(doc.text[x.span()[0]:x.span()[1]])
 
   def test_find_protocol_votes_re(self):

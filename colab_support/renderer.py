@@ -11,7 +11,6 @@ from sklearn.metrics import confusion_matrix
 
 from analyser.legal_docs import LegalDocument
 from analyser.ml_tools import ProbableValue
-from analyser.patterns import AV_PREFIX, AV_SOFT
 from analyser.structures import ContractSubject
 from analyser.structures import OrgStructuralLevel
 from analyser.text_tools import Tokens
@@ -145,25 +144,25 @@ class SilentRenderer(AbstractRenderer):
   pass
 
 
-v_color_map = {
-  'deal_value_attention_vector': (1, 0.0, 0.5),
-  'soft$.$at_sum__': (0.9, 0.5, 0.0),
-
-  '$at_sum__': (0.9, 0, 0.1),
-  'soft$.$at_d_order_': (0.0, 0.3, 0.9),
-
-  f'{AV_PREFIX}margin_value': (1, 0.0, 0.5),
-  f'{AV_SOFT}{AV_PREFIX}margin_value': (1, 0.0, 0.5),
-
-  f'{AV_PREFIX}x_{ContractSubject.Charity}': (0.0, 0.9, 0.3),
-  f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.Charity}': (0.0, 1.0, 0.0),
-
-  f'{AV_PREFIX}x_{ContractSubject.Lawsuit}': (0.8, 0, 0.7),
-  f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.Lawsuit}': (0.9, 0, 0.9),
-
-  f'{AV_PREFIX}x_{ContractSubject.RealEstate}': (0.2, 0.2, 1),
-  f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.RealEstate}': (0.2, 0.2, 1),
-}
+# v_color_map = {
+#   'deal_value_attention_vector': (1, 0.0, 0.5),
+#   'soft$.$at_sum__': (0.9, 0.5, 0.0),
+#
+#   '$at_sum__': (0.9, 0, 0.1),
+#   'soft$.$at_d_order_': (0.0, 0.3, 0.9),
+#
+#   f'{AV_PREFIX}margin_value': (1, 0.0, 0.5),
+#   f'{AV_SOFT}{AV_PREFIX}margin_value': (1, 0.0, 0.5),
+#
+#   f'{AV_PREFIX}x_{ContractSubject.Charity}': (0.0, 0.9, 0.3),
+#   f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.Charity}': (0.0, 1.0, 0.0),
+#
+#   f'{AV_PREFIX}x_{ContractSubject.Lawsuit}': (0.8, 0, 0.7),
+#   f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.Lawsuit}': (0.9, 0, 0.9),
+#
+#   f'{AV_PREFIX}x_{ContractSubject.RealEstate}': (0.2, 0.2, 1),
+#   f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.RealEstate}': (0.2, 0.2, 1),
+# }
 
 colors_by_contract_subject = {
   ContractSubject.RealEstate: (0.2, 0.2, 1),
@@ -171,8 +170,9 @@ colors_by_contract_subject = {
   ContractSubject.Charity: (0.0, 0.9, 0.3),
 }
 
-for k in colors_by_contract_subject:
-  v_color_map[f'{AV_SOFT}{AV_PREFIX}x_{k}'] = colors_by_contract_subject[k]
+
+# for k in colors_by_contract_subject:
+#   v_color_map[f'{AV_SOFT}{AV_PREFIX}x_{k}'] = colors_by_contract_subject[k]
 
 
 class HtmlRenderer(AbstractRenderer):
@@ -209,16 +209,6 @@ class HtmlRenderer(AbstractRenderer):
         html += "¶<br>"
 
     return html
-
-  def map_attention_vectors_to_colors(self, search_result):
-    attention_vectors = {
-      search_result.attention_vector_name: search_result.get_attention(),
-    }
-    for subj in known_subjects:
-      attention_vectors[AV_PREFIX + f'x_{subj}'] = search_result.get_attention(AV_PREFIX + f'x_{subj}')
-      attention_vectors[AV_SOFT + AV_PREFIX + f'x_{subj}'] = search_result.get_attention(
-        AV_SOFT + AV_PREFIX + f'x_{subj}')
-    return attention_vectors
 
   def sign_to_text(self, sign: int):
     if sign < 0:
