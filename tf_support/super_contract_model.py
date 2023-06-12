@@ -4,7 +4,6 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
 from pandas import DataFrame
 from tensorflow import keras
 from tensorflow.keras import Model
@@ -16,7 +15,7 @@ from tensorflow.keras.layers import concatenate
 from analyser.headers_detector import TOKEN_FEATURES
 from analyser.hyperparams import work_dir
 from analyser.structures import ContractSubject
-from tf_support.addons import sigmoid_focal_crossentropy
+from tf_support.addons import sigmoid_focal_crossentropy, ThresholdLayer
 from tf_support.tools import KerasTrainingContext
 
 seq_labels_dn = ['date', 'number']
@@ -213,42 +212,6 @@ def uber_detection_model_005_1_1(name="uber_detection_model_005_1_1", ctx: Keras
   return _model
 
 
-def uber_detection_model_006(name, ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False):
-  warnings.warn("not in use, to be removed", DeprecationWarning)
-  input_text_emb = Input(shape=[None, EMB], dtype='float32', name="input_text_emb")
-  input_token_features = Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="input_token_features")
-
-  base_model_inputs = [input_text_emb, input_token_features]
-
-  _out = Dropout(0.45, name="drops")(input_text_emb)  # small_drops_of_poison
-  _out = Conv1D(filters=FEATURES * 5, kernel_size=(3), padding='same', activation=None)(_out)
-  _out = concatenate([_out, input_token_features], axis=-1)
-  _out = Conv1D(filters=FEATURES * 5, kernel_size=(4),
-                padding='same', activation='relu',
-                name='embedding_reduced')(_out)
-
-  # ---------------------
-
-  _out_d = Dropout(0.15, name='alzheimer')(_out)  # small_drops_of_poison
-  _out = Bidirectional(LSTM(FEATURES * 2, return_sequences=True, name='paranoia'), name='self_reflection_1')(_out_d)
-  _out = Dropout(0.1, name='alzheimer_11')(_out)
-  _out = LSTM(FEATURES, return_sequences=True, activation='tanh', name='O1_tagging')(_out)
-
-  # OUT 2: subject detection
-  pool_size = 2
-  emotions = MaxPooling1D(pool_size=pool_size, name='emotions')(_out_d)
-  insights = MaxPooling1D(pool_size=pool_size, name='insights')(_out)
-  _out2 = concatenate([emotions, insights], axis=-1, name='bipolar_disorder')
-  _out2 = Dropout(0.3, name='alzheimer_3')(_out2)
-  _out2 = Bidirectional(LSTM(16, return_sequences=False, name='narcissisism'), name='self_reflection_2')(_out2)
-  _out2 = Dropout(0.1, name='alzheimer_1')(_out2)
-
-  _out2 = Dense(CLASSES, activation='softmax', name='O2_subject')(_out2)
-
-  _model = Model(inputs=base_model_inputs, outputs=[_out, _out2], name=name)
-  _model.compile(loss=losses, optimizer='Nadam', metrics=metrics)
-  return _model
-
 
 @dataclass
 class Config:
@@ -297,183 +260,10 @@ def bert_module(query, key, value, i, height, key_dim_base=config.EMBED_DIM):
   return sequence_output
 
 
-class ThresholdLayer(layers.Layer):
-  def __init__(self, **kwargs):
-    super(ThresholdLayer, self).__init__(**kwargs)
-
-  def build(self, input_shape):
-    self.kernel = self.add_weight(name="threshold", shape=(1,), initializer="uniform",
-                                  trainable=True)
-    super(ThresholdLayer, self).build(input_shape)
-
-  def call(self, x, *args, **kwargs):
-    return keras.backend.sigmoid(100 * (x - self.kernel))
-
-  def compute_output_shape(self, input_shape):
-    return input_shape
 
 
-SEQUENCE_AXIS = -2
 
 
-class PositionEmbedding(layers.Layer):
-
-  def __init__(
-          self,
-          sequence_length,
-          initializer="glorot_uniform",
-          **kwargs,
-  ):
-    super().__init__(**kwargs)
-    if sequence_length is None:
-      raise ValueError(
-        "`sequence_length` must be an Integer, received `None`."
-      )
-    self.sequence_length = int(sequence_length)
-    self.initializer = keras.initializers.get(initializer)
-
-  def get_config(self):
-    _config = super().get_config()
-    _config.update(
-      {
-        "sequence_length": self.sequence_length,
-        "initializer": keras.initializers.serialize(self.initializer),
-      }
-    )
-    return _config
-
-  def build(self, input_shape):
-    feature_size = input_shape[-1]
-    self.position_embeddings = self.add_weight(
-      "embeddings",
-      shape=[self.sequence_length, feature_size],
-      initializer=self.initializer,
-      trainable=True,
-    )
-
-    super().build(input_shape)
-
-  def call(self, inputs, *args, **kwargs):
-    if isinstance(inputs, tf.RaggedTensor):
-      bounding_shape = inputs.bounding_shape()
-      position_embeddings = self._trim_and_broadcast_position_embeddings(
-        bounding_shape,
-      )
-      # then apply row lengths to recreate the same ragged shape as inputs
-      return tf.RaggedTensor.from_tensor(
-        position_embeddings,
-        inputs.nested_row_lengths(),
-      )
-    else:
-      return self._trim_and_broadcast_position_embeddings(
-        tf.shape(inputs),
-      )
-
-  def _trim_and_broadcast_position_embeddings(self, shape):
-    input_length = shape[SEQUENCE_AXIS]
-    # trim to match the length of the input sequence, which might be less
-    # than the sequence_length of the layer.
-    position_embeddings = self.position_embeddings[:input_length, :]
-    # then broadcast to add the missing dimensions to match "shape"
-    return tf.broadcast_to(position_embeddings, shape)
-
-
-class SinePositionEncoding(layers.Layer):
-
-  def __init__(
-          self,
-          max_wavelength=10000,
-          **kwargs,
-  ):
-    super().__init__(**kwargs)
-    self.max_wavelength = max_wavelength
-
-  def call(self, inputs, *args, **kwargs):
-    # TODO(jbischof): replace `hidden_size` with`hidden_dim` for consistency
-    # with other layers.
-    input_shape = tf.shape(inputs)
-    # length of sequence is the second last dimension of the inputs
-    seq_length = input_shape[-2]
-    hidden_size = input_shape[-1]
-    position = tf.cast(tf.range(seq_length), self.compute_dtype)
-    min_freq = tf.cast(1 / self.max_wavelength, dtype=self.compute_dtype)
-    timescales = tf.pow(
-      min_freq,
-      tf.cast(2 * (tf.range(hidden_size) // 2), self.compute_dtype)
-      / tf.cast(hidden_size, self.compute_dtype),
-    )
-    angles = tf.expand_dims(position, 1) * tf.expand_dims(timescales, 0)
-    # even indices are sine, odd are cosine
-    cos_mask = tf.cast(tf.range(hidden_size) % 2, self.compute_dtype)
-    sin_mask = 1 - cos_mask
-    # embedding shape is [seq_length, hidden_size]
-    positional_encodings = (
-            tf.sin(angles) * sin_mask + tf.cos(angles) * cos_mask
-    )
-
-    return tf.broadcast_to(positional_encodings, input_shape)
-
-  def get_config(self):
-    _config = super().get_config()
-    _config.update(
-      {
-        "max_wavelength": self.max_wavelength,
-      }
-    )
-    return _config
-
-
-def make_att_model_02(name='make_att_model_02', ctx: KerasTrainingContext = DEFAULT_TRAIN_CTX, trained=False) -> Model:
-  warnings.warn("not in use, to be removed", DeprecationWarning)
-  # ---------------------
-  input_text_emb = layers.Input(shape=[None, EMB], dtype='float32', name="input_text_emb")
-  input_text_emb_n = layers.Dropout(0.15, name='alzheimer_001')(input_text_emb)
-  input_text_emb_n = layers.LayerNormalization(epsilon=1e-6, name="ln_1e")(input_text_emb_n)
-
-  token_features = layers.Input(shape=[None, TOKEN_FEATURES], dtype='float32', name="input_token_features")
-
-  token_features_n = layers.LayerNormalization(epsilon=1e-6, name="ln_1t")(token_features)
-
-  # reducing size of embedding
-  _out = layers.concatenate([input_text_emb_n, token_features_n], axis=-1)
-  _out = layers.Conv1D(filters=FEATURES * 4, kernel_size=(2), padding='same', activation=None)(_out)
-  _emb__len = FEATURES * 4
-  embedding_reduced = layers.Conv1D(filters=_emb__len, kernel_size=(4), padding='same', activation='relu',
-                                    name='embedding_reduced')(
-    _out)
-
-  _out = layers.BatchNormalization(name="norm_embedding_reduced")(embedding_reduced)
-
-  _pos_emb = SinePositionEncoding(name='sine_position')(_out)
-
-  _out = _pos_emb + _out
-  _out = layers.Dropout(0.15, name='alzheimer_002')(_out)
-
-  for i in range(config.NUM_LAYERS):
-    _out = bert_module(_out, _out, _out, i, height=_emb__len)
-
-  bert_out = _out
-  bert_out = layers.BatchNormalization(name="norm_bert_out")(bert_out)
-
-  if True:
-    # branch 1
-    _out = layers.Bidirectional(
-      layers.LSTM(FEATURES // 2, return_sequences=True, name='narcissisism1', activation='tanh'),
-      name='O1_tagging_tanh')(bert_out)
-    _out1 = ThresholdLayer(name='O1_tagging')(_out)
-
-  if True:
-    _out2 = layers.Bidirectional(layers.LSTM(32, return_sequences=False, name='narcissisism2'),
-                                 name='self_reflection_2')(bert_out)
-    _out2 = layers.Dropout(0.15, name='alzheimer_1')(_out2)
-
-    _out2 = layers.Dense(CLASSES, activation='softmax', name='O2_subject')(_out2)
-
-  base_model_inputs = [input_text_emb, token_features]
-  model = Model(inputs=base_model_inputs, outputs=[_out1, _out2], name=name)
-  model.compile(loss=losses, optimizer='Adam', metrics=metrics)
-
-  return model
 
 
 def make_att_model_03(name='make_att_model_03'):
