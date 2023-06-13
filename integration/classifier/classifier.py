@@ -1,3 +1,4 @@
+import pandas as pd
 from mlflow.pyfunc import PythonModel, PythonModelContext
 
 from integration.classifier.text_utils import cleanup_all
@@ -25,7 +26,7 @@ class PracticeClassifier(PythonModel):
 
   def predict(self, context: PythonModelContext, data: pd.DataFrame) -> pd.DataFrame:
     import tensorflow as tf
-    import pandas as pd
+
     print(f'{tf.__version__=}')
 
     input_strings = [cleanup_all(x) for x in data['text'].values]
