@@ -22,7 +22,7 @@ jsonschema==3.2.0
 zeep==4.2.1
 packaging==21.0
 sentence-transformers==2.0.0
-umap-learn==0.5.1
+umap-learn==0.5.3
 huggingface-hub==0.0.19
 fuzzywuzzy==0.18.0
 python-Levenshtein==0.20.8
