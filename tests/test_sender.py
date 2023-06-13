@@ -46,7 +46,6 @@ class ClassifierTestCase(unittest.TestCase):
 
   @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
   def test_get_sender_judicial_org_from_header(self):
-    # doc4classification, main_doc = get_doc4classification(audit)
     document = finalizer.get_doc_by_id(ObjectId("639c64de4b01c8adaa5a4f61"))
     document = document['parse']
     print(document)
@@ -62,5 +61,5 @@ class ClassifierTestCase(unittest.TestCase):
     classification_result = None
     classification_result = apply_judical_practice(classification_result, "sender_judicial_org")
     print(classification_result)
-    self.assertEquals("sender_judicial_org", classification_result[0]['sender_judicial_org'])
-    self.assertEquals("Практика судебной защиты", classification_result[0]['label'])
+    self.assertEqual("sender_judicial_org", classification_result[0]['sender_judicial_org'])
+    self.assertEqual("Практика судебной защиты", classification_result[0]['label'])

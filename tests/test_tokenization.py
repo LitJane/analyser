@@ -114,7 +114,6 @@ class TokenisationTestCase(unittest.TestCase):
   def test_word_tokenize_quotes(self):
     text = '"сл"'
     tokenizer = TreebankWordTokenizer()
-    # _spans = nltk.word_tokenize(text)
     _spans = tokenizer.tokenize(text)
 
     spans = [s for s in _spans]
@@ -149,8 +148,6 @@ class TokenisationTestCase(unittest.TestCase):
     tm3 = tm0.slice(slice(1, 3))
     self.assertEqual('мамаэтилен', tm3.text)
 
-    # //text_range(doc.tokens_map, [0, 10])
-
   def test_char_range(self):
     text = 'этилен мама ಶ್ರೀರಾಮ'
     tm = TextMap(text)
@@ -176,7 +173,7 @@ class TokenisationTestCase(unittest.TestCase):
     print(tm.map[0])
     print(tm.tokens[11])
     print(tm.map[11])
-    # print(f'[{doc.tokens_map.text}]')
+
     print(f'[{tm.text}]')
 
     print(len(tm))
@@ -263,7 +260,7 @@ class TokenisationTestCase(unittest.TestCase):
     self.assertEqual(0, tm.token_index_by_char(0))
 
     txt = ' ' * 20 + '''основании Устава, с одной стороны, и Фонд «Благо»'''
-    # tm = TextMap(txt)
+
     doc = LegalDocument(txt).parse()
     tm = doc.tokens_map
     print(tm.map[0])
@@ -334,7 +331,7 @@ class TokenisationTestCase(unittest.TestCase):
     text = 'этилен мама этилен'
     __doc = LegalDocument(text)
     __doc.parse()
-    # tm: TextMap = __doc.tokens_map
+
     subdoc = __doc.subdoc_slice(slice(0, 1))
     del __doc
 
@@ -386,8 +383,7 @@ class TokenisationTestCase(unittest.TestCase):
 
     tm = TextMap(text)  # tokenization
     ti = tm.token_indices_by_char_range(span)
-    # self.assertEqual(0, ti[0])
-    # self.assertEqual(1, ti[1])
+
     actual = tm.text_range(ti)
     self.assertEqual(expected, actual)
 
@@ -438,7 +434,7 @@ class TokenisationTestCase(unittest.TestCase):
     text = '1 2 3\nмама\nಶ್ರೀರಾಮ'
     tm = TextMap(text)
 
-    spans = [s for s in tm.split_spans('\n', add_delimiter=False)]
+    spans = list(tm.split_spans('\n', add_delimiter=False))
     for k in spans:
       print(tm.text_range(k))
 
@@ -531,7 +527,6 @@ class TokenisationTestCase(unittest.TestCase):
     for _ in range(N):
       tm1 += tm2
 
-    # //tm1.parse()
     self.assertEqual(expected_tokens, len(tm1.tokens))
 
   def test_concat_docs_2(self):
@@ -545,7 +540,7 @@ class TokenisationTestCase(unittest.TestCase):
       tm1 += tm2
 
     print(tm1.tokens_map_norm._full_text)
-    # //tm1.parse()
+
     self.assertEqual(expected_tokens, len(tm1.tokens_cc))
     self.assertEqual('more words', tm1.tokens_map_norm.text_range((3, 5)))
 

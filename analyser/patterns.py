@@ -1,28 +1,22 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # coding=utf-8
-import random
 import warnings
 
 import numpy as np
 
 from analyser.documents import CaseNormalizer
-from analyser.structures import OrgStructuralLevel, ContractSubject
 from analyser.text_tools import dist_mean_cosine, min_index, Tokens
 from analyser.transaction_values import ValueConstraint
 
-# DIST_FUNC = dist_frechet_cosine_undirected
 DIST_FUNC = dist_mean_cosine
-# DIST_FUNC = dist_cosine_housedorff_undirected
+
 PATTERN_THRESHOLD = 0.75  # 0...1
 
 
 class FuzzyPattern():
 
   def __init__(self, prefix_pattern_suffix_tuple, _name='undefined'):
-    # assert prefix_pattern_suffix_tuple is not None
-    # assert prefix_pattern_suffix_tuple[0].strip() == prefix_pattern_suffix_tuple[0], f'{_name}: {prefix_pattern_suffix_tuple} '
-    # assert prefix_pattern_suffix_tuple[2].strip() == prefix_pattern_suffix_tuple[2], f'{_name}: {prefix_pattern_suffix_tuple} '
 
     self.prefix_pattern_suffix_tuple = prefix_pattern_suffix_tuple
     self.name = _name
@@ -37,7 +31,9 @@ class FuzzyPattern():
     self.region = region
 
   def _eval_distances(self, _text, dist_function=DIST_FUNC, whd_padding=0, wnd_mult=1):
-    assert self.embeddings is not None
+    if self.embeddings is None:
+      raise ValueError
+
     """
       For each token in the given sentences, it calculates the semantic distance to
       each and every pattern in _pattens arg.
@@ -60,7 +56,9 @@ class FuzzyPattern():
     return _distances
 
   def _eval_distances_multi_window(self, _text, dist_function=DIST_FUNC):
-    assert self.embeddings is not None
+
+    if self.embeddings is None:
+      raise ValueError
     distances = [self._eval_distances(_text, dist_function, whd_padding=0, wnd_mult=1)]
 
     if self.soft_sliding_window_borders:
@@ -134,45 +132,6 @@ class ExclusivePattern(CompoundPattern):
           a[i, j] = mask
 
     return a
-
-  def calc_exclusive_distances(self, text_ebd) -> ([float], [], {}):
-    warnings.warn("calc_exclusive_distances is deprecated ", DeprecationWarning)
-    distances_per_pattern = np.zeros((len(self.patterns), len(text_ebd)))
-
-    for pattern_index in range(len(self.patterns)):
-      pattern = self.patterns[pattern_index]
-      distances_sum = pattern._find_patterns(text_ebd)
-      distances_per_pattern[pattern_index] = distances_sum
-
-    # invert
-    distances_per_pattern *= -1
-    distances_per_pattern = self.onehot_column(distances_per_pattern, None)
-    distances_per_pattern *= -1
-
-    # p1 [ [ min, max, mean  ] [ d1, d2, d3, nan, d5 ... ] ]
-    # p2 [ [ min, max, mean  ] [ d1, d2, d3, nan, d5 ... ] ]
-    ranges: [[float, float, float]] = []
-    for row in distances_per_pattern:
-      b = row
-
-      if len(b) > 0:
-        min = np.nanmin(b)
-        max = np.nanmax(b)
-        mean = np.nanmean(b)
-        ranges.append([min, max, mean])
-      else:
-        _id = len(ranges)
-        print("WARNING: never winning pattern detected! index:", _id, self.patterns[_id])
-        ranges.append([np.inf, -np.inf, 0])
-
-    winning_patterns = {}
-    for row_index in range(len(distances_per_pattern)):
-      row = distances_per_pattern[row_index]
-      for col_i in range(len(row)):
-        if not np.isnan(row[col_i]):
-          winning_patterns[col_i] = (row_index, row[col_i])
-
-    return distances_per_pattern, ranges, winning_patterns
 
 
 class AbstractPatternFactory:
@@ -264,77 +223,12 @@ def make_pattern_attention_vector(pat: FuzzyPattern, embeddings, dist_function=D
 
     # TODO: this inversion must be a part of a dist_function
     dists = 1.0 - dists
-    # distances_per_pattern_dict[pat.name] = dists
     dists.flags.writeable = False
 
   except Exception as e:
     print('ERROR: calculate_distances_per_pattern ', e)
     dists = np.zeros(len(embeddings))
   return dists
-
-
-def make_smart_meta_click_pattern(attention_vector, embeddings, name=None):
-  if attention_vector is None:
-    raise ValueError("please provide non empty attention_vector")
-
-  if name is None:
-    name = 's-meta-na-' + str(random.random())
-
-  best_id = np.argmax(attention_vector)
-  confidence = attention_vector[best_id]
-  best_embedding_v = embeddings[best_id]
-  meta_pattern = FuzzyPattern(('', ' ', ''), _name=name)
-  meta_pattern.embeddings = np.array([best_embedding_v])
-
-  return meta_pattern, confidence, best_id
-
-
-""" 💔🛐  ===========================📈=================================  ✂️ """
-
-AV_SOFT = 'soft$.'
-AV_PREFIX = '$at_'
-
-
-class PatternMatch():
-
-  def __init__(self, region):
-    warnings.warn("use SemanticTag", DeprecationWarning)
-
-    self.subject_mapping = {
-      'subj': ContractSubject.Other,
-      'confidence': 0
-    }
-    self.constraints: [ValueConstraint] = []
-    self.region: slice = region
-    self.confidence: float = 0
-    self.pattern_prefix: str = None
-    self.attention_vector_name: str = None
-    self.parent = None  # 'LegalDocument'
-
-  def get_attention(self, name=None):
-    warnings.warn("use SemanticTag", DeprecationWarning)
-    if name is None:
-      return self.parent.distances_per_pattern_dict[self.attention_vector_name][self.region]
-
-    return self.parent.distances_per_pattern_dict[name][self.region]
-
-  def get_index(self):
-    warnings.warn("use SemanticTag", DeprecationWarning)
-    return self.region.start
-
-  key_index = property(get_index)
-
-  def get_tokens(self):
-    return self.parent.tokens[self.region]
-
-  tokens = property(get_tokens)
-
-
-class PatternSearchResult(PatternMatch):
-  def __init__(self, org_level: OrgStructuralLevel, region):
-    warnings.warn("use SemanticTag", DeprecationWarning)
-    super().__init__(region)
-    self.org_level: OrgStructuralLevel = org_level
 
 
 class ConstraintsSearchResult:

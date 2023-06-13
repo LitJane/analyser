@@ -1,5 +1,4 @@
 import os
-from enum import Enum
 
 import pandas as pd
 from overrides import overrides
@@ -12,11 +11,10 @@ from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
-from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
+from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
-from analyser.parsing import ParsingContext, AuditContext
-from analyser.patterns import AV_SOFT, AV_PREFIX
+from analyser.parsing import ParsingContext, AuditContext, find_value_sign
 from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import to_float, span_len
@@ -29,8 +27,8 @@ INSIDES_FINDER_ENABLED = 'GPN_DISABLE_INSIDES' not in os.environ
 
 class ContractDocument(LegalDocument):
 
-  def __init__(self, original_text):
-    LegalDocument.__init__(self, original_text)
+  def __init__(self, original_text, id=None):
+    LegalDocument.__init__(self, original_text, id=id)
 
     self.attributes_tree = ContractSchema()
 
@@ -151,7 +149,6 @@ class ContractParser(GenericParser):
     # -------------------------------
     # repeat phase 1
 
-    # self.find_org_date_number(contract, ctx)
     semantic_map, subj_1hot = nn_predict(self.subject_prediction_model, _contract_cut)
 
     if not contract.attributes_tree.number:
@@ -204,11 +201,6 @@ def max_value(vals: [ContractValue]) -> ContractValue or None:
   return max(vals, key=lambda a: a.value.value)
 
 
-def _sub_attention_names(subj: Enum):
-  a = f'x_{subj}'
-  b = AV_PREFIX + f'x_{subj}'
-  c = AV_SOFT + a
-  return a, b, c
 
 
 def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
@@ -253,7 +245,7 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
 
   check_org_intersections(contract_agents)  # mutator
 
-  return contract_agents  # _swap_org_tags(cas)
+  return contract_agents
 
 
 def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: AuditContext):
