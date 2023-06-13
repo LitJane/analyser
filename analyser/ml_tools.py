@@ -643,7 +643,7 @@ def calc_distances_per_pattern(sentences_embeddings_: [], patterns_named_embeddi
 
   distances_per_pattern_dict = pd.DataFrame()
 
-  for i, col in patterns_named_embeddings.iteritems():
+  for _, col in patterns_named_embeddings.iteritems():
     _distances = calc_distances_to_pattern(sentences_embeddings_, col.values)
     distances_per_pattern_dict[col.name] = _distances
 

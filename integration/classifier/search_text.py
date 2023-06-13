@@ -30,7 +30,7 @@ def wrapper(document):
     df = pd.DataFrame([json_from_text], columns=['text'])
     predictions = model.predict(df)
     result = []
-    for index, row in predictions.iterrows():
+    for _, row in predictions.iterrows():
         result.append({
             'label': row['practice'],
             'score': row['confidence']

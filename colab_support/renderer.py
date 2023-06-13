@@ -456,5 +456,5 @@ def plot_cm(y_true, y_pred, figsize=(12, 12)):
   cm = pd.DataFrame(cm_perc, index=np.unique(y_true), columns=np.unique(y_true))
   cm.index.name = 'Actual'
   cm.columns.name = 'Predicted'
-  fig, ax = plt.subplots(figsize=figsize)
+  _, ax = plt.subplots(figsize=figsize)
   sns.heatmap(cm, cmap="YlGnBu", annot=annot, fmt='', ax=ax)
