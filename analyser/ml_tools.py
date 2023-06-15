@@ -166,18 +166,6 @@ def softmax(v: np.ndarray) -> np.ndarray:
   return x
 
 
-def make_echo(av: FixedVector, k=0.5) -> np.ndarray:
-  innertia = np.zeros(len(av))
-  _sum = 0
-
-  for i in range(len(av)):
-    if av[i] > k:
-      _sum = av[i]
-    innertia[i] = _sum
-  #     sum-=0.0005
-  return innertia
-
-
 def momentum_(x: FixedVector, decay=0.99) -> np.ndarray:
   innertia = np.zeros(len(x))
   m = 0
@@ -195,24 +183,6 @@ def momentum(x: FixedVector, decay=0.999) -> np.ndarray:
   for i, xi in enumerate(x):
     m = max(m, xi)
     innertia[i] = m
-    m *= decay
-
-  return innertia
-
-
-def momentum_t(x: FixedVector, half_decay: int = 10, left=False) -> np.ndarray:
-  # assert half_decay > 0
-
-  decay = math.pow(2, -1 / half_decay)
-  innertia = np.zeros(len(x))
-  m = 0
-  _r = range(len(x))
-  if left:
-    _r = reversed(_r)
-  for i in _r:
-    m = max(m, x[i])
-    innertia[i] = m
-
     m *= decay
 
   return innertia
@@ -722,7 +692,7 @@ def attribute_patternmatch_to_index(header_to_pattern_distances_: pd.DataFrame,
   vals = header_to_pattern_distances_.values
 
   headers_n = vals.shape[0]
-   
+
   pairs = []
   for __header_index in range(headers_n):
 

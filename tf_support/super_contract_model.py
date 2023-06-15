@@ -215,8 +215,6 @@ def uber_detection_model_005_1_1(name="uber_detection_model_005_1_1", ctx: Keras
 
 @dataclass
 class Config:
-  # MAX_LEN = 256
-  # BATCH_SIZE = 32
   LR = 0.001
 
   EMBED_DIM = EMB

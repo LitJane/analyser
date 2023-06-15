@@ -9,6 +9,8 @@ from analyser.contract_parser import ContractDocument
 from analyser.embedding_tools import AbstractEmbedder, Embeddings
 from analyser.text_tools import Tokens
 
+NO_DB = os.environ.get('GPN_DB_HOST', None) is None
+NO_DB_ERR_MSG = "requires GPN_DB_HOST to be set in env"
 
 def load_json_sample(fn: str) -> dict:
   pth = os.path.dirname(__file__)

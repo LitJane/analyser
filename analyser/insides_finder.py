@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +9,9 @@ from analyser.hyperparams import models_path, HyperParameters
 from analyser.legal_docs import tokenize_doc_into_sentences_map, LegalDocument
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag
+
+os.environ['TRANSFORMERS_CACHE'] = str(Path(__file__).parent.parent / 'work')
+print('TRANSFORMERS_CACHE', os.environ['TRANSFORMERS_CACHE'])
 
 
 def estimate_distance_threshold(patterns_embeddings):
@@ -73,9 +77,6 @@ class InsidesFinder():
         sim_max = av[ii]
 
         logger.info(f"{k}=cluster \t {av[ii]}=similarity, \n {sentence_map.tokens[ii]} ")
-
         _span = sentence_map.remap_span((ii, ii + 1), sample_doc.tokens_map)
-
         tag = SemanticTag('insideInformation', 'Unknown', span=_span, confidence=np.float(av[ii]))
-
         sample_doc.attributes_tree.insideInformation = tag

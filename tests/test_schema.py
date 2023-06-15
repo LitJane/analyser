@@ -19,12 +19,12 @@ from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, 
 from analyser.schemas import document_schemas
 from analyser.structures import OrgStructuralLevel, ContractSubject
 from integration.db import get_mongodb_connection
+from tests.test_utilits import NO_DB_ERR_MSG, NO_DB
 
 
 class TestSchema(unittest.TestCase):
 
-  # @unittest.skip
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_insert_schema_to_db_json(self):
     db = get_mongodb_connection()
     collection_schemas = db['schemas']
@@ -36,7 +36,7 @@ class TestSchema(unittest.TestCase):
     collection_schemas.delete_many({"_id": key})
     collection_schemas.insert_one({"_id": key, 'json': json_str, "version": analyser.__version__})
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_read_schema_from_db(self):
     db = get_mongodb_connection()
     collection_schemas = db['schemas']
@@ -151,7 +151,7 @@ class TestSchema(unittest.TestCase):
     tree = {
       "contract": {
         "date": {
-          # "_ovalue": "2017-06-13T00:00:00.000Z",
+
           "value": "wrong date",
           "span": [14, 17],
           "span_map": "words",
