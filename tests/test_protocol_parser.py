@@ -24,7 +24,7 @@ class TestProtocolParser(unittest.TestCase):
 
   def test_read_json(self):
     data = load_json_sample('protocol_1.json')
-    print(data['parse'])
+    self.assertIsNotNone(data)
 
   def test_protocol_processor(self):
     json_doc = load_json_sample('protocol_1.json')
@@ -59,8 +59,6 @@ class TestProtocolParser(unittest.TestCase):
   def test_load_picke(self):
     doc = self.get_doc('Протокол_СД_ 3.docx.pickle')
     doc: LegalDocument = doc
-    for p in doc.paragraphs:
-      print('😱 \t', doc.get_tag_text(p.header).strip(), '📂')
 
   def test_find_protocol_org_1(self):
     suff = ' ' * 1000
@@ -77,7 +75,7 @@ class TestProtocolParser(unittest.TestCase):
   def test_find_protocol_org_2(self):
     doc = self.get_doc('Протокол_СД_ 3.docx.pickle')
     doc.parse()
-    print(doc[0:200].text)
+
     tags = find_protocol_org(doc)
     self.assertEqual('Технологический центр «Бажен»', tags[0].value)
     self.assertEqual('Общество с ограниченной ответственностью', tags[1].value)

@@ -53,7 +53,7 @@ class TestJsonExport(unittest.TestCase):
     ctx.find_attributes(doc, actx)
     json_struct = DocumentJson(doc)
     _j = json_struct.dumps()
-    print(_j)
+
     # TODO: compare with file
 
 

@@ -61,7 +61,6 @@ class ContractAgentsTestCase(unittest.TestCase):
 
   def test_compare_masked_strings(self):
     similarity = compare_masked_strings('Газпром нефть-Мобильная карта', 'Газпромнефть-Мобильная карта', [])
-    print('similarity=', similarity)
     self.assertGreater(similarity, HyperParameters.subsidiary_name_match_min_jaro_similarity)
 
   def test_find_closest_org_name(self):
@@ -85,7 +84,7 @@ class ContractAgentsTestCase(unittest.TestCase):
   def test_compare_masked_strings_1(self):
     s = compare_masked_strings('Многофункциональный комплекс «Лахта центр»',
                                'Многофункциональный комплекс «Лахта центр»', [])
-    print(s)
+
     for s1 in subsidiaries:
       for name in s1['aliases']:
         s = compare_masked_strings(name, name, [])
@@ -156,7 +155,6 @@ class ContractAgentsTestCase(unittest.TestCase):
       known_org_name, similarity = find_closest_org_name(subsidiaries, augmented, _threshold)
       self.assertIsNotNone(known_org_name, f'{augmented} -> NOTHING {similarity}')
       self.assertEqual(s1['_id'], known_org_name['_id'])
-      print(known_org_name)
 
   def test_find_closest_org_names_cut_begin(self):
     _threshold = 0.8
