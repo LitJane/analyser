@@ -21,8 +21,9 @@ from analyser.text_tools import to_float, span_len
 from analyser.transaction_values import ValueSpansFinder
 from gpn.gpn import is_gpn_name
 from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, nn_predict
+from gpn_config import config as gconfig
 
-INSIDES_FINDER_ENABLED = 'GPN_DISABLE_INSIDES' not in os.environ
+INSIDES_FINDER_ENABLED = 'GPN_DISABLE_INSIDES' not in gconfig
 
 
 class ContractDocument(LegalDocument):

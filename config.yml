@@ -1,0 +1,24 @@
+#GPN_CSGK_WSDL: False
+#GPN_CSGK_WSDL: None
+
+#TFHUB_CACHE_DIR
+#TRANSFORMERS_CACHE: None #path to hugging face cache dir
+
+
+GPN_DB_NAME: 'gpn'
+GPN_DB_HOST: 'localhost'
+GPN_DB_PORT: 27017
+
+MLFLOW_URL: "http://192.168.10.38:5000"
+
+#GPN_DB_USER: None # set in env, because it is secret
+#GPN_DB_PASSWORD: None # set in env, because it is secret
+#GPN_USE_MONGO_TLS: False # set in env, because it is secret
+#GPN_DB_TLS_CA: None # set in env, because it is secret
+#GPN_DB_TLS_KEY:  # set in env, because it is secret
+
+
+#GPN_CURRENCY_USER  # set in env, because it is secret
+# GPN_CURRENCY_PASSWORD  # set in env, because it is secret
+
+#GPN_CURRENCY_URL: # set in env, because it is secret

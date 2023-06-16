@@ -1,9 +1,11 @@
 import os
+from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 
+import gpn_config
 from analyser.embedding_tools import AbstractEmbedder
 from analyser.hyperparams import work_dir
 from analyser.log import logger
@@ -11,11 +13,10 @@ from analyser.text_tools import Tokens
 
 _e_instance: AbstractEmbedder or None = None
 
-if "TFHUB_CACHE_DIR" not in os.environ:
-  tf_cache = os.path.join(work_dir, 'tf_cache')
-  os.environ["TFHUB_CACHE_DIR"] = tf_cache
-
-
+__t_cache_dir = gpn_config.config.get('TFHUB_CACHE_DIR')
+if __t_cache_dir is None:
+  __t_cache_dir = str(Path(work_dir) / 'tf_hub_cache')
+os.environ['TFHUB_CACHE_DIR'] = __t_cache_dir
 
 
 class ElmoEmbedderWrapper(AbstractEmbedder):
@@ -38,7 +39,7 @@ class ElmoEmbedderWrapper(AbstractEmbedder):
 
 class ElmoEmbedderImpl(AbstractEmbedder):
 
-  #TODO: move this to external config
+  # TODO: move this to external config
   def __init__(self, module_url: str = 'https://storage.googleapis.com/az-nlp/elmo_ru-news_wmt11-16_1.5M_steps.tar.gz'):
     self.module_url = module_url
     self.session = None

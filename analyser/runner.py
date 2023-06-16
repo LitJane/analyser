@@ -1,5 +1,4 @@
 import json
-import os
 
 import gridfs
 import pymongo
@@ -7,6 +6,7 @@ import requests
 from bson import json_util, ObjectId
 from jsonschema import ValidationError, FormatChecker, Draft7Validator
 
+import gpn_config
 from analyser import finalizer
 from analyser.charter_parser import CharterParser
 from analyser.contract_parser import ContractParser, GenericParser
@@ -31,7 +31,7 @@ schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecke
 CHARTER = 'CHARTER'
 CONTRACT = 'CONTRACT'
 PROTOCOL = 'PROTOCOL'
-classifier_url = os.environ.get('GPN_CLASSIFIER_SERVICE_URL')
+classifier_url = gpn_config.config.get('GPN_CLASSIFIER_SERVICE_URL')
 
 
 class Runner:

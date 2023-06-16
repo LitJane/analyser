@@ -5,13 +5,16 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics import pairwise_distances
 
-from analyser.hyperparams import models_path, HyperParameters
+import gpn_config
+from analyser.hyperparams import models_path, HyperParameters, work_dir
 from analyser.legal_docs import tokenize_doc_into_sentences_map, LegalDocument
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag
 
-os.environ['TRANSFORMERS_CACHE'] = str(Path(__file__).parent.parent / 'work')
-print('TRANSFORMERS_CACHE', os.environ['TRANSFORMERS_CACHE'])
+__t_cache_dir = gpn_config.config.get('TRANSFORMERS_CACHE')
+if __t_cache_dir is None:
+  __t_cache_dir  = str(Path(work_dir) / 'tf_hub_cache')
+os.environ['TRANSFORMERS_CACHE'] = __t_cache_dir
 
 
 def estimate_distance_threshold(patterns_embeddings):

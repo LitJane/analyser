@@ -21,7 +21,7 @@ def main():
   update_db_dictionaries()
   migrate()
 
-  check_interval = os.environ.get("GPN_DB_CHECK_INTERVAL")
+  check_interval = gpn_config.config.get("GPN_DB_CHECK_INTERVAL")
   if check_interval is None:
     check_interval = 30
     print("Environment variable GPN_DB_CHECK_INTERVAL not set. Default value is %d sec." % (check_interval))

@@ -4,12 +4,15 @@ import warnings
 from pathlib import Path
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+import gpn_config
+
 __location__path = Path(__location__)
 
 models_path = os.path.join(__location__, 'vocab')
 
-if 'GPN_WORK_DIR' in os.environ:
-  work_dir = os.environ.get('GPN_WORK_DIR')
+if 'GPN_WORK_DIR' in gpn_config.config:
+  work_dir = gpn_config.config.get('GPN_WORK_DIR')
 else:
   work_dir = os.path.join(__location__path.parent.parent, 'work')
   warnings.warn('please set GPN_WORK_DIR environment variable')

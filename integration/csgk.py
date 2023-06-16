@@ -3,6 +3,7 @@ from datetime import datetime
 
 from zeep import Client, helpers
 
+import gpn_config
 from analyser.finalizer import normalize_only_company_name
 from analyser.log import logger
 from analyser.structures import legal_entity_types
@@ -12,19 +13,13 @@ from integration.db import get_mongodb_connection
 _client = None
 
 
-def _env_var(vname, default_val=None):
-    if vname not in os.environ:
-        msg = f'CSGK : define {vname} environment variable! defaulting to {default_val}'
-        logger.warning(msg)
-        return default_val
-    else:
-        return os.environ[vname]
+
 
 
 def get_csgk_client():
     try:
         global _client
-        wsdl = _env_var('GPN_CSGK_WSDL')
+        wsdl = gpn_config.config.get('GPN_CSGK_WSDL')
         if _client is None:
             if wsdl is not None:
                 logger.info(f"CSGK WSDL: {wsdl}")
@@ -160,7 +155,7 @@ def get_board_of_directors():
 
 
 def sync_csgk_data():
-    if os.environ.get("GPN_CSGK_WSDL") is None:
+    if gpn_config.config.get("GPN_CSGK_WSDL") is None:
         return
     logger.info('Start CSGK synchronization.')
     subsidiaries = get_subsidiary_list()
