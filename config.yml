@@ -21,6 +21,9 @@ MLFLOW_URL: "http://192.168.10.38:5000"
 #GPN_CURRENCY_USER  # set in env, because it is secret
 #GPN_CURRENCY_PASSWORD  # set in env, because it is secret
 
+#GPN_CSGK_USER # set in env, because it is secret
+#GPN_CSGK_PASSWORD # set in env, because it is secret
+
 GPN_CURRENCY_URL: #conversion rates service endpoint
 
 #email

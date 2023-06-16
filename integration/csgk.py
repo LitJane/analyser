@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 
 from zeep import Client, helpers
@@ -8,11 +7,10 @@ from analyser.finalizer import normalize_only_company_name
 from analyser.log import logger
 from analyser.structures import legal_entity_types
 from gpn.gpn import update_subsidiaries_cache
+from gpn_config import secret
 from integration.db import get_mongodb_connection
 
 _client = None
-
-
 
 
 
@@ -53,8 +51,8 @@ def _clean_subsidiary_name(name, legal_entities):
 def get_subsidiary_list():
     try:
         client = get_csgk_client()
-        user = _env_var('GPN_CSGK_USER')
-        password = _env_var('GPN_CSGK_PASSWORD')
+        user = secret('GPN_CSGK_USER')
+        password = secret('GPN_CSGK_PASSWORD')
         if client is not None and user is not None and password is not None:
             subsidiaries = {}
             result_raw = client.service.Execute(user, password, 'Get_CompanySimple_List')
@@ -93,8 +91,8 @@ def get_subsidiary_list():
 def get_shareholders():
     try:
         client = get_csgk_client()
-        user = _env_var('GPN_CSGK_USER')
-        password = _env_var('GPN_CSGK_PASSWORD')
+        user = secret('GPN_CSGK_USER')
+        password = secret('GPN_CSGK_PASSWORD')
         if client is not None and user is not None and password is not None:
             shareholders = []
             result_raw = client.service.Execute(user, password, 'Get_CompanyShareHolder_List')
@@ -126,8 +124,8 @@ def get_shareholders():
 def get_board_of_directors():
     try:
         client = get_csgk_client()
-        user = _env_var('GPN_CSGK_USER')
-        password = _env_var('GPN_CSGK_PASSWORD')
+        user = secret('GPN_CSGK_USER')
+        password = secret('GPN_CSGK_PASSWORD')
         if client is not None and user is not None and password is not None:
             shareholders = []
             result_raw = client.service.Execute(user, password, 'Get_CompanyAuthoritySD_List')

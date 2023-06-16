@@ -13,23 +13,22 @@ if path_to_config is None:
   if in_test_mode:
     path_to_config = Path(__file__).parent / 'config-test.yml'
 else:
-  logger.info('config file is overriden by env var GPN_CONFIG_PATH')
+  logger.info('config file is overridden by env var GPN_CONFIG_PATH')
 logger.info('config file')
 logger.info(path_to_config)
 
-
 __config = yaml.safe_load(open(str(path_to_config)))
 
+
 def configured(key, default_val=None):
-  val =  __config.get(key, default_val)
+  val = __config.get(key, default_val)
   if val is None:
     msg = f'⚠️ {key}: config variable is not set, refer {path_to_config}'
     logger.warning(msg)
 
 
 def secret(key, default_val=None):
-  val =  os.environ.get(key, default_val)
+  val = os.environ.get(key, default_val)
   if val is None:
-    msg = f'⚠️ {key}: evironment variable is not set'
+    msg = f'⚠️ {key}: environment variable is not set'
     logger.warning(msg)
-
