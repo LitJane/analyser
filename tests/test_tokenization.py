@@ -12,6 +12,7 @@ from nltk import TreebankWordTokenizer
 
 from analyser.documents import TextMap, TOKENIZER_DEFAULT
 from analyser.legal_docs import LegalDocument, tokenize_doc_into_sentences_map, PARAGRAPH_DELIMITER
+from analyser.log import logger
 
 
 class TokenisationTestCase(unittest.TestCase):
@@ -47,8 +48,8 @@ class TokenisationTestCase(unittest.TestCase):
     maxlen = 50
     tm = tokenize_doc_into_sentences_map(doc.tokens_map._full_text, maxlen)
     lens = [len(t) for t in tm.tokens]
-    for t in tm.tokens:
-      print(t)
+
+    self.assertIsNotNone(tm.tokens)
     print(min(lens))
     print(max(lens))
     print(np.mean(lens))
@@ -62,7 +63,8 @@ class TokenisationTestCase(unittest.TestCase):
         """
     doc_o = LegalDocument(doc_text)
     doc_o.parse()
-    print(doc_o.tokens_map.tokens)
+    self.assertIsNotNone(doc_o.tokens_map.tokens)
+
 
   def test_normalize_doc_slice(self):
     doc_text = """\n\n\nАкционерное общество «Газпром - Вибраниум и Криптонит» (АО «ГВК»), именуемое в собранием `` акционеров собранием `` акционеров \'\' \
@@ -106,10 +108,7 @@ class TokenisationTestCase(unittest.TestCase):
   def test_span_tokenize(self):
     text = 'УТВЕРЖДЕН.\n\nОбщим собранием `` акционеров собранием `` акционеров \'\' '
     spans = TOKENIZER_DEFAULT.span_tokenize(text)
-
-    print(spans)
-    for c in spans:
-      print(c)
+    self.assertEqual(len(list(spans)), 11)
 
   def test_word_tokenize_quotes(self):
     text = '"сл"'
@@ -170,23 +169,15 @@ class TokenisationTestCase(unittest.TestCase):
     offff = 20
     txt = ' ' * offff + '''основании Устава, с одной стороны, и Фонд «Благо»'''
     tm = TextMap(txt)
-    print(tm.map[0])
-    print(tm.tokens[11])
-    print(tm.map[11])
 
-    print(f'[{tm.text}]')
-
-    print(len(tm))
     tm_sliced = tm.slice(slice(0, len(tm)))
-    print('span-0')
-    print(tm.map[0])
-    print(tm_sliced.map[0])
+
 
     self.assertEqual(len(tm), len(tm_sliced))
     self.assertEqual(tm.map[0], tm_sliced.map[0])
 
     for c in range(len(tm.tokens[0])):
-      print(c)
+
       self.assertEqual(0, tm.token_index_by_char(c))
       self.assertEqual(0, tm_sliced.token_index_by_char(c))
 
@@ -556,10 +547,10 @@ class TokenisationTestCase(unittest.TestCase):
 
     # test iteration
     for x in ቅ:
-      print(x)
+      logger.debug(str(x))
 
     # test slicing
-    print(ቅ[0:2])
+    logger.debug(ቅ[0:2])
 
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ from analyser.legal_docs import LegalDocument
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag
 from analyser.protocol_parser import ProtocolDocument, find_protocol_org
-from analyser.text_normalize import _r_name_ru, r_human_abbr_name, r_human_full_name, _r_name_lat, replacements_regex, \
+from analyser.text_normalize import r_human_abbr_name, r_human_full_name, replacements_regex, \
   r_alias_prefix, r_types, sub_ip_quoter, sub_alias_quote, r_human_name, ru_cap, r_quoted_name, r_group
 
 _suffix = " слово" * 1000
@@ -675,7 +675,7 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     t = 'что-то именуемое в дальнейшем Жертвователь-какаха, и нечто, именуемое далее КАКАХА-ХА '
 
-    x = sub_alias_quote[0].search(t)
+    sub_alias_quote[0].search(t)
 
     replacer = r[1]
     pattern = r[0]
