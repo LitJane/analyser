@@ -19,7 +19,7 @@ _client = None
 def get_csgk_client():
     try:
         global _client
-        wsdl = gpn_config.config.get('GPN_CSGK_WSDL')
+        wsdl = gpn_config.configured('GPN_CSGK_WSDL')
         if _client is None:
             if wsdl is not None:
                 logger.info(f"CSGK WSDL: {wsdl}")
@@ -155,7 +155,7 @@ def get_board_of_directors():
 
 
 def sync_csgk_data():
-    if gpn_config.config.get("GPN_CSGK_WSDL") is None:
+    if gpn_config.configured("GPN_CSGK_WSDL") is None:
         return
     logger.info('Start CSGK synchronization.')
     subsidiaries = get_subsidiary_list()

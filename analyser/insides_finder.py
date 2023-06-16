@@ -11,7 +11,7 @@ from analyser.legal_docs import tokenize_doc_into_sentences_map, LegalDocument
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag
 
-__t_cache_dir = gpn_config.config.get('TRANSFORMERS_CACHE')
+__t_cache_dir = gpn_config.configured('TRANSFORMERS_CACHE')
 if __t_cache_dir is None:
   __t_cache_dir  = str(Path(work_dir) / 'tf_hub_cache')
 os.environ['TRANSFORMERS_CACHE'] = __t_cache_dir

@@ -15,11 +15,11 @@ _db_client = None
 # mongod --config /usr/local/etc/mongod.conf
 def get_mongodb_connection():
   global _db_client
-  db_name = gpn_config.config.get('GPN_DB_NAME', 'gpn')
+  db_name = gpn_config.configured( 'GPN_DB_NAME', 'gpn')
   if _db_client is None:
     try:
-      host = gpn_config.config.get('GPN_DB_HOST', 'localhost')
-      port = gpn_config.config.get('GPN_DB_PORT', 27017)
+      host = gpn_config.configured('GPN_DB_HOST', 'localhost')
+      port = gpn_config.configured('GPN_DB_PORT', 27017)
       print(f"DB HOST IS: {host}")
       user = gpn_config.secret('GPN_DB_USER', None)
       password = gpn_config.secret('GPN_DB_PASSWORD', None)

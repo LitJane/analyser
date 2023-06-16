@@ -4,7 +4,7 @@
 #TFHUB_CACHE_DIR
 #TRANSFORMERS_CACHE: None #path to hugging face cache dir
 
-
+GPN_DISABLE_INSIDES: False
 GPN_DB_NAME: 'gpn'
 #GPN_DB_HOST: None
 GPN_DB_PORT: 27017

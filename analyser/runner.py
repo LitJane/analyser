@@ -31,7 +31,7 @@ schema_validator = Draft7Validator(document_schemas, format_checker=FormatChecke
 CHARTER = 'CHARTER'
 CONTRACT = 'CONTRACT'
 PROTOCOL = 'PROTOCOL'
-classifier_url = gpn_config.config.get('GPN_CLASSIFIER_SERVICE_URL')
+classifier_url = gpn_config.configured('GPN_CLASSIFIER_SERVICE_URL')
 
 
 class Runner:

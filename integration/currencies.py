@@ -12,7 +12,7 @@ currency_rates = {"RUB": 1.0, "USD": 63.72, "EUR": 70.59, "KZT": 0.17}
 
 user = gpn_config.secret('GPN_CURRENCY_USER')
 password = gpn_config.secret('GPN_CURRENCY_PASSWORD')
-url = gpn_config.secret('GPN_CURRENCY_URL')
+url = gpn_config.configured('GPN_CURRENCY_URL')
 
 
 def convert_to_currency(value_currency, new_currency, date=None):

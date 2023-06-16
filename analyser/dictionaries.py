@@ -54,7 +54,7 @@ def update_db_dictionaries():
 
   insert_schemas_to_db(db)
 
-  if gpn_config.config.get("GPN_CSGK_WSDL") is None:
+  if gpn_config.configured("GPN_CSGK_WSDL") is None:
     coll = db["subsidiaries"]
     coll.delete_many({})
     coll.insert_many(subsidiaries)

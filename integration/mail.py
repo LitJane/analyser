@@ -1,4 +1,3 @@
-import os
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -7,10 +6,9 @@ from email.mime.text import MIMEText
 from socket import gaierror
 from urllib.parse import urljoin
 
+import gpn_config
 from analyser.log import logger
-
-
-
+from gpn_config import configured, secret
 
 
 def send_email(smtp_server, port, login, password, message):
@@ -36,12 +34,12 @@ def escape_email_headers(input: str) -> str:
 
 def send_end_audit_email(audit) -> bool:
     try:
-        smtp_server = _env_var('GPN_SMTP_SERVER')
-        port = _env_var('GPN_SMTP_PORT')
-        sender_email = _env_var('GPN_SENDER_EMAIL')
-        login = _env_var('GPN_SENDER_LOGIN')
-        password = _env_var('GPN_SENDER_PASSWORD')
-        web_url = _env_var('GPN_WEB_URL')
+        smtp_server = gpn_config.config.get('GPN_SMTP_SERVER')
+        port = gpn_config.config.get('GPN_SMTP_PORT')
+        sender_email = gpn_config.config.get('GPN_SENDER_EMAIL')
+        login = gpn_config.secret('GPN_SENDER_LOGIN')
+        password = gpn_config.secret('GPN_SENDER_PASSWORD')
+        web_url = gpn_config.config.get('GPN_WEB_URL')
 
         if smtp_server is not None and port is not None and sender_email is not None and password is not None and login:
             message = MIMEMultipart("alternative")
@@ -98,12 +96,12 @@ def generate_links(audit, practices: [], web_url) -> str:
 
 def send_classifier_email(audit, top_classification_result, attachments: [], practices, additional_classification_result) -> bool:
     try:
-        smtp_server = _env_var('GPN_SMTP_SERVER')
-        port = _env_var('GPN_SMTP_PORT')
-        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
-        login = _env_var('GPN_CLASSIFIER_LOGIN')
-        password = _env_var('GPN_CLASSIFIER_PASSWORD')
-        web_url = _env_var('GPN_WEB_URL')
+        smtp_server = gpn_config.configured('GPN_SMTP_SERVER')
+        port = gpn_config.configured('GPN_SMTP_PORT')
+        sender_email = gpn_config.configured('GPN_CLASSIFIER_EMAIL')
+        login = gpn_config.secret('GPN_CLASSIFIER_LOGIN')
+        password = gpn_config.secret('GPN_CLASSIFIER_PASSWORD')
+        web_url = gpn_config.configured('GPN_WEB_URL')
 
         if smtp_server and port and sender_email and password and login and web_url:
             message = EmailMessage()
@@ -176,12 +174,12 @@ def generate_errors(errors, html) -> str:
 
 def send_classifier_error_email(audit, attachments: []) -> bool:
     try:
-        smtp_server = _env_var('GPN_SMTP_SERVER')
-        port = _env_var('GPN_SMTP_PORT')
-        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
-        login = _env_var('GPN_CLASSIFIER_LOGIN')
-        password = _env_var('GPN_CLASSIFIER_PASSWORD')
-        web_url = _env_var('GPN_WEB_URL')
+        smtp_server = gpn_config.configured('GPN_SMTP_SERVER')
+        port = gpn_config.configured('GPN_SMTP_PORT')
+        sender_email = gpn_config.configured('GPN_CLASSIFIER_EMAIL')
+        login = gpn_config.secret('GPN_CLASSIFIER_LOGIN')
+        password = gpn_config.secret('GPN_CLASSIFIER_PASSWORD')
+        web_url = gpn_config.configured('GPN_WEB_URL')
 
         if smtp_server and port and sender_email and password and login and web_url:
             message = EmailMessage()
@@ -189,6 +187,7 @@ def send_classifier_error_email(audit, attachments: []) -> bool:
             message["From"] = escape_email_headers(sender_email)
             message['To'] = escape_email_headers(audit['additionalFields']['email_from'])
 
+            # TODO: externalize the text template
             plain_text = f"""
                 Здравствуйте!
                 
@@ -226,12 +225,12 @@ def send_classifier_error_email(audit, attachments: []) -> bool:
 
 def send_compliance_info_email(audit) -> bool:
     try:
-        smtp_server = _env_var('GPN_SMTP_SERVER')
-        port = _env_var('GPN_SMTP_PORT')
-        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
-        login = _env_var('GPN_CLASSIFIER_LOGIN')
-        password = _env_var('GPN_CLASSIFIER_PASSWORD')
-        web_url = _env_var('GPN_WEB_URL')
+        smtp_server = configured('GPN_SMTP_SERVER')
+        port = configured('GPN_SMTP_PORT')
+        sender_email = configured( 'GPN_CLASSIFIER_EMAIL')
+        login = secret('GPN_CLASSIFIER_LOGIN')
+        password = secret('GPN_CLASSIFIER_PASSWORD')
+        web_url = configured('GPN_WEB_URL')
 
         if smtp_server and port and sender_email and password and login and web_url:
             message = EmailMessage()
@@ -269,12 +268,12 @@ def send_compliance_info_email(audit) -> bool:
 
 def send_compliance_error_email(audit, errors, to) -> bool:
     try:
-        smtp_server = _env_var('GPN_SMTP_SERVER')
-        port = _env_var('GPN_SMTP_PORT')
-        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
-        login = _env_var('GPN_CLASSIFIER_LOGIN')
-        password = _env_var('GPN_CLASSIFIER_PASSWORD')
-        web_url = _env_var('GPN_WEB_URL')
+        smtp_server = configured ('GPN_SMTP_SERVER')
+        port = configured('GPN_SMTP_PORT')
+        sender_email = configured('GPN_CLASSIFIER_EMAIL')
+        login = secret('GPN_CLASSIFIER_LOGIN')
+        password = secret('GPN_CLASSIFIER_PASSWORD')
+        web_url = configured('GPN_WEB_URL')
 
         if smtp_server and port and sender_email and password and login and web_url:
             message = EmailMessage()
@@ -321,12 +320,12 @@ def send_compliance_error_email(audit, errors, to) -> bool:
 
 def send_compliance_protocol_preparation_email(audit) -> bool:
     try:
-        smtp_server = _env_var('GPN_SMTP_SERVER')
-        port = _env_var('GPN_SMTP_PORT')
-        sender_email = _env_var('GPN_CLASSIFIER_EMAIL')
-        login = _env_var('GPN_CLASSIFIER_LOGIN')
-        password = _env_var('GPN_CLASSIFIER_PASSWORD')
-        web_url = _env_var('GPN_WEB_URL')
+        smtp_server = configured('GPN_SMTP_SERVER')
+        port = configured('GPN_SMTP_PORT')
+        sender_email = configured('GPN_CLASSIFIER_EMAIL')
+        login = secret('GPN_CLASSIFIER_LOGIN')
+        password = secret('GPN_CLASSIFIER_PASSWORD')
+        web_url = configured('GPN_WEB_URL')
 
         if smtp_server and port and sender_email and password and login and web_url:
             message = EmailMessage()

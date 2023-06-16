@@ -729,5 +729,5 @@ def update_subsidiaries_cache(new_subsidiaries):
         HyperParameters.subsidiary_name_match_min_jaro_similarity)
 
 
-if gpn_config.config.get("GPN_CSGK_WSDL") is None:
+if gpn_config.configured("GPN_CSGK_WSDL") is None:
   update_subsidiaries_cache(data['Subsidiary'])

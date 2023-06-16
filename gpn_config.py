@@ -18,11 +18,18 @@ logger.info('config file')
 logger.info(path_to_config)
 
 
-config = yaml.safe_load(open(str(path_to_config)))
+__config = yaml.safe_load(open(str(path_to_config)))
+
+def configured(key, default_val=None):
+  val =  __config.get(key, default_val)
+  if val is None:
+    msg = f'⚠️ {key}: config variable is not set, refer {path_to_config}'
+    logger.warning(msg)
 
 
 def secret(key, default_val=None):
-  return os.environ.get(key, default_val)
+  val =  os.environ.get(key, default_val)
+  if val is None:
+    msg = f'⚠️ {key}: evironment variable is not set'
+    logger.warning(msg)
 
-if __name__ == '__main__':
-  print(config['MLFLOW_URL'])

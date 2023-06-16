@@ -11,8 +11,8 @@ __location__path = Path(__location__)
 
 models_path = os.path.join(__location__, 'vocab')
 
-if 'GPN_WORK_DIR' in gpn_config.config:
-  work_dir = gpn_config.config.get('GPN_WORK_DIR')
+if gpn_config.configured('GPN_WORK_DIR' ):
+  work_dir = gpn_config.configured('GPN_WORK_DIR')
 else:
   work_dir = os.path.join(__location__path.parent.parent, 'work')
   warnings.warn('please set GPN_WORK_DIR environment variable')

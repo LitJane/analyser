@@ -13,7 +13,7 @@ from analyser.text_tools import Tokens
 
 _e_instance: AbstractEmbedder or None = None
 
-__t_cache_dir = gpn_config.config.get('TFHUB_CACHE_DIR')
+__t_cache_dir = gpn_config.configured('TFHUB_CACHE_DIR')
 if __t_cache_dir is None:
   __t_cache_dir = str(Path(work_dir) / 'tf_hub_cache')
 os.environ['TFHUB_CACHE_DIR'] = __t_cache_dir
