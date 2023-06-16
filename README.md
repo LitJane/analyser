@@ -5,7 +5,18 @@
 ## CLI  
 см. [основные команды для работы с анализатором](cli/README.md)
 
-___
+## Конфигурация
+
+- [config.yaml](config.yaml) --  в файле заданы переменные 
+- [config-test.yaml](config.yaml) --  определяет альтернативную конфигурацию 
+  для unit-tests (например, др. базу данных)
+
+- Для переопределения пути к файлу конфигурации можно установить переменную среды *GPN_CONFIG_PATH* 
+```
+export GPN_CONFIG_PATH = some/path/to/alternative/config.yaml
+```
+- детали см. в [gpn_config.py](gpn_config.py)
+
 
 ## Конве́йер анализатора
 0. Пользователь предоставляет документы. 
@@ -236,3 +247,5 @@ sudo docker run --name <ANYNAME> -d
    dvcorg/cml-py3
 ```
 
+
+[]: https://github.com/nemoware/document-parser
