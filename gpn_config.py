@@ -25,10 +25,11 @@ def configured(key, default_val=None):
   if val is None:
     msg = f'⚠️ {key}: config variable is not set, refer {path_to_config}'
     logger.warning(msg)
-
+  return val
 
 def secret(key, default_val=None):
   val = os.environ.get(key, default_val)
   if val is None:
     msg = f'⚠️ {key}: environment variable is not set'
     logger.warning(msg)
+  return val
