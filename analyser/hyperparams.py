@@ -17,8 +17,8 @@ else:
   warnings.warn('please set GPN_WORK_DIR environment variable')
 
 datasets_dir: Path = work_dir / 'datasets'
-reports_dir: Path = Path(__file__).parent / 'training_reports'
-notebooks_dir: Path = Path(__file__).parent / 'trainsets'
+reports_dir: Path = Path(__file__).parent.parent / 'training_reports'
+notebooks_dir: Path = Path(__file__).parent.parent / 'trainsets'
 models_path = str(__location__path / 'vocab')
 
 print(f'USING WORKDIR: [{work_dir}]\n configure GPN_WORK_DIR to override')
