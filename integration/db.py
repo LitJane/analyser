@@ -9,9 +9,8 @@ import gpn_config
 _db_client = None
 
 
-
-
 # mongod --config /usr/local/etc/mongod.conf
+
 def get_mongodb_connection():
   global _db_client
   db_name = gpn_config.configured( 'GPN_DB_NAME', 'gpn')

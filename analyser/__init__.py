@@ -6,3 +6,7 @@ __version__ = "23.6.8.1"  # year.month.day.minor
 
 __version_ints__ = [int(x) for x in __version__.split('.')]
 print(f'Nemoware Analyser v{__version__}')
+
+from analyser.hyperparams import HyperParameters
+
+HyperParameters()

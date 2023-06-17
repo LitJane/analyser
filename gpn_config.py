@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import yaml
+
 from analyser.log import logger
 
 in_test_mode = 'unittest' in sys.modules.keys()
@@ -26,6 +27,7 @@ def configured(key, default_val=None):
     msg = f'⚠️ {key}: config variable is not set, refer {path_to_config}'
     logger.warning(msg)
   return val
+
 
 def secret(key, default_val=None):
   val = os.environ.get(key, default_val)

@@ -12,6 +12,7 @@ from pymongo import MongoClient
 
 import analyser
 from analyser.attributes import to_json, convert_one
+from analyser.log import logger
 from analyser.ml_tools import SemanticTagBase
 from analyser.runner import schema_validator
 from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, ContractPrice, OrgItem, \
@@ -30,8 +31,7 @@ class TestSchema(unittest.TestCase):
     collection_schemas = db['schemas']
 
     json_str = json.dumps(document_schemas, indent=4, ensure_ascii=False)
-    print(json_str)
-    print(type(json_str))
+
     key = f"documents_schema_{analyser.__version__}"
     collection_schemas.delete_many({"_id": key})
     collection_schemas.insert_one({"_id": key, 'json': json_str, "version": analyser.__version__})
@@ -43,8 +43,7 @@ class TestSchema(unittest.TestCase):
     key = f"documents_schema_{analyser.__version__}"
     a = collection_schemas.find_one({"_id": key})['json']
     db_document_schemas = json.loads(a)
-    print(a)
-    print(type(db_document_schemas))
+
 
     wrong_tree = {
       "contract": {
@@ -85,10 +84,9 @@ class TestSchema(unittest.TestCase):
       "some": OrgStructuralLevel.CEO
     }
 
-    a, b = to_json(d)
+    to_json(d)
 
-    print(a)
-    print(a)
+
 
   def test_convert_to_legasy_list(self):
     cs = CharterSchema()
@@ -138,14 +136,13 @@ class TestSchema(unittest.TestCase):
     converter = Schema2LegacyListConverter()
     dest = {}
     converter.schema2list(dest, cs)
-    for k, v in dest.items():
-      print(f"[{k}]", v)
+
 
     self.assertTrue('BoardOfCompany/Charity/constraint-max-1' in dest)
     self.assertTrue('org-1-name' in dest)
     self.assertTrue('org-1-type' in dest)
     self.assertTrue('org-1-alias' in dest)
-    # print(dest)
+
 
   def test_date_wrong_2(self):
     tree = {
@@ -183,7 +180,7 @@ class TestSchema(unittest.TestCase):
       schema_validator.validate(tree)
 
     self.assertIsNotNone(context.exception)
-    print(context.exception)
+    logger.error(context.exception)
 
   def test_date_wrong(self):
     tree = {
@@ -354,7 +351,6 @@ class TestSchema(unittest.TestCase):
     aic.number.span = (50, 100)
     self.assertEqual(aic.span, (10, 100))
 
-    print(aic.span)
 
     aic.orgs.append(OrgItem())
     aic.orgs[0].type = SemanticTagBase()
