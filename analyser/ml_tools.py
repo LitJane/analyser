@@ -755,3 +755,14 @@ def is_span_intersect(span1, span2) -> bool:
   '''
   return is_in(span1[0], span2) or is_in(span1[1], span2) \
          or is_in(span2[0], span1) or is_in(span2[1], span1)
+
+def merge_spans(tags: [SemanticTagBase]) -> (int, int):
+  arr = []
+  for attr in tags:
+    if attr is not None and attr.get_span() is not None:
+      arr.append(attr.get_span()[0])
+      arr.append(attr.get_span()[1])
+  if len(arr) > 0:
+    return min(arr), max(arr)
+
+  return None

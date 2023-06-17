@@ -11,9 +11,9 @@ from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
 from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings
 from analyser.log import logger
-from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
+from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect, merge_spans
 from analyser.parsing import ParsingContext, AuditContext, find_value_sign
-from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
+from analyser.schemas import ContractSchema, OrgItem, ContractPrice
 from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import to_float, span_len
 from analyser.transaction_values import ValueSpansFinder
