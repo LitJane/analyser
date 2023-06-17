@@ -42,8 +42,7 @@ class TestSchema(unittest.TestCase):
     collection_schemas = db['schemas']
     key = f"documents_schema_{analyser.__version__}"
     a = collection_schemas.find_one({"_id": key})['json']
-    db_document_schemas = json.loads(a)
-
+    json.loads(a)
 
     wrong_tree = {
       "contract": {
@@ -85,8 +84,6 @@ class TestSchema(unittest.TestCase):
     }
 
     to_json(d)
-
-
 
   def test_convert_to_legasy_list(self):
     cs = CharterSchema()
@@ -137,12 +134,10 @@ class TestSchema(unittest.TestCase):
     dest = {}
     converter.schema2list(dest, cs)
 
-
     self.assertTrue('BoardOfCompany/Charity/constraint-max-1' in dest)
     self.assertTrue('org-1-name' in dest)
     self.assertTrue('org-1-type' in dest)
     self.assertTrue('org-1-alias' in dest)
-
 
   def test_date_wrong_2(self):
     tree = {
@@ -350,7 +345,6 @@ class TestSchema(unittest.TestCase):
     aic.number = SemanticTagBase()
     aic.number.span = (50, 100)
     self.assertEqual(aic.span, (10, 100))
-
 
     aic.orgs.append(OrgItem())
     aic.orgs[0].type = SemanticTagBase()
