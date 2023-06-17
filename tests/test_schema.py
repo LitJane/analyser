@@ -12,6 +12,7 @@ from pymongo import MongoClient
 
 import analyser
 from analyser.attributes import to_json, convert_one
+from analyser.log import logger
 from analyser.ml_tools import SemanticTagBase
 from analyser.runner import schema_validator
 from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, ContractPrice, OrgItem, \
@@ -19,32 +20,29 @@ from analyser.schemas import CharterSchema, CharterStructuralLevel, Competence, 
 from analyser.schemas import document_schemas
 from analyser.structures import OrgStructuralLevel, ContractSubject
 from integration.db import get_mongodb_connection
+from tests.test_utilits import NO_DB_ERR_MSG, NO_DB
 
 
 class TestSchema(unittest.TestCase):
 
-  # @unittest.skip
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_insert_schema_to_db_json(self):
     db = get_mongodb_connection()
     collection_schemas = db['schemas']
 
     json_str = json.dumps(document_schemas, indent=4, ensure_ascii=False)
-    print(json_str)
-    print(type(json_str))
+
     key = f"documents_schema_{analyser.__version__}"
     collection_schemas.delete_many({"_id": key})
     collection_schemas.insert_one({"_id": key, 'json': json_str, "version": analyser.__version__})
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_read_schema_from_db(self):
     db = get_mongodb_connection()
     collection_schemas = db['schemas']
     key = f"documents_schema_{analyser.__version__}"
     a = collection_schemas.find_one({"_id": key})['json']
-    db_document_schemas = json.loads(a)
-    print(a)
-    print(type(db_document_schemas))
+    json.loads(a)
 
     wrong_tree = {
       "contract": {
@@ -85,10 +83,7 @@ class TestSchema(unittest.TestCase):
       "some": OrgStructuralLevel.CEO
     }
 
-    a, b = to_json(d)
-
-    print(a)
-    print(a)
+    to_json(d)
 
   def test_convert_to_legasy_list(self):
     cs = CharterSchema()
@@ -138,20 +133,17 @@ class TestSchema(unittest.TestCase):
     converter = Schema2LegacyListConverter()
     dest = {}
     converter.schema2list(dest, cs)
-    for k, v in dest.items():
-      print(f"[{k}]", v)
 
     self.assertTrue('BoardOfCompany/Charity/constraint-max-1' in dest)
     self.assertTrue('org-1-name' in dest)
     self.assertTrue('org-1-type' in dest)
     self.assertTrue('org-1-alias' in dest)
-    # print(dest)
 
   def test_date_wrong_2(self):
     tree = {
       "contract": {
         "date": {
-          # "_ovalue": "2017-06-13T00:00:00.000Z",
+
           "value": "wrong date",
           "span": [14, 17],
           "span_map": "words",
@@ -183,7 +175,7 @@ class TestSchema(unittest.TestCase):
       schema_validator.validate(tree)
 
     self.assertIsNotNone(context.exception)
-    print(context.exception)
+    logger.error(context.exception)
 
   def test_date_wrong(self):
     tree = {
@@ -353,8 +345,6 @@ class TestSchema(unittest.TestCase):
     aic.number = SemanticTagBase()
     aic.number.span = (50, 100)
     self.assertEqual(aic.span, (10, 100))
-
-    print(aic.span)
 
     aic.orgs.append(OrgItem())
     aic.orgs[0].type = SemanticTagBase()

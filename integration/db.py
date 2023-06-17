@@ -1,36 +1,29 @@
-import os
 import urllib.parse
 import warnings
 
 from bson import ObjectId
 from pymongo import MongoClient
 
+import gpn_config
+
 _db_client = None
 
 
-def _env_var(vname, default_val=None):
-  if vname not in os.environ:
-    msg = f'MongoDB : define {vname} environment variable! defaulting to {default_val}'
-    warnings.warn(msg)
-    return default_val
-  else:
-    return os.environ[vname]
-
-
 # mongod --config /usr/local/etc/mongod.conf
+
 def get_mongodb_connection():
   global _db_client
-  db_name = _env_var('GPN_DB_NAME', 'gpn')
+  db_name = gpn_config.configured( 'GPN_DB_NAME', 'gpn')
   if _db_client is None:
     try:
-      host = _env_var('GPN_DB_HOST', 'localhost')
-      port = _env_var('GPN_DB_PORT', 27017)
+      host = gpn_config.configured('GPN_DB_HOST', 'localhost')
+      port = gpn_config.configured('GPN_DB_PORT', 27017)
       print(f"DB HOST IS: {host}")
-      user = _env_var('GPN_DB_USER', None)
-      password = _env_var('GPN_DB_PASSWORD', None)
-      mongo_tls = _env_var('GPN_USE_MONGO_TLS', False)
-      ca_file = _env_var('GPN_DB_TLS_CA')
-      cert_file = _env_var('GPN_DB_TLS_KEY')
+      user = gpn_config.secret('GPN_DB_USER', None)
+      password = gpn_config.secret('GPN_DB_PASSWORD', None)
+      mongo_tls = gpn_config.secret('GPN_USE_MONGO_TLS', False)
+      ca_file = gpn_config.secret('GPN_DB_TLS_CA')
+      cert_file = gpn_config.secret('GPN_DB_TLS_KEY')
       if mongo_tls:
         tls_opts = f'?tls=true&tlsCAFile={ca_file}&tlsCertificateKeyFile={cert_file}'
       else:

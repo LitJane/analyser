@@ -11,7 +11,6 @@ from enum import Enum
 
 import numpy as np
 from bson import json_util
-from overrides import final
 
 import analyser
 from analyser.attributes import to_json
@@ -178,7 +177,6 @@ class LegalDocument:
     _json_tree['attributes_tree'] = {}
     return _json_tree
 
-
   def get_tokens_cc(self):
     return self.tokens_map.tokens
 
@@ -263,7 +261,6 @@ class LegalDocument:
     _s = slice(max(0, start), end)
     return self.subdoc_slice(_s)
 
-  @final
   def embedd_tokens(self, embedder: AbstractEmbedder, max_tokens=8000):
     self.embeddings = embedd_tokens(self.tokens_map_norm,
                                     embedder,

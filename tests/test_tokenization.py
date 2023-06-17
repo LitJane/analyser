@@ -12,6 +12,7 @@ from nltk import TreebankWordTokenizer
 
 from analyser.documents import TextMap, TOKENIZER_DEFAULT
 from analyser.legal_docs import LegalDocument, tokenize_doc_into_sentences_map, PARAGRAPH_DELIMITER
+from analyser.log import logger
 
 
 class TokenisationTestCase(unittest.TestCase):
@@ -47,8 +48,8 @@ class TokenisationTestCase(unittest.TestCase):
     maxlen = 50
     tm = tokenize_doc_into_sentences_map(doc.tokens_map._full_text, maxlen)
     lens = [len(t) for t in tm.tokens]
-    for t in tm.tokens:
-      print(t)
+
+    self.assertIsNotNone(tm.tokens)
     print(min(lens))
     print(max(lens))
     print(np.mean(lens))
@@ -62,7 +63,7 @@ class TokenisationTestCase(unittest.TestCase):
         """
     doc_o = LegalDocument(doc_text)
     doc_o.parse()
-    print(doc_o.tokens_map.tokens)
+    self.assertIsNotNone(doc_o.tokens_map.tokens)
 
   def test_normalize_doc_slice(self):
     doc_text = """\n\n\nАкционерное общество «Газпром - Вибраниум и Криптонит» (АО «ГВК»), именуемое в собранием `` акционеров собранием `` акционеров \'\' \
@@ -106,10 +107,7 @@ class TokenisationTestCase(unittest.TestCase):
   def test_span_tokenize(self):
     text = 'УТВЕРЖДЕН.\n\nОбщим собранием `` акционеров собранием `` акционеров \'\' '
     spans = TOKENIZER_DEFAULT.span_tokenize(text)
-
-    print(spans)
-    for c in spans:
-      print(c)
+    self.assertEqual(len(list(spans)), 11)
 
   def test_word_tokenize_quotes(self):
     text = '"сл"'
@@ -117,9 +115,7 @@ class TokenisationTestCase(unittest.TestCase):
     _spans = tokenizer.tokenize(text)
 
     spans = [s for s in _spans]
-    print("".join(spans))
-    for c in spans:
-      print(len(c))
+
     self.assertEqual(3, len(spans))
 
   def test_span_tokenize_quotes(self):
@@ -127,7 +123,7 @@ class TokenisationTestCase(unittest.TestCase):
     _spans = TOKENIZER_DEFAULT.span_tokenize(text)
 
     spans = [s for s in _spans]
-    print(spans)
+
     self.assertEqual(3, len(spans))
 
   def test_concat_then_slice(self):
@@ -141,7 +137,6 @@ class TokenisationTestCase(unittest.TestCase):
     tm0 += tm1
     tm0 += tm2
 
-    print(tm1.tokens)
     self.assertEqual(text1 + text2, tm0.text)
     self.assertEqual('мамаэтилен', tm0.text_range([1, 3]))
 
@@ -170,23 +165,13 @@ class TokenisationTestCase(unittest.TestCase):
     offff = 20
     txt = ' ' * offff + '''основании Устава, с одной стороны, и Фонд «Благо»'''
     tm = TextMap(txt)
-    print(tm.map[0])
-    print(tm.tokens[11])
-    print(tm.map[11])
 
-    print(f'[{tm.text}]')
-
-    print(len(tm))
     tm_sliced = tm.slice(slice(0, len(tm)))
-    print('span-0')
-    print(tm.map[0])
-    print(tm_sliced.map[0])
 
     self.assertEqual(len(tm), len(tm_sliced))
     self.assertEqual(tm.map[0], tm_sliced.map[0])
 
     for c in range(len(tm.tokens[0])):
-      print(c)
       self.assertEqual(0, tm.token_index_by_char(c))
       self.assertEqual(0, tm_sliced.token_index_by_char(c))
 
@@ -218,8 +203,7 @@ class TokenisationTestCase(unittest.TestCase):
     tm = TextMap('стороны Заключили\n  договор  ПРЕДМЕТ \nДОГОВОРА')
 
     bounds = tm.sentence_at_index(0)
-    print(bounds)
-    print(tm.text_range(bounds))
+
     for i in range(0, 3):
       bounds = tm.sentence_at_index(i)
       self.assertEqual('стороны Заключили\n', tm.text_range(bounds), str(i))
@@ -237,8 +221,6 @@ class TokenisationTestCase(unittest.TestCase):
     tm = TextMap('стороны Заключили\n  договор  ПРЕДМЕТ \nДОГОВОРА')
 
     bounds = tm.sentence_at_index(0, return_delimiters=False)
-    print(bounds)
-    print(tm.text_range(bounds))
 
     for i in range(0, 3):
       bounds = tm.sentence_at_index(i, return_delimiters=False)
@@ -262,12 +244,8 @@ class TokenisationTestCase(unittest.TestCase):
     txt = ' ' * 20 + '''основании Устава, с одной стороны, и Фонд «Благо»'''
 
     doc = LegalDocument(txt).parse()
-    tm = doc.tokens_map
-    print(tm.map[0])
-    print(tm.tokens[11])
-    print(tm.map[11])
-    print(f'[{doc.tokens_map.text}]')
-    print(f'[{doc.text}]')
+
+    self.assertIsNotNone(doc.tokens_map)
 
   def test_tokens_in_range(self):
     text = 'мама'
@@ -364,7 +342,6 @@ class TokenisationTestCase(unittest.TestCase):
     text = 'мама'
     span = [0, 4]
     expected = text[span[0]:span[1]]
-    print(expected)
 
     tm = TextMap(text)  # tokenization
     ti = tm.token_indices_by_char_range(span)
@@ -379,7 +356,6 @@ class TokenisationTestCase(unittest.TestCase):
            'и составляет 1000 рублей 00 копеек, в том числе НДС (20%) в размере.'
     span = [178, 184]
     expected = text[span[0]:span[1]]
-    print("expected", expected)
 
     tm = TextMap(text)  # tokenization
     ti = tm.token_indices_by_char_range(span)
@@ -413,20 +389,11 @@ class TokenisationTestCase(unittest.TestCase):
     self.assertEqual(tokens[0], '1.2.')
     self.assertEqual(tokens[1], 'мама')
 
-  def test_split(self):
-    text = '1 2 3\nмама\nಶ್ರೀರಾಮ'
-    tm = TextMap(text)
-
-    for k in tm.split('\n'):
-      print(k)
-
   def test_split_span_add_delimiters(self):
     text = '1 2 3\nмама\nಶ್ರೀರಾಮ'
     tm = TextMap(text)
 
     spans = [s for s in tm.split_spans('\n', add_delimiter=True)]
-    for k in spans:
-      print(tm.text_range(k))
 
     self.assertEqual('1 2 3\n', tm.text_range(spans[0]))
 
@@ -435,8 +402,6 @@ class TokenisationTestCase(unittest.TestCase):
     tm = TextMap(text)
 
     spans = list(tm.split_spans('\n', add_delimiter=False))
-    for k in spans:
-      print(tm.text_range(k))
 
     self.assertEqual('1 2 3', tm.text_range(spans[0]))
     self.assertEqual('мама', tm.text_range(spans[1]))
@@ -453,7 +418,7 @@ class TokenisationTestCase(unittest.TestCase):
   def test_get_tokens(self):
     text = 'ಉಂದು ಅರ್ತೊಪೂರ್ಣೊ ವಾಕ್ಯೊಲೆನ್ ಕೊರ್ಪುನ ಸಾಮರ್ತ್ಯೊನು ಹೊಂದೊಂತ್ '
     tm = TextMap(text)
-    print(tm.tokens)
+
     self.assertEqual(6, len(tm.tokens))
 
   def test_get_len(self):
@@ -465,7 +430,7 @@ class TokenisationTestCase(unittest.TestCase):
   def test_PARAGRAPH_DELIMITER(self):
 
     tm = TextMap('a' + PARAGRAPH_DELIMITER + 'b')
-    print(tm.tokens)
+
     self.assertEqual(3, len(tm))
 
   def test_PARAGRAPH_DELIMITER_docs(self):
@@ -539,8 +504,6 @@ class TokenisationTestCase(unittest.TestCase):
     for _ in range(N):
       tm1 += tm2
 
-    print(tm1.tokens_map_norm._full_text)
-
     self.assertEqual(expected_tokens, len(tm1.tokens_cc))
     self.assertEqual('more words', tm1.tokens_map_norm.text_range((3, 5)))
 
@@ -556,10 +519,10 @@ class TokenisationTestCase(unittest.TestCase):
 
     # test iteration
     for x in ቅ:
-      print(x)
+      logger.debug(str(x))
 
     # test slicing
-    print(ቅ[0:2])
+    logger.debug(ቅ[0:2])
 
 
 if __name__ == '__main__':

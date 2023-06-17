@@ -94,8 +94,6 @@ ___________________________________________________________________
         '''
 
     normal_text = normalize_text(t, replacements_regex)
-    print(normal_text)
-    print('=' * 20)
 
     self.assertTrue(len(normal_text) < len(t) * 0.9)
 
@@ -186,8 +184,6 @@ ___________________________________________________________________
         '''
 
     normal_text = normalize_text(t, replacements_regex)
-    print(normal_text)
-    print('=' * 20)
 
     self.assertTrue(len(normal_text) < len(t) * 0.9)
 
@@ -362,8 +358,6 @@ TABLE OF CONTENTS
         '''
 
     normal_text = normalize_text(t, replacements_regex)
-    print(normal_text)
-    print('=' * 20)
 
     self.assertTrue(len(normal_text) < len(t) * 0.9)
 
@@ -432,7 +426,5 @@ TABLE OF CONTENTS
         '''
 
     normal_text = normalize_text(t, replacements_regex)
-    print(normal_text)
-    print('=' * 20)
 
     self.assertTrue(len(normal_text) < len(t) * 0.9)

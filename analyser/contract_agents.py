@@ -146,9 +146,8 @@ def find_org_names_raw(doc: LegalDocument, max_names=2, parent=None, decay_confi
   # filter, keep unique names
   _map = {}
   for ca in all_org_names:
-    if ca.name is not None:
-      if ca.confidence() > 0.2:
-        put_if_better(_map, ca.name.value, ca, lambda a, b: a.confidence() > b.confidence())
+    if ca.name is not None and ca.confidence() > 0.2:
+      put_if_better(_map, ca.name.value, ca, lambda a, b: a.confidence() > b.confidence())
 
   res = list(_map.values())
   res = sorted(res, key=lambda a: -a.confidence())

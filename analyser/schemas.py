@@ -7,22 +7,13 @@
 import warnings
 from enum import Enum
 
-from analyser.ml_tools import SemanticTagBase, conditional_p_sum
+from analyser.ml_tools import SemanticTagBase, conditional_p_sum, merge_spans
 from analyser.structures import OrgStructuralLevel, ContractSubject, InsiderInfoType, Currencies
 
 tag_value_field_name = "value"
 
 
-def merge_spans(tags: [SemanticTagBase]) -> (int, int):
-  arr = []
-  for attr in tags:
-    if attr is not None:
-      arr.append(attr.get_span()[0])
-      arr.append(attr.get_span()[1])
-  if len(arr) > 0:
-    return min(arr), max(arr)
 
-  return None
 
 
 class DocumentSchema:

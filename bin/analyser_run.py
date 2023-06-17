@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import os
 import time
 
 import schedule
@@ -7,6 +6,7 @@ import schedule
 from analyser import runner
 from analyser.attributes import convert_all_docs
 from analyser.dictionaries import update_db_dictionaries
+from gpn_config import configured
 from integration.csgk import sync_csgk_data
 
 
@@ -21,10 +21,7 @@ def main():
   update_db_dictionaries()
   migrate()
 
-  check_interval = os.environ.get("GPN_DB_CHECK_INTERVAL")
-  if check_interval is None:
-    check_interval = 30
-    print("Environment variable GPN_DB_CHECK_INTERVAL not set. Default value is %d sec." % (check_interval))
+  check_interval = configured("GPN_DB_CHECK_INTERVAL", 30)
 
   schedule.every(int(check_interval)).seconds.do(runner.run)
   schedule.every().day.at("03:03").do(sync_csgk_data)

@@ -67,7 +67,7 @@ class ThresholdLayer(layers.Layer):
   def call(self, x, *args, **kwargs):
     return keras.backend.sigmoid(100 * (x - self.kernel))
 
-  def compute_output_shape(self, input_shape):
+  def compute_output_shape(self, input_shape): # noqa
     return input_shape
 
 

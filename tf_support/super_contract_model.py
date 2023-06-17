@@ -12,8 +12,8 @@ from tensorflow.keras.layers import LayerNormalization, Input, Conv1D, Dropout, 
   MaxPooling1D, ReLU, LeakyReLU
 from tensorflow.keras.layers import concatenate
 
+from analyser import hyperparams
 from analyser.headers_detector import TOKEN_FEATURES
-from analyser.hyperparams import work_dir
 from analyser.structures import ContractSubject
 from tf_support.addons import sigmoid_focal_crossentropy, ThresholdLayer
 from tf_support.tools import KerasTrainingContext
@@ -69,10 +69,14 @@ FEATURES = len(semantic_map_keys_contract)
 EMB = 1024
 
 
+def datapoint_path(doc_id, suffix) -> Path:
+  return hyperparams.datasets_dir / f'{doc_id}-datapoint-{suffix}.npy'
+
+
 @lru_cache(maxsize=72)
 def _load_arrays(doc_id):
-  def _dp_fn(doc_id, suffix):
-    return str(Path(work_dir) / 'datasets' / f'{doc_id}-datapoint-{suffix}.npy')
+  def _dp_fn(doc_id, suffix) -> str:
+    return str(datapoint_path(doc_id, suffix))
 
   embeddings = np.load(_dp_fn(doc_id, 'embeddings'))
   token_features = np.load(_dp_fn(doc_id, 'token_features'))
@@ -212,11 +216,8 @@ def uber_detection_model_005_1_1(name="uber_detection_model_005_1_1", ctx: Keras
   return _model
 
 
-
 @dataclass
 class Config:
-  # MAX_LEN = 256
-  # BATCH_SIZE = 32
   LR = 0.001
 
   EMBED_DIM = EMB
@@ -258,12 +259,6 @@ def bert_module(query, key, value, i, height, key_dim_base=config.EMBED_DIM):
     epsilon=1e-6, name=f"encoder_{i}/ffn_layernormalization"
   )(attention_output + ffn_output)
   return sequence_output
-
-
-
-
-
-
 
 
 def make_att_model_03(name='make_att_model_03'):

@@ -73,9 +73,6 @@ class InsidesFinder():
         sim_max = av[ii]
 
         logger.info(f"{k}=cluster \t {av[ii]}=similarity, \n {sentence_map.tokens[ii]} ")
-
         _span = sentence_map.remap_span((ii, ii + 1), sample_doc.tokens_map)
-
         tag = SemanticTag('insideInformation', 'Unknown', span=_span, confidence=np.float(av[ii]))
-
         sample_doc.attributes_tree.insideInformation = tag

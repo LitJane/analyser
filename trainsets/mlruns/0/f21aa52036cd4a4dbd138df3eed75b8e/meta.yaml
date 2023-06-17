@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/artem/work/nemo/analyser/trainsets/mlruns/0/f21aa52036cd4a4dbd138df3eed75b8e/artifacts
+end_time: 1686984742279
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: f21aa52036cd4a4dbd138df3eed75b8e
+run_name: secretive-shrew-425
+run_uuid: f21aa52036cd4a4dbd138df3eed75b8e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1686984495615
+status: 3
+tags: []
+user_id: artem
