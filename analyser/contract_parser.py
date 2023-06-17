@@ -1,6 +1,3 @@
-import os
-from enum import Enum
-
 import pandas as pd
 from overrides import overrides
 from pandas import DataFrame
@@ -12,25 +9,25 @@ from analyser.doc_dates import find_date
 from analyser.documents import TextMap
 from analyser.hyperparams import HyperParameters
 from analyser.insides_finder import InsidesFinder
-from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings, find_value_sign
+from analyser.legal_docs import LegalDocument, ContractValue, ParserWarnings
 from analyser.log import logger
 from analyser.ml_tools import SemanticTag, SemanticTagBase, is_span_intersect
-from analyser.parsing import ParsingContext, AuditContext
-from analyser.patterns import AV_SOFT, AV_PREFIX
+from analyser.parsing import ParsingContext, AuditContext, find_value_sign
 from analyser.schemas import ContractSchema, OrgItem, ContractPrice, merge_spans
 from analyser.text_normalize import r_human_name_compilled
 from analyser.text_tools import to_float, span_len
 from analyser.transaction_values import ValueSpansFinder
 from gpn.gpn import is_gpn_name
+from gpn_config import configured
 from tf_support.tf_subject_model import load_subject_detection_trained_model, decode_subj_prediction, nn_predict
 
-INSIDES_FINDER_ENABLED = 'GPN_DISABLE_INSIDES' not in os.environ
+INSIDES_FINDER_ENABLED = configured('GPN_DISABLE_INSIDES')
 
 
 class ContractDocument(LegalDocument):
 
-  def __init__(self, original_text):
-    LegalDocument.__init__(self, original_text)
+  def __init__(self, original_text, id=None):
+    LegalDocument.__init__(self, original_text, id=id)
 
     self.attributes_tree = ContractSchema()
 
@@ -151,7 +148,6 @@ class ContractParser(GenericParser):
     # -------------------------------
     # repeat phase 1
 
-    # self.find_org_date_number(contract, ctx)
     semantic_map, subj_1hot = nn_predict(self.subject_prediction_model, _contract_cut)
 
     if not contract.attributes_tree.number:
@@ -204,13 +200,6 @@ def max_value(vals: [ContractValue]) -> ContractValue or None:
   return max(vals, key=lambda a: a.value.value)
 
 
-def _sub_attention_names(subj: Enum):
-  a = f'x_{subj}'
-  b = AV_PREFIX + f'x_{subj}'
-  c = AV_SOFT + a
-  return a, b, c
-
-
 def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
                       audit_ctx: AuditContext) -> [ContractAgent]:
   # TODO:SORT ORDER, see 63c506cbe2456d59975e12a6
@@ -253,7 +242,7 @@ def nn_find_org_names(textmap: TextMap, semantic_map: DataFrame,
 
   check_org_intersections(contract_agents)  # mutator
 
-  return contract_agents  # _swap_org_tags(cas)
+  return contract_agents
 
 
 def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: AuditContext):
@@ -263,10 +252,9 @@ def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: Aud
   for contract_agent in contract_agents:
     check_org_is_natural_person(contract_agent, ctx)
 
-  if header0:
-    if header0.lower().find('с физическим лицом') >= 0:
-      _set_natural_person(contract_agents[-1])
-      # TODO: why setting it to the last array element??
+  if header0 and header0.lower().find('с физическим лицом') >= 0:
+    _set_natural_person(contract_agents[-1])
+    # TODO: why setting it to the last array element??
 
   return contract_agents
 
@@ -274,9 +262,8 @@ def check_orgs_natural_person(contract_agents: [OrgItem], header0: str, ctx: Aud
 def check_org_is_natural_person(contract_agent: OrgItem, audit_ctx: AuditContext):
   human_name = False
 
-  if contract_agent.type is not None:
-    if len(contract_agent.type) >= 2:
-      return
+  if contract_agent.type is not None and len(contract_agent.type) >= 2:
+    return
 
   if contract_agent.name is not None:
     name: str = contract_agent.name.value
@@ -377,10 +364,9 @@ def nn_find_contract_value(textmap: TextMap, tagsmap: DataFrame) -> [ContractPri
     # removing attributes that lay outside the parent block
     for child_name in cp.list_children_names():
       child = getattr(cp, child_name)
-      if child is not None:
-        if not cp.contains(child.span):
-          # remove it, then later (fallback) try to find it inside parent span
-          setattr(cp, child_name, None)
+      if child is not None and not cp.contains(child.span):
+        # remove it, then later (fallback) try to find it inside parent span
+        setattr(cp, child_name, None)
 
   #   ///SIGN
 

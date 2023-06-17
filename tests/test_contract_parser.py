@@ -33,27 +33,16 @@ class TestContractParser(unittest.TestCase):
 
   def test_find_value_sign_currency(self):
 
-    contract, factory, ctx = self._get_doc_factory_ctx('Договор _2_.docx.pickle')
+    contract, _, ctx = self._get_doc_factory_ctx('Договор _2_.docx.pickle')
     contract.__dict__['warnings'] = []  # hack for old pickles
-    semantic_map, subj_1hot = nn_predict(ctx.subject_prediction_model, contract)
-    r :[ContractPrice]= nn_find_contract_value(contract.tokens_map, semantic_map)
-    # r = ctx.find_contract_value_NEW(doc)
+    semantic_map, _ = nn_predict(ctx.subject_prediction_model, contract)
+    r: [ContractPrice] = nn_find_contract_value(contract.tokens_map, semantic_map)
     print(len(r))
     for group in r:
       for tag in group.list_children():
         print(tag)
 
     self.assertLessEqual(len(r), 2)
-    # print(r)
-    #
-    # value = SemanticTag.find_by_kind(r[0], 'value')
-    # sign = SemanticTag.find_by_kind(r[0], 'sign')
-    # currency = SemanticTag.find_by_kind(r[0], 'currency')
-    #
-    # print(doc.tokens_map_norm.text_range(value.span))
-    # self.assertEqual(price, value.value, text)
-    # self.assertEqual(currency_exp, currency.value)
-    # print(f'{value}, {sign}, {currency}')
 
   def _get_doc_factory_ctx(self, fn='2. Договор по благ-ти Радуга.docx.pickle'):
     doc, factory = self.get_doc(fn)
@@ -69,19 +58,18 @@ class TestContractParser(unittest.TestCase):
     print(pr.__dict__['date'])
 
   def test_contract_analyze(self):
-    doc, factory, ctx = self._get_doc_factory_ctx()
+    doc, _, ctx = self._get_doc_factory_ctx()
     doc.__dict__['number'] = None  # hack for old pickles
     doc.__dict__['date'] = None  # hack for old pickles
     doc.__dict__['attributes_tree'] = ContractSchema()  # hack for old pickles
 
     doc: ContractDocument = ctx.find_attributes(doc, AuditContext())
-    # tags: [SemanticTag] = doc.get_tags()
 
-    _tag = doc.contract_values[0].amount_netto  # SemanticTag.find_by_kind(tags, ContractTags.Value.display_string)
+    _tag = doc.contract_values[0].amount_netto
     quote = doc.tokens_map.text_range(_tag.span)
     self.assertEqual('80000,00', quote)
 
-    _tag = doc.contract_values[0].currency  # SemanticTag.find_by_kind(tags, ContractTags.Currency.display_string)
+    _tag = doc.contract_values[0].currency
     quote = doc.tokens_map.text_range(_tag.span)
     self.assertEqual('рублей', quote)
     self.assertEqual('RUB', doc.contract_values[0].currency.value)

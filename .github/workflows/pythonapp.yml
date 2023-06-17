@@ -32,4 +32,4 @@ jobs:
           GPN_WORK_DIR: fake_dir_for_tests
         run: |
           mkdir $GPN_WORK_DIR
-          pytest
+          python -m pytest .

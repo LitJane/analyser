@@ -9,13 +9,13 @@ from analyser.charter_parser import CharterDocument, CharterParser
 from analyser.log import logger
 from analyser.parsing import AuditContext
 from analyser.runner import get_audits, get_docs_by_audit_id, CHARTER
-from integration.db import get_mongodb_connection
 from integration.word_document_parser import join_paragraphs
+from tests.test_runner import NO_DB, NO_DB_ERR_MSG
 
 
 class TestCharterAnalyse(unittest.TestCase):
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_get_org_names(self):
     parser = CharterParser()
 

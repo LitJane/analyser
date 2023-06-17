@@ -24,11 +24,8 @@ from analyser.ml_tools import SemanticTag, FixedVector, Embeddings, filter_value
   conditional_p_sum, clean_semantic_tag_copy
 from analyser.patterns import DIST_FUNC, AbstractPatternFactory, make_pattern_attention_vector
 from analyser.schemas import ContractPrice, DocumentSchema, GenericDocSchema
-from analyser.structures import ContractTags
 from analyser.text_normalize import normalize_text, replacements_regex
 from analyser.text_tools import find_token_before_index
-from analyser.transaction_values import _re_greather_then, _re_less_then, _re_greather_then_1, VALUE_SIGN_MIN_TOKENS, \
-  ValueSpansFinder
 
 REPORTED_DEPRECATED = {}
 
@@ -64,9 +61,9 @@ class Paragraph:
 
 class LegalDocument:
 
-  def __init__(self, original_text=None, name="legal_doc"):
+  def __init__(self, original_text=None, name="legal_doc", id=None):
 
-    self._id = None  # TODO
+    self._id = id
 
     self.attributes_tree: DocumentSchema or None = DocumentSchema()
     # self.date: SemanticTag or None = None
@@ -181,9 +178,6 @@ class LegalDocument:
     _json_tree['attributes_tree'] = {}
     return _json_tree
 
-  def to_json(self) -> str:
-    j = DocumentJson(self)
-    return json.dumps(j.__dict__, indent=4, ensure_ascii=False, default=lambda o: '<not serializable>')
 
   def get_tokens_cc(self):
     return self.tokens_map.tokens
@@ -285,8 +279,8 @@ class LegalDocument:
 
 class GenericDocument(LegalDocument):
 
-  def __init__(self, original_text):
-    LegalDocument.__init__(self, original_text)
+  def __init__(self, original_text, id=None):
+    LegalDocument.__init__(self, original_text, id=id)
     self.attributes_tree = GenericDocSchema()
 
   def to_json_obj(self) -> dict:
@@ -298,8 +292,8 @@ class GenericDocument(LegalDocument):
 
 class LegalDocumentExt(LegalDocument):
 
-  def __init__(self, doc: LegalDocument):
-    super().__init__('')
+  def __init__(self, doc: LegalDocument, id=None):
+    super().__init__('', id=id)
 
     if doc is not None:
       self.__dict__.update(doc.__dict__)
@@ -330,15 +324,6 @@ class LegalDocumentExt(LegalDocument):
 
 
 class DocumentJson:
-
-  @staticmethod
-  def from_json_str(json_string: str) -> 'DocumentJson':
-    jsondata = json.loads(json_string, object_hook=json_util.object_hook)
-
-    c = DocumentJson(None)
-    c.__dict__ = jsondata
-
-    return c
 
   def __init__(self, doc: LegalDocument):
     self.version = analyser.__version__
@@ -416,22 +401,6 @@ def calculate_distances_per_pattern(doc: LegalDocument, pattern_factory: Abstrac
   return distances_per_pattern_dict
 
 
-def find_value_sign(txt: TextMap) -> (int, (int, int)):
-  a = next(txt.finditer(_re_greather_then_1), None)  # не менее, не превышающую
-  if a:
-    return +1, a
-
-  a = next(txt.finditer(_re_less_then), None)  # менее
-  if a:
-    return -1, a
-  else:
-    a = next(txt.finditer(_re_greather_then), None)  # более
-    if a:
-      return +1, a
-
-  return 0, None
-
-
 class ContractValue:
   def __init__(self, sign: SemanticTag, value: SemanticTag, currency: SemanticTag, parent: SemanticTag = None):
     warnings.warn("switch to ContractPrice struktur", DeprecationWarning)
@@ -488,45 +457,6 @@ class ContractValue:
   def integral_sorting_confidence(self) -> float:
     return conditional_p_sum(
       [self.parent.confidence, self.value.confidence, self.currency.confidence, self.sign.confidence])
-
-
-def extract_sum_sign_currency(doc: LegalDocument, region: (int, int)) -> ContractValue or None:
-  subdoc: LegalDocument = doc[region[0] - VALUE_SIGN_MIN_TOKENS: region[1]]
-
-  _sign, _sign_span = find_value_sign(subdoc.tokens_map)
-
-  # ======================================
-  try:
-    results = ValueSpansFinder(subdoc.text)
-  except TypeError:
-    results = None
-  # ======================================
-
-  if results:
-    value_span = subdoc.tokens_map.token_indices_by_char_range(results.number_span)
-    currency_span = subdoc.tokens_map.token_indices_by_char_range(results.currency_span)
-
-    group = SemanticTag('sign_value_currency', value=None, span=region)
-
-    sign = SemanticTag(ContractTags.Sign.display_string, _sign, _sign_span, parent=group)
-    sign.offset(subdoc.start)
-
-    value_tag = SemanticTag(ContractTags.Value.display_string, results.value, value_span, parent=group)
-    value_tag.offset(subdoc.start)
-
-    currency = SemanticTag(ContractTags.Currency.display_string, results.currencly_name, currency_span,
-                           parent=group)
-    currency.offset(subdoc.start)
-
-    groupspan = [0, 0]
-    groupspan[0] = min(sign.span[0], value_tag.span[0], currency.span[0], group.span[0])
-    groupspan[1] = max(sign.span[1], value_tag.span[1], currency.span[1], group.span[1])
-    group.span = groupspan
-
-    # TODO: return ContractPrice
-    return ContractValue(sign, value_tag, currency, group)
-  else:
-    return None
 
 
 def tokenize_doc_into_sentences_map(txt: str, max_len_chars=150) -> TextMap:

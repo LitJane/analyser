@@ -35,12 +35,12 @@ def embedd_tokenized_sentences_list(embedder, tokenized_sentences_list):
 
 class AbstractEmbedder:
 
-  def __cache_fn(self, checksum):
-    return os.path.join(datasets_dir, f'cache-{checksum}-embeddings-ElmoEmbedder.npy')
+  def __cache_fn(self, checksum) -> str:
+    return str(datasets_dir / f'cache-{checksum}-embeddings-ElmoEmbedder.npy')
 
   def get_cached_embedding(self, checksum) -> Embeddings or None:
     fn = self.__cache_fn(checksum)
-    # print(f'checking for existence {fn}')
+
     if os.path.isfile(fn):
       elmo_logger.debug(f'skipping embedding doc {checksum} ...., {fn} exists, loading')
       e = np.load(fn)

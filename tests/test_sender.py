@@ -5,7 +5,7 @@ from bson import ObjectId
 from analyser import finalizer
 from analyser.runner import apply_judical_practice
 from integration.classifier.sender import get_sender_judicial_org
-from integration.db import get_mongodb_connection
+from tests.test_utilits import NO_DB, NO_DB_ERR_MSG
 
 
 class ClassifierTestCase(unittest.TestCase):
@@ -44,9 +44,8 @@ class ClassifierTestCase(unittest.TestCase):
     b = get_sender_judicial_org(a)
     self.assertIsNotNone(b)
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_get_sender_judicial_org_from_header(self):
-    # doc4classification, main_doc = get_doc4classification(audit)
     document = finalizer.get_doc_by_id(ObjectId("639c64de4b01c8adaa5a4f61"))
     document = document['parse']
     print(document)
@@ -62,5 +61,5 @@ class ClassifierTestCase(unittest.TestCase):
     classification_result = None
     classification_result = apply_judical_practice(classification_result, "sender_judicial_org")
     print(classification_result)
-    self.assertEquals("sender_judicial_org", classification_result[0]['sender_judicial_org'])
-    self.assertEquals("Практика судебной защиты", classification_result[0]['label'])
+    self.assertEqual("sender_judicial_org", classification_result[0]['sender_judicial_org'])
+    self.assertEqual("Практика судебной защиты", classification_result[0]['label'])

@@ -24,18 +24,16 @@ class TestProtocolParser(unittest.TestCase):
 
   def test_read_json(self):
     data = load_json_sample('protocol_1.json')
-    print(data['parse'])
+    self.assertIsNotNone(data)
 
   def test_protocol_processor(self):
     json_doc = load_json_sample('protocol_1.json')
     jdoc = DbJsonDoc(json_doc)
     legal_doc = jdoc.asLegalDoc()
 
-    # print (doc)
-
     pp = Runner.get_instance().protocol_parser
-    # pp.find_org_date_number(legal_doc, AuditContext())
-    legal_doc:ProtocolDocument = pp.find_attributes(legal_doc, AuditContext())
+
+    legal_doc: ProtocolDocument = pp.find_attributes(legal_doc, AuditContext())
 
     orgtags = legal_doc.org_tags
     for t in orgtags:
@@ -61,8 +59,6 @@ class TestProtocolParser(unittest.TestCase):
   def test_load_picke(self):
     doc = self.get_doc('Протокол_СД_ 3.docx.pickle')
     doc: LegalDocument = doc
-    for p in doc.paragraphs:
-      print('😱 \t', doc.get_tag_text(p.header).strip(), '📂')
 
   def test_find_protocol_org_1(self):
     suff = ' ' * 1000
@@ -79,7 +75,7 @@ class TestProtocolParser(unittest.TestCase):
   def test_find_protocol_org_2(self):
     doc = self.get_doc('Протокол_СД_ 3.docx.pickle')
     doc.parse()
-    print(doc[0:200].text)
+
     tags = find_protocol_org(doc)
     self.assertEqual('Технологический центр «Бажен»', tags[0].value)
     self.assertEqual('Общество с ограниченной ответственностью', tags[1].value)
@@ -122,7 +118,6 @@ class TestProtocolParser(unittest.TestCase):
     doc = self.get_doc('Протокол_СД_ 3.docx.pickle')
     x = protocol_votes_re.search(doc.text)
 
-    # for f in x:
     print(doc.text[x.span()[0]:x.span()[1]])
 
   def test_find_protocol_votes_re(self):

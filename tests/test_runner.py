@@ -16,6 +16,7 @@ from analyser.persistence import DbJsonDoc
 from analyser.runner import Runner, get_audits, get_docs_by_audit_id, document_processors, save_analysis, \
   contract_processor
 from integration.db import get_mongodb_connection
+from tests.test_utilits import NO_DB, NO_DB_ERR_MSG
 
 SKIP_TF = True
 
@@ -26,11 +27,11 @@ def get_runner_instance_no_embedder() -> Runner:
   return TestRunner.default_no_tf_instance
 
 
-@unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+@unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
 class TestRunner(unittest.TestCase):
   default_no_tf_instance: Runner = None
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_is_valid(self):
     doc = get_doc_by_id(ObjectId('5fb3d79f78df3635f5441d31'))
     if doc is None:
@@ -41,13 +42,13 @@ class TestRunner(unittest.TestCase):
     contract_processor.is_valid(audit, jdoc)
     # is_va
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_get_audits(self):
     aa = get_audits()
     for a in aa:
       print(a['_id'])
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_get_docs_by_audit_id(self):
     audits = get_audits()
     if len(audits) == 0:
@@ -67,7 +68,7 @@ class TestRunner(unittest.TestCase):
       if len(doc_ids) > 0:
         print(doc_ids[0])
         doc = finalizer.get_doc_by_id(doc_ids[0])
-        # jdoc = DbJsonDoc(doc)
+
         yield doc
 
   def _preprocess_single_doc(self, kind):
@@ -76,19 +77,16 @@ class TestRunner(unittest.TestCase):
       processor = document_processors.get(kind)
       processor.preprocess(d, AuditContext())
 
-  # @unittest.skipIf(SKIP_TF, "requires TF")
-
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_preprocess_single_protocol(self):
     self._preprocess_single_doc('PROTOCOL')
 
-  @unittest.skipIf(get_mongodb_connection() is None is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_preprocess_single_contract(self):
     self._preprocess_single_doc('CONTRACT')
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_process_contracts_phase_1(self):
-    # runner = Runner.get_instance()
 
     audits = get_audits()
     if len(audits) == 0:
@@ -103,7 +101,7 @@ class TestRunner(unittest.TestCase):
       jdoc = DbJsonDoc(_doc)
       processor.preprocess(jdoc, AuditContext())
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_process_charters_phase_1(self):
     audits = get_audits()
     if len(audits) == 0:
@@ -117,7 +115,7 @@ class TestRunner(unittest.TestCase):
       jdoc = DbJsonDoc(_doc)
       processor.preprocess(jdoc, AuditContext())
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_process_protocols_phase_1(self):
     runner = get_runner_instance_no_embedder()
 
@@ -126,15 +124,10 @@ class TestRunner(unittest.TestCase):
       docs = get_docs_by_audit_id(audit_id, kind='PROTOCOL')
 
       for doc in docs:
-        # charter = runner.make_legal_doc(doc)
-
         jdoc = DbJsonDoc(doc)
         legal_doc = jdoc.asLegalDoc()
 
         runner.protocol_parser.find_org_date_number(legal_doc, AuditContext())
         save_analysis(jdoc, legal_doc, -1)
 
-  # if get_mongodb_connection() is not None:
   unittest.main(argv=['-e utf-8'], verbosity=3, exit=False)
-# else:
-#   warnings.warn('mongo connection is not available')

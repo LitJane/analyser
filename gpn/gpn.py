@@ -1,6 +1,6 @@
-import os
 import re
 
+import gpn_config
 from analyser.hyperparams import HyperParameters
 from analyser.text_tools import compare_masked_strings
 
@@ -729,5 +729,5 @@ def update_subsidiaries_cache(new_subsidiaries):
         HyperParameters.subsidiary_name_match_min_jaro_similarity)
 
 
-if os.environ.get("GPN_CSGK_WSDL") is None:
+if gpn_config.configured("GPN_CSGK_WSDL") is None:
   update_subsidiaries_cache(data['Subsidiary'])

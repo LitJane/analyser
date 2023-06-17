@@ -137,8 +137,6 @@ def find_org_names_raw(doc: LegalDocument, max_names=2, parent=None, decay_confi
                                            parent=parent,
                                            decay_confidence=decay_confidence)
 
-  # if len(all) < 200:
-  # falling back to case-agnostic regexp
   all_org_names += find_org_names_raw_by_re(doc,
                                             regex=re_ignore_case,  # case-agnostic
                                             confidence_base=0.75,
@@ -148,9 +146,8 @@ def find_org_names_raw(doc: LegalDocument, max_names=2, parent=None, decay_confi
   # filter, keep unique names
   _map = {}
   for ca in all_org_names:
-    if ca.name is not None:
-      if ca.confidence() > 0.2:
-        put_if_better(_map, ca.name.value, ca, lambda a, b: a.confidence() > b.confidence())
+    if ca.name is not None and ca.confidence() > 0.2:
+      put_if_better(_map, ca.name.value, ca, lambda a, b: a.confidence() > b.confidence())
 
   res = list(_map.values())
   res = sorted(res, key=lambda a: -a.confidence())
@@ -162,7 +159,7 @@ def find_org_names_raw_by_re(doc: LegalDocument, regex, confidence_base: float, 
                              decay_confidence=True) -> [ContractAgent]:
   all_: [ContractAgent] = []
 
-  iter = [m for m in re.finditer(regex, doc.text)]
+  iter = list(re.finditer(regex, doc.text))
 
   for m in iter:
     ca = ContractAgent()

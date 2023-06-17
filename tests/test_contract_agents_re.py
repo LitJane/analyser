@@ -11,9 +11,10 @@ from analyser.contract_agents import r_type_and_name, complete_re_str, find_org_
   complete_re_str_org, complete_re, r_alias, r_alter, r_quoted_name_alias, r_being_a_citizen, r_being_a_human_citizen
 from analyser.contract_parser import ContractDocument
 from analyser.legal_docs import LegalDocument
+from analyser.log import logger
 from analyser.ml_tools import SemanticTag
 from analyser.protocol_parser import ProtocolDocument, find_protocol_org
-from analyser.text_normalize import _r_name_ru, r_human_abbr_name, r_human_full_name, _r_name_lat, replacements_regex, \
+from analyser.text_normalize import r_human_abbr_name, r_human_full_name, replacements_regex, \
   r_alias_prefix, r_types, sub_ip_quoter, sub_alias_quote, r_human_name, ru_cap, r_quoted_name, r_group
 
 _suffix = " слово" * 1000
@@ -39,18 +40,6 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     x = ru_cap('автономной учрежденией')
     self.assertEqual(r'([Аа]втономн[а-я]{0,3})\s+([Уу]чреждени[а-я]{0,3})', x)
-
-  def test_r_name(self):
-
-    r = re.compile(_r_name_ru, re.MULTILINE)
-    x = r.search('УУУ')
-    print(x)
-    x = r.search('ННН')
-    print(x)
-
-    r = re.compile(_r_name_lat, re.MULTILINE)
-    x = r.search('YYy')
-    print(x)
 
   def test_r_type_and_name(self):
 
@@ -84,8 +73,7 @@ class TestContractAgentsSearch(unittest.TestCase):
        ООО «Газпромнефть-Региональные продажи» в дальнейшем «Благотворитель», с другой стороны
        """
     x = r.search(t)
-    for c in range(6):
-      print(c, x[c])
+
     self.assertEqual('ООО', x['type'])
     self.assertEqual('Газпромнефть-Региональные продажи', x['name'])
 
@@ -97,8 +85,7 @@ class TestContractAgentsSearch(unittest.TestCase):
        ООО «Газпромнефть-Региональные продажи», в дальнейшем «Благотворитель», с другой стороны
        """
     x = r.search(t)
-    for c in range(6):
-      print(c, x[c])
+
     self.assertEqual('ООО', x['type'])
     self.assertEqual('Газпромнефть-Региональные продажи', x['name'])
 
@@ -107,8 +94,7 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     x = r.search(
       'некое Общество с ограниченной ответственностью «Меццояхве » ( или "Иначе"), именуемое в дальнейшем "Нечто"')
-    for c in range(13):
-      print(c, x[c])
+
 
     self.assertEqual('Общество с ограниченной ответственностью', x['type'])
     self.assertEqual('Меццояхве', x['name'])
@@ -120,8 +106,6 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     x = r.search(
       'некое Общество с ограниченной ответственностью «НЕ БЕЗ НАЗВАНИЯ» ( или "Иначе"), как бе именуемое в дальнейшем "Как-то так"')
-    # for c in range(13):
-    #   print(c, x[c])
 
     self.assertEqual('Общество с ограниченной ответственностью', x['type'])
     self.assertEqual('НЕ БЕЗ НАЗВАНИЯ', x['name'])
@@ -174,12 +158,12 @@ class TestContractAgentsSearch(unittest.TestCase):
          'услуг (далее – «Договор»)  о нижеследующем:'
 
     t1 = n(t1)
-    # r = re.compile(r_types, re.MULTILINE)
+
     r = complete_re_ignore_case
     x = r.search(t1)
-    print('===r_alias_prefix=', x['r_alias_prefix'])
-    print('===r_quoted_name=', x['r_quoted_name'])
-    print('===r_quoted_name_alias=', x['r_quoted_name_alias'])
+    logger.info('===r_alias_prefix=%s', x['r_alias_prefix'])
+    logger.info('===r_quoted_name=%s', x['r_quoted_name'])
+    logger.info('===r_quoted_name_alias=%s', x['r_quoted_name_alias'])
 
     tags: List[SemanticTag] = find_org_names(LegalDocument(t1).parse())
 
@@ -331,7 +315,7 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     doc = ProtocolDocument(LegalDocument(doc_text))
     doc.parse()
-    print(doc.text)
+
     tags: [SemanticTag] = find_protocol_org(doc)
     self._validate_org(tags, 1, ('Общество с ограниченной ответственностью', 'Газпромнефть Шиппинг', None))
 
@@ -383,7 +367,7 @@ class TestContractAgentsSearch(unittest.TestCase):
                'именуемые «Стороны», а по отдельности - «Сторона», заключили настоящий договор (далее по тексту – ' \
                'Договор) о нижеследующем:'
     doc = LegalDocument(txt_full).parse()
-    print(doc.text)
+
 
     txt = txt_full[150:]
 
@@ -407,8 +391,8 @@ class TestContractAgentsSearch(unittest.TestCase):
     self.assertEqual('ООО', x['type'])
     self.assertEqual('Ромашка', x['name'])
     self.assertEqual('Покупатель', x['alias'])
-    print('r_alias_prefix=', x['r_alias_prefix'])
-    print('_alias_ext=', x['_alias_ext'])
+    logger.info('r_alias_prefix=%s', x['r_alias_prefix'])
+    logger.info('_alias_ext=%s', x['_alias_ext'])
 
     r = complete_re
     x = r.search(normalized_txt)
@@ -441,9 +425,6 @@ class TestContractAgentsSearch(unittest.TestCase):
     x = r.search(n(txt))
     self.assertEqual('Акционерное Общество', x['type'])
     self.assertEqual('Газпромнефть – Терминал', x['name'])
-
-    print('r_alias_prefix=', x['r_alias_prefix'])
-    print('_alias_ext=', x['_alias_ext'])
 
     r = complete_re
     x = r.search(n(txt))
@@ -611,7 +592,6 @@ class TestContractAgentsSearch(unittest.TestCase):
 
   def test_r_alias_prefix(self):
     r = re.compile(r_alias_prefix, re.MULTILINE)
-    print(r)
 
     x = r.search('что-то именуемое в дальнейшем Жертвователь, и ')
     self.assertEqual(x[2], 'именуемое в дальнейшем ')
@@ -643,9 +623,7 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     r = re.compile(r_alter + r_alias, re.MULTILINE)
     x = r.search(t)
-    # for c in x.groups():
-    #   print(c)
-    print('r_alias_prefix=', x['r_alias_prefix'])
+
     self.assertEqual('Исполнитель', x['alias'])
 
   def test_r_alias_2(self):
@@ -663,7 +641,6 @@ class TestContractAgentsSearch(unittest.TestCase):
     self.assertEqual('Заказчик', x['alias'])
 
   def test_r_quoted_name(self):
-    # 'Фонд поддержки социальных инициатив «Лингвистическая школа «Слово», именуемый'
 
     t = n("""
         ООО «Газпромнефть-Региональные продажи» в дальнейшем «Благотворитель», с другой стороны
@@ -684,7 +661,7 @@ class TestContractAgentsSearch(unittest.TestCase):
     self.assertEqual('Лингвистическая школа «Слово', x1['name'])
 
   def test_r_quoted_name_alias(self):
-    # 'Фонд поддержки социальных инициатив «Лингвистическая школа «Слово», именуемый'
+
     rgc = re.compile(r_quoted_name_alias, re.MULTILINE)
 
     x = rgc.search('что-то именуемое в дальнейшем " Абралябмда филорна", и ')
@@ -698,9 +675,7 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     t = 'что-то именуемое в дальнейшем Жертвователь-какаха, и нечто, именуемое далее КАКАХА-ХА '
 
-    x = sub_alias_quote[0].search(t)
-    for c in range(7):
-      print(c, x[c])
+    sub_alias_quote[0].search(t)
 
     replacer = r[1]
     pattern = r[0]
@@ -753,8 +728,6 @@ class TestContractAgentsSearch(unittest.TestCase):
     x = r.search(t1)
     self.assertEqual('являющаяся гражданинкой', x['citizen'])
 
-    # self.assertEqual('Фамильный Имен Отчестыч', x['human_name'])
-
   def test_find_agents_personz_1(self):
     t0 = """с одной \
     стороны, и Базедов Недуг Бледнович, являющийся гражданином Российской Федерации, действующий \
@@ -763,8 +736,7 @@ class TestContractAgentsSearch(unittest.TestCase):
 
     r = re.compile(complete_re_str, re.MULTILINE)
     x = r.search(t0)
-    for t in x.groups():
-      print(t)
+
     self.assertEqual('Базедов Недуг Бледнович', x['human_name'])
 
   def test_find_agents_personz_2(self):
@@ -773,12 +745,6 @@ class TestContractAgentsSearch(unittest.TestCase):
     стороны, и Базедов Недуг Бледнович, являющийся гражданином Российской Федерации, действующий \
     от собственного имени, именуемый в дальнейшем «Исполнитель», с другой стороны, совместно \
     именуемые «Стороны», и каждая в отдельности «Сторона», заключили настоящий """
-
-    # r = re.compile(complete_re_str, re.MULTILINE)
-    # x = r.search(t0)
-    # for t in x.groups():
-    #   print(t)
-    # self.assertEqual('Базедов Недуг Бледнович', x['human_name'])
 
     tags: List[SemanticTag] = find_org_names(LegalDocument(t0).parse())
     self._validate_org(tags, 2, ('Общество с ограниченной ответственностью', 'Кишки Бога', 'Заказчик'))
@@ -814,10 +780,8 @@ class TestContractAgentsSearch(unittest.TestCase):
     self.assertEqual(None, x)
 
   def test_r_human_name(self):
-    # r = re.compile(r'\W' + r_human_name, re.MULTILINE)
+
     r = re.compile(r'\W' + r_group(r_human_abbr_name, 'human_name'), re.MULTILINE)
-    # r_human_full_name
-    # r_human_abbr_name
 
     x = r.search('что-то Газпромнефть-Омский НПЗ, который был')
     self.assertIsNone(x)

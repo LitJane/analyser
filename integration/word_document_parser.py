@@ -12,16 +12,15 @@ def create_doc_by_type(t: str, doc_id, filename) -> CharterDocument or ContractD
   # TODO: check type of res
 
   if t in ('CONTRACT', 'ANNEX', 'SUPPLEMENTARY_AGREEMENT', 'AGREEMENT'):
-    doc = ContractDocument('')
+    doc = ContractDocument('', id=doc_id)
   elif t == 'PROTOCOL':
-    doc = ProtocolDocument()
+    doc = ProtocolDocument(id=doc_id)
   elif t == 'CHARTER':
-    doc = CharterDocument()
+    doc = CharterDocument(id=doc_id)
   else:
     logging.warning(f"Unsupported document type: {t}")
-    doc = GenericDocument('')
+    doc = GenericDocument('', id=doc_id)
 
-  doc._id = doc_id
   doc.filename = filename
 
   doc.parse()
