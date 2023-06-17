@@ -13,7 +13,7 @@ def in_unit_test():
   for stack_frame in current_stack:
     if stack_frame and stack_frame[4]:
       for program_line in stack_frame[4]:  # This element of the stack frame contains
-        if "unittest" in program_line:  # some contextual program lines
+        if "unittest" in program_line or "pytest" in program_line:  # some contextual program lines
 
           return True
   return False
