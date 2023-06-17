@@ -1,12 +1,25 @@
+import inspect
 import os
-import sys
 from pathlib import Path
 
 import yaml
 
 from analyser.log import logger
 
-in_test_mode = 'unittest' in sys.modules.keys()
+
+def in_unit_test():
+  current_stack = inspect.stack()
+
+  for stack_frame in current_stack:
+    if stack_frame and stack_frame[4]:
+      for program_line in stack_frame[4]:  # This element of the stack frame contains
+        if "unittest" in program_line:  # some contextual program lines
+
+          return True
+  return False
+
+
+in_test_mode = in_unit_test()
 
 path_to_config = os.environ.get('GPN_CONFIG_PATH')
 if path_to_config is None:
@@ -35,3 +48,12 @@ def secret(key, default_val=None):
     msg = f'⚠️ {key}: environment variable is not set'
     logger.warning(msg)
   return val
+
+
+print(path_to_config)
+for x in __config:
+  print(x, '\t -- \t', f'[{__config[x]}]')
+
+if __name__ == '__main__':
+  if in_test_mode:
+    logger.warning("CONFIG: IN UNIT TEST MODE")
