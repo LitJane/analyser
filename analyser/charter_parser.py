@@ -361,9 +361,8 @@ def collect_subjects_spans2(subdoc, subject_attentions_map, min_len=20) -> Spans
                                                                   subject_attention,
                                                                   min_len=min_len,
                                                                   return_delimiters=False)
-    if confidence > HyperParameters.charter_subject_attention_confidence:
-      if paragraph_span not in spans:
-        spans.append(paragraph_span)
+    if confidence > HyperParameters.charter_subject_attention_confidence and paragraph_span not in spans:
+      spans.append(paragraph_span)
 
   unique_sentence_spans = merge_colliding_spans(spans, eps=-1)
 

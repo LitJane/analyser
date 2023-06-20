@@ -37,7 +37,6 @@ class TestContractParser(unittest.TestCase):
     contract.__dict__['warnings'] = []  # hack for old pickles
     semantic_map, _ = nn_predict(ctx.subject_prediction_model, contract)
     r: [ContractPrice] = nn_find_contract_value(contract.tokens_map, semantic_map)
-    # r = ctx.find_contract_value_NEW(doc)
     print(len(r))
     for group in r:
       for tag in group.list_children():

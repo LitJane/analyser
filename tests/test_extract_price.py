@@ -140,14 +140,14 @@ class PriceExtractTestCase(unittest.TestCase):
     # ex = '2.2 Общая стоимость Услуг составляет шестьдесят два миллиона (62000000) рублей ноль (30) копеек, включая НДС (20%): ' \
     #      'Десять миллионов четыреста тысяч (10400000) рубля ноль (00) копеек. Стоимость Услуг является фиксированной (твердой) ' \
     #      'и не подлежит изменению в течение срока действия Договора.'
-    # print('sum', extract_sum(ex))
+
     tx = "составит - не более 1661 293,757 тыс. рублей  25 копеек ( с учетом ндс ) ( 0,93 % балансовой стоимости активов)"
     val = ValueSpansFinder(tx)
     self.assertEqual(True, val.including_vat)
     self.assertEqual(1661293757.25, val.original_sum)
     self.assertEqual('RUB', val.currencly_name)
 
-    print('val', val)
+
 
   def test_find_value_sign_a(self):
     text = """стоимость, равную или превышающую 2000000 ( два миллиона ) долларов сша"""
@@ -170,10 +170,8 @@ class PriceExtractTestCase(unittest.TestCase):
       sign, span = find_value_sign(tm)
       if sign_expected:
         self.assertEqual(sign_expected, sign, text)
-      quote = ''
-      if span:
-        quote = tm.text_range(span)
-      print(f'{sign},\t {span},\t {quote}')
+
+
 
   def test_extract(self):
     errorsc = 0
@@ -249,11 +247,8 @@ class PriceExtractTestCase(unittest.TestCase):
       doc.parse()
       r: List = find_value_sign_currency(doc)
       if r:
-        print(doc.tokens_map_norm.text_range(r[0].amount.span))
         self.assertEqual(price, r[0].amount.value, text)
         self.assertEqual(currency_exp, r[0].currency.value, text)
-        print(r[0].amount.value)
-        print(f'{r[0].value}, {r[0].sign}, {r[0].currency}')
 
   def test_number_re(self):
     from analyser.transaction_values import number_re
@@ -271,10 +266,9 @@ class PriceExtractTestCase(unittest.TestCase):
     numbers = numbers_str.split('\n')
     for n in numbers:
       tokens = nltk.word_tokenize(n)
-      print(tokens)
+
       for t in tokens:
-        ff = number_re.findall(t)
-        print(len(ff) > 0, ff)
+        _ = number_re.findall(t)
 
   def test_conditional_p_sum(self):
     v = [0.9, 0.9]

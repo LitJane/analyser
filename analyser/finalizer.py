@@ -19,7 +19,6 @@ from integration.currencies import convert_to_currency
 from integration.db import get_mongodb_connection, get_doc_by_id
 from integration.mail import send_classifier_email, send_classifier_error_email
 
-# get_doc_by_id=db.get_doc_by_id
 
 full_name_pattern = re.compile(r'(?P<last_name>[а-я,А-Я,a-z,A-Z]+) +(?P<first_name>[а-я,А-Я,a-z,A-Z]+)(\.? +)?(?P<middle_name>[а-я,А-Я,a-z,A-Z]+)?')
 company_name_pattern = re.compile(r'[«\'"](?P<company_name>.+)[»\'"]')
