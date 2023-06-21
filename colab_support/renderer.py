@@ -144,35 +144,11 @@ class SilentRenderer(AbstractRenderer):
   pass
 
 
-# v_color_map = {
-#   'deal_value_attention_vector': (1, 0.0, 0.5),
-#   'soft$.$at_sum__': (0.9, 0.5, 0.0),
-#
-#   '$at_sum__': (0.9, 0, 0.1),
-#   'soft$.$at_d_order_': (0.0, 0.3, 0.9),
-#
-#   f'{AV_PREFIX}margin_value': (1, 0.0, 0.5),
-#   f'{AV_SOFT}{AV_PREFIX}margin_value': (1, 0.0, 0.5),
-#
-#   f'{AV_PREFIX}x_{ContractSubject.Charity}': (0.0, 0.9, 0.3),
-#   f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.Charity}': (0.0, 1.0, 0.0),
-#
-#   f'{AV_PREFIX}x_{ContractSubject.Lawsuit}': (0.8, 0, 0.7),
-#   f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.Lawsuit}': (0.9, 0, 0.9),
-#
-#   f'{AV_PREFIX}x_{ContractSubject.RealEstate}': (0.2, 0.2, 1),
-#   f'{AV_SOFT}{AV_PREFIX}x_{ContractSubject.RealEstate}': (0.2, 0.2, 1),
-# }
-
 colors_by_contract_subject = {
   ContractSubject.RealEstate: (0.2, 0.2, 1),
   ContractSubject.Lawsuit: (0.9, 0, 0.9),
   ContractSubject.Charity: (0.0, 0.9, 0.3),
 }
-
-
-# for k in colors_by_contract_subject:
-#   v_color_map[f'{AV_SOFT}{AV_PREFIX}x_{k}'] = colors_by_contract_subject[k]
 
 
 class HtmlRenderer(AbstractRenderer):
@@ -480,5 +456,5 @@ def plot_cm(y_true, y_pred, figsize=(12, 12)):
   cm = pd.DataFrame(cm_perc, index=np.unique(y_true), columns=np.unique(y_true))
   cm.index.name = 'Actual'
   cm.columns.name = 'Predicted'
-  fig, ax = plt.subplots(figsize=figsize)
+  _, ax = plt.subplots(figsize=figsize)
   sns.heatmap(cm, cmap="YlGnBu", annot=annot, fmt='', ax=ax)

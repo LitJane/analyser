@@ -12,10 +12,9 @@ from analyser.log import logger
 from analyser.parsing import AuditContext
 from analyser.persistence import DbJsonDoc
 from analyser.runner import BaseProcessor, document_processors, CONTRACT, PROTOCOL, CHARTER, audit_phase_1_doc
-from integration.db import get_mongodb_connection
+from tests.test_runner import NO_DB, NO_DB_ERR_MSG
 
 
-# @unittest.skip
 class AnalyzerTestCase(unittest.TestCase):
 
   @unittest.skip
@@ -33,13 +32,13 @@ class AnalyzerTestCase(unittest.TestCase):
     processor.process(jdoc, audit, ctx)
     print(jdoc)
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_audit_phase_1(self):
     a = get_audit_by_id(ObjectId("633ed919061c0ae8025a7bfb"))
     ctx = AuditContext(a.get("subsidiary", {}).get("name", None))
     audit_phase_1_doc(ObjectId('633ed91ec35ce0d42fd09095'), ctx)
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_analyze_generic_doc(self):
     uid = ObjectId('633ed91ac35ce0d42fd09039')
     processor: BaseProcessor = document_processors["GENERIC"]
@@ -60,7 +59,7 @@ class AnalyzerTestCase(unittest.TestCase):
     legal_doc = processor.process(jdoc, audit, ctx)
     print(legal_doc.attributes_tree)
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_analyze_contract(self):
     processor: BaseProcessor = document_processors[CONTRACT]
 
@@ -78,7 +77,7 @@ class AnalyzerTestCase(unittest.TestCase):
     processor.preprocess(jdoc, context=ctx)
     processor.process(jdoc, audit, ctx)
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_analyze_protocol(self):
     processor: BaseProcessor = document_processors[PROTOCOL]
     doc = get_doc_by_id(ObjectId('5e5de70b01c6c73c19eebd35'))
@@ -93,7 +92,7 @@ class AnalyzerTestCase(unittest.TestCase):
     processor.preprocess(jdoc, context=ctx)
     processor.process(jdoc, audit, ctx)
 
-  @unittest.skipIf(get_mongodb_connection() is None, "requires mongo")
+  @unittest.skipIf(NO_DB, NO_DB_ERR_MSG)
   def test_analyze_charter(self):
     processor: BaseProcessor = document_processors[CHARTER]
     doc = get_doc_by_id(ObjectId('60c371b7862b20b4ba55c735'))

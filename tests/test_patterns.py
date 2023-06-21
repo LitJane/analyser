@@ -15,16 +15,6 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     print(m)
     self.assertTrue(np.allclose(m, np.array([[3, mask, mask], [mask, 3, 5]])))
 
-  def test_exclusive_find(self):
-    point2 = [1, 7]
-    point3 = [1, 6]
-
-    fp1 = FuzzyPattern(None)
-    fp1.set_embeddings(np.array([point2]))
-
-    fp2 = FuzzyPattern(None)
-    fp2.set_embeddings(np.array([point3]))
-
   def test_eval_distances(self):
     point1 = [1, 3]
     point2 = [1, 7]
@@ -91,6 +81,8 @@ class CoumpoundFuzzyPatternTestCase(unittest.TestCase):
     distances = pattern._eval_distances(text_emb)
     # ----------------
     print('sums=', distances)
+    self.assertAlmostEqual(0.00052, distances[0], places=4)
+    self.assertAlmostEqual(0.00026, distances[1], places=4)
 
   def test_etimate_confidence(self):
     from analyser.ml_tools import estimate_confidence

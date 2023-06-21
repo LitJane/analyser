@@ -1,10 +1,10 @@
 import json
-import os
 from pathlib import Path
 
 from pymongo import DESCENDING
 
 import analyser
+import gpn_config
 from analyser.charter_parser import CharterParser
 from analyser.schemas import document_schemas
 from analyser.structures import OrgStructuralLevel, ContractSubject, contract_subjects, \
@@ -54,7 +54,7 @@ def update_db_dictionaries():
 
   insert_schemas_to_db(db)
 
-  if os.environ.get("GPN_CSGK_WSDL") is None:
+  if gpn_config.configured("GPN_CSGK_WSDL") is None:
     coll = db["subsidiaries"]
     coll.delete_many({})
     coll.insert_many(subsidiaries)

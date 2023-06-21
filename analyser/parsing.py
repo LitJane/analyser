@@ -64,7 +64,7 @@ class AuditContext:
     self.audit_subsidiary_name: str = audit_subsidiary_name
     self.fixed_audit_subsidiary_name = '__unknown___'
 
-    known_org_name, best_similarity = find_closest_org_name(subsidiaries, audit_subsidiary_name,
+    known_org_name, _ = find_closest_org_name(subsidiaries, audit_subsidiary_name,
                                                             HyperParameters.subsidiary_name_match_min_jaro_similarity)
     if known_org_name is not None:
       self.fixed_audit_subsidiary_name = known_org_name['_id']

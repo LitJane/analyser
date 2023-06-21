@@ -5,17 +5,10 @@ import tensorflow as tf
 import tensorflow_hub as hub
 
 from analyser.embedding_tools import AbstractEmbedder
-from analyser.hyperparams import work_dir
 from analyser.log import logger
 from analyser.text_tools import Tokens
 
 _e_instance: AbstractEmbedder or None = None
-
-if "TFHUB_CACHE_DIR" not in os.environ:
-  tf_cache = os.path.join(work_dir, 'tf_cache')
-  os.environ["TFHUB_CACHE_DIR"] = tf_cache
-
-
 
 
 class ElmoEmbedderWrapper(AbstractEmbedder):
@@ -38,7 +31,7 @@ class ElmoEmbedderWrapper(AbstractEmbedder):
 
 class ElmoEmbedderImpl(AbstractEmbedder):
 
-  #TODO: move this to external config
+  # TODO: move this to external config
   def __init__(self, module_url: str = 'https://storage.googleapis.com/az-nlp/elmo_ru-news_wmt11-16_1.5M_steps.tar.gz'):
     self.module_url = module_url
     self.session = None
@@ -48,8 +41,8 @@ class ElmoEmbedderImpl(AbstractEmbedder):
     embedding_graph = tf.compat.v1.Graph()
 
     with embedding_graph.as_default():
-      logger.info(f'< loading ELMO module {self.module_url}')
-      logger.info(f'TF hub cache dir is  {os.environ["TFHUB_CACHE_DIR"]}')
+      logger.info('loading ELMO module %s', self.module_url)
+      logger.info('TF hub cache dir is %s', os.environ["TFHUB_CACHE_DIR"])
       _elmo = hub.Module(self.module_url, trainable=False)
       logger.info(f'ELMO module loaded >')
 

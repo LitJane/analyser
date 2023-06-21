@@ -18,11 +18,10 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from analyser.documents import TextMap
 from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
-from analyser.hyperparams import work_dir as default_work_dir
 from analyser.legal_docs import embedd_tokens
 from analyser.persistence import DbJsonDoc
 from tf_support.embedder_elmo import ElmoEmbedder
-from tf_support.super_contract_model import get_semantic_map_new, make_att_model, losses, metrics
+from tf_support.super_contract_model import get_semantic_map_new, make_att_model, losses, metrics, datapoint_path
 from tf_support.tools import KerasTrainingContext
 
 matplotlib.use('Agg')
@@ -36,10 +35,6 @@ _EMBEDD = True
 
 # TODO: 2. use averaged tags confidence for sample weighting
 # TODO: 3. evaluate on user-marked documents only
-
-
-def _dp_fn(doc_id, suffix):
-  return os.path.join(default_work_dir, 'datasets', f'{doc_id}-datapoint-{suffix}.npy')
 
 
 def save_contract_data_arrays(db_json_doc: DbJsonDoc):
@@ -63,9 +58,9 @@ def save_contract_data_arrays(db_json_doc: DbJsonDoc):
   semantic_map: DataFrame = get_semantic_map_new(db_json_doc)
   #####
 
-  np.save(_dp_fn(id_, 'token_features'), token_features)
-  np.save(_dp_fn(id_, 'semantic_map'), semantic_map)
-  _embeddings_file = _dp_fn(id_, 'embeddings')
+  np.save(str(datapoint_path(id_, 'token_features')), token_features)
+  np.save(str(datapoint_path(id_, 'semantic_map')), semantic_map)
+  _embeddings_file = str(datapoint_path(id_, 'embeddings'))
   np.save(_embeddings_file, embeddings)
   print(f'embeddings saved to {_embeddings_file} {embeddings.shape}')
 

@@ -3,6 +3,7 @@ from typing import Dict, List
 import mlflow
 import pandas as pd
 
+# TODO: why importing it here?
 from analyser.dictionaries import integration_path, labels, label2id
 from utilits.utils import _env_var
 
@@ -30,7 +31,9 @@ def wrapper(document):
     df = pd.DataFrame([json_from_text], columns=['text'])
     predictions = model.predict(df)
     result = []
-    for index, row in predictions.iterrows():
+
+    for _, row in predictions.iterrows():
+
         result.append({
             'label': row['practice'],
             'score': row['confidence']
