@@ -1,5 +1,5 @@
 import re
-from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+ILLEGAL_CHARACTERS_RE = re.compile(r'[\000-\010]|[\013-\014]|[\016-\037]')
 
 list_of_address_regexes = [
     # (опционально: ООО, "Фирма"), Индекс, город, улица, дом
