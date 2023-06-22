@@ -8,6 +8,7 @@ from analyser.headers_detector import get_tokens_features
 from analyser.hyperparams import models_path
 from analyser.ml_tools import FixedVector
 from analyser.structures import ContractSubject
+from integration import mlflow_tools
 from tf_support.super_contract_model import make_att_model, semantic_map_keys_contract
 from tf_support.tools import KerasTrainingContext
 
@@ -39,7 +40,7 @@ predict_subject = nn_predict
 
 def load_subject_detection_trained_model() -> Model:
   ctx = KerasTrainingContext(models_path)
-
-  final_model = ctx.init_model(make_att_model, trained=True, trainable=False, verbose=10)
+  weights_file = mlflow_tools.load_weights_from_mlflow()
+  final_model = ctx.init_model(make_att_model, trained=True, trainable=False, verbose=10, weights=weights_file)
 
   return final_model

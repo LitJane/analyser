@@ -74,21 +74,6 @@ class KerasTrainingContext:
     else:
       return None, 0
 
-  def resave_model_h5(self, model_factory_fn):
-    model = self.init_model(model_factory_fn, load_weights=False)
-    model_name = model_factory_fn.__name__
-    ch_fn_old = os.path.join(self.model_checkpoint_path, f"{model_name}.weights")
-    model.load_weights(ch_fn_old)
-    logger.info(f'model weights loaded: {ch_fn_old}')
-
-    ch_fn = os.path.join(self.model_checkpoint_path, f"{model_name}-{keras.__version__}.h5")
-
-    if not os.path.isfile(ch_fn):
-      model.save_weights(ch_fn)
-      logger.info(f"model weights saved to {ch_fn}")
-
-    else:
-      logger.info(f"model weights NOT saved, because file exists {ch_fn}")
 
   def init_model(self, model_factory_fn, model_name_override=None, weights_file_override=None,
                  verbose=0,

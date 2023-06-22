@@ -10,6 +10,9 @@ GPN_DB_HOST: '192.168.10.36'
 GPN_DB_PORT: 27017
 
 MLFLOW_URL: "http://192.168.10.38:5000"
+MLFLOW_MODEL_STAGE_TO_USE: "Production" #or Staging? refer ml flow wwb for values
+
+
 
 #GPN_DB_USER: None # set in env, because it is secret
 #GPN_DB_PASSWORD: None # set in env, because it is secret
