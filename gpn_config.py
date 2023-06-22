@@ -1,10 +1,25 @@
+
 import inspect
 import os
 from pathlib import Path
 
 import yaml
 
-from analyser.log import logger
+
+import logging
+
+logger = logging.getLogger('gpn_cfg')
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+_FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
+
+formatter = logging.Formatter(_FORMAT)
+ch.setFormatter(formatter)
+logger.setLevel(logging.DEBUG)
+
+logger.addHandler(ch)
+
 
 
 def in_unit_test():
@@ -56,4 +71,5 @@ for x in __config:
 
 if __name__ == '__main__':
   if in_test_mode:
+    pass
     logger.warning("CONFIG: IN UNIT TEST MODE")
