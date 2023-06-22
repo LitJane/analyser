@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas as pd
 import tensorflow.keras.backend as K
 from pandas import DataFrame
-from tensorflow import keras
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger, ReduceLROnPlateau
 
