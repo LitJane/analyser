@@ -177,13 +177,13 @@ class UberModelTrainsetManager:
 
     try:
       model.load_weights(weights_file_new, by_name=True, skip_mismatch=True)
-      logger.info(f'weights loaded: {weights_file_new}')
+      logger.info(f'weights loaded: %s', weights_file_new)
 
     except Exception as e:
       msg = f'cannot load  {model_name} from  {weights_file_new}: {e}'
       warnings.warn(msg)
       model.load_weights(weights_file_old, by_name=True, skip_mismatch=True)
-      logger.info(f'weights loaded: {weights_file_old}')
+      logger.info(f'weights loaded: %s',  weights_file_old)
 
     # freeze bottom 6 layers, including 'embedding_reduced' #TODO: this must be model-specific parameter
     for layer in model.layers[0:6]:
