@@ -11,11 +11,19 @@
 - [config-test.yaml](config.yaml) --  определяет альтернативную конфигурацию 
   для unit-tests (например, др. базу данных)
 
-- Для переопределения пути к файлу конфигурации можно установить переменную среды *GPN_CONFIG_PATH* 
+- Для переопределения пути к файлу конфигурации следует установить переменную среды *GPN_CONFIG_PATH* 
 ```
 export GPN_CONFIG_PATH = some/path/to/alternative/config.yaml
 ```
 - детали см. в [gpn_config.py](gpn_config.py)
+  
+### Теущая модель 
+Должна быть выбрана через UI MLFLow в разделе /models/Analyser. 
+Модель должна быть в той фазе, которая указана в [config.yaml](config.yaml): 
+- `MLFLOW_MODEL_STAGE_TO_USE` -- `Production` или `Staging`, 
+- `MLFLOW_URL` определяет URL сервера
+
+
 
 
 ## Конве́йер анализатора

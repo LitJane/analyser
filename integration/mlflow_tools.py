@@ -13,8 +13,9 @@ def __load_weights_from_mlflow(weights_file_name='make_att_model_03.h5'):
   logger.info(gpn_config.configured('MLFLOW_URL'))
 
   mlflow_client = mlflow.tracking.MlflowClient()
-  print('ML FLOW tracking_uri', mlflow_client.tracking_uri)
-  print('ML FLOW version', mlflow.__version__)
+  logger.info('ML FLOW tracking_uri: %s', mlflow_client.tracking_uri)
+  logger.info('ML FLOW version: %s', mlflow.__version__)
+
   try:
     for mv in mlflow_client.search_model_versions("name='Analyser'"):
       _d = dict(mv)
