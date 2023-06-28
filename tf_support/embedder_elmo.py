@@ -11,6 +11,8 @@ from gpn_config import configured
 
 _e_instance: AbstractEmbedder or None = None
 
+_default_module_url = configured('BASE_MODEL_URL')
+
 
 class ElmoEmbedderWrapper(AbstractEmbedder):
   def __init__(self, instance: AbstractEmbedder, layer: str):
@@ -32,11 +34,8 @@ class ElmoEmbedderWrapper(AbstractEmbedder):
 
 class ElmoEmbedderImpl(AbstractEmbedder):
 
-  def __init__(self, module_url: str = None):
-    if module_url is None:
-      self.module_url = configured('BASE_MODEL_URL')
-    else:
-      self.module_url = module_url
+  def __init__(self, module_url: str = _default_module_url):
+    self.module_url = module_url
     self.session = None
 
   def _build_session_and_graph(self):
