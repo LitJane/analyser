@@ -5,23 +5,26 @@ import mlflow
 import gpn_config
 from analyser.hyperparams import work_dir
 from analyser.log import logger
+from gpn_config import configured
 
-mlflow.set_tracking_uri(gpn_config.configured('MLFLOW_URL'))
+mlflow.set_tracking_uri(configured('MLFLOW_URL'))
+
+mlflow_model_name = configured('MLFLOW_ANALYSER_MODEL_NAME', 'Analyser')
 
 
-def __load_weights_from_mlflow(weights_file_name='make_att_model_03.h5'):
-  logger.info(gpn_config.configured('MLFLOW_URL'))
+def __load_weights_from_mlflow(weights_file_name='make_att_model_03.h5', model_name=mlflow_model_name):
+  logger.debug(configured('MLFLOW_URL'))
 
   mlflow_client = mlflow.tracking.MlflowClient()
   logger.info('ML FLOW tracking_uri: %s', mlflow_client.tracking_uri)
   logger.info('ML FLOW version: %s', mlflow.__version__)
 
   try:
-    for mv in mlflow_client.search_model_versions("name='Analyser'"):
+    for mv in mlflow_client.search_model_versions(f"name='{model_name}'"):
       _d = dict(mv)
       print(_d)
 
-      if _d['current_stage'] == gpn_config.configured('MLFLOW_MODEL_STAGE_TO_USE'):
+      if _d['current_stage'] == configured('MLFLOW_ANALYSER_MODEL_STAGE'):
         run_id = _d['run_id']
         dst_path = work_dir / 'models' / run_id
         dst_path.mkdir(parents=True, exist_ok=True)
@@ -48,7 +51,7 @@ def __load_weights_from_mlflow(weights_file_name='make_att_model_03.h5'):
 
 
 def __load_weights_from_mlflow_mock():
-  logger.warning(' ⚠️ ⚠️ ⚠️ We are not using BEST model from MLFLOW in TEST mode ⚠️ ⚠️ ⚠️  MLFLOW is not available')
+  logger.warning(' ⚠️ ⚠️ ⚠️ NOT using STAGED model from MLFLOW in TEST mode ⚠️ ⚠️ ⚠️  MLFLOW is not available')
   return None
 
 

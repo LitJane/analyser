@@ -5,7 +5,7 @@ import pandas as pd
 
 # TODO: why importing it here?
 from analyser.dictionaries import integration_path, labels, label2id
-from utilits.utils import _env_var
+from gpn_config import configured
 
 model = None
 
@@ -19,11 +19,10 @@ def wrapper(document):
     json_from_text = concat_paragraphs_to_string(document)
 
     if model is None:
-        TRACKING_URI = _env_var('ML_FLOW_TRACKING_URI')
-        mlflow.set_tracking_uri(TRACKING_URI)
+        mlflow.set_tracking_uri(configured ('MLFLOW_URL'))
 
-        model_name = _env_var('ML_FLOW_MODEL_NAME', "practice-classifier-ruRoberta-large")
-        stage = _env_var('ML_FLOW_STAGE', "Staging")
+        model_name = configured('MLFLOW_CLASSIFIER_MODEL_NAME', "practice-classifier-ruRoberta-large")
+        stage = configured('MLFLOW_CLASSIFIER_MODEL_STAGE', "Staging")
 
         model = mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}/{stage}",
                                          dst_path='integration/classifier/model')
