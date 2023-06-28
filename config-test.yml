@@ -9,6 +9,8 @@ GPN_DB_NAME: 'gpn'
 #GPN_DB_HOST: None
 GPN_DB_PORT: 27017
 
+BASE_MODEL_URL: "https://storage.googleapis.com/az-nlp/elmo_ru-news_wmt11-16_1.5M_steps.tar.gz"
+
 MLFLOW_URL: "http://192.168.10.38:5000"
 
 #GPN_DB_USER: None # set in env, because it is secret
