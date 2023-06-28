@@ -9,6 +9,7 @@ GPN_DB_NAME: 'gpn'
 GPN_DB_HOST: '192.168.10.36'
 GPN_DB_PORT: 27017
 
+BASE_MODEL_URL: "https://storage.googleapis.com/az-nlp/elmo_ru-news_wmt11-16_1.5M_steps.tar.gz"
 MLFLOW_URL: "http://192.168.10.38:5000"
 MLFLOW_MODEL_STAGE_TO_USE: "Production" #or Staging? refer ml flow wwb for values
 

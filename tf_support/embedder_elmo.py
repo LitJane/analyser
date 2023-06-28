@@ -7,6 +7,7 @@ import tensorflow_hub as hub
 from analyser.embedding_tools import AbstractEmbedder
 from analyser.log import logger
 from analyser.text_tools import Tokens
+from gpn_config import configured
 
 _e_instance: AbstractEmbedder or None = None
 
@@ -31,9 +32,11 @@ class ElmoEmbedderWrapper(AbstractEmbedder):
 
 class ElmoEmbedderImpl(AbstractEmbedder):
 
-  # TODO: move this to external config
-  def __init__(self, module_url: str = 'https://storage.googleapis.com/az-nlp/elmo_ru-news_wmt11-16_1.5M_steps.tar.gz'):
-    self.module_url = module_url
+  def __init__(self, module_url: str = None):
+    if module_url is None:
+      self.module_url = configured('BASE_MODEL_URL')
+    else:
+      self.module_url = module_url
     self.session = None
 
   def _build_session_and_graph(self):
