@@ -52,7 +52,6 @@ def __load_weights_from_mlflow(weights_file_name='make_att_model_03.h5', model_n
 
 def __load_weights_from_mlflow_mock():
   logger.warning(' ⚠️ ⚠️ ⚠️ NOT using STAGED model from MLFLOW in TEST mode ⚠️ ⚠️ ⚠️  MLFLOW is not available')
-  return None
 
 
 if gpn_config.in_test_mode:
