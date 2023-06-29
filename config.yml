@@ -12,7 +12,7 @@ BASE_MODEL_URL: "https://storage.googleapis.com/az-nlp/elmo_ru-news_wmt11-16_1.5
 
 MLFLOW_URL: "http://192.168.10.38:5000"
 
-MLFLOW_ANALYSER_MODEL_NAME: "practice-classifier-ruRoberta-large"
+MLFLOW_ANALYSER_MODEL_NAME: "Analyser"
 MLFLOW_ANALYSER_MODEL_STAGE: "Staging" #"Production" #or Staging.. refer ml flow docs for values
 
 MLFLOW_CLASSIFIER_MODEL_NAME: "practice-classifier-ruRoberta-large"
