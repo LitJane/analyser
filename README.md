@@ -18,10 +18,17 @@ export GPN_CONFIG_PATH = some/path/to/alternative/config.yaml
 - детали см. в [gpn_config.py](gpn_config.py)
   
 ### Теущая модель 
-Должна быть выбрана через UI MLFLow в разделе /models/Analyser. 
-Модель должна быть в той фазе, которая указана в [config.yaml](config.yaml): 
-- `MLFLOW_MODEL_STAGE_TO_USE` -- `Production` или `Staging`, 
-- `MLFLOW_URL` определяет URL сервера
+Должна быть зарегсистрирована и выбрана через UI MLFLow в разделе /models/Analyser.
+
+Параметр `MLFLOW_URL` определяет URL сервера
+
+1. Лучшая модель характеризуется большим значением метрики accuracy_TAGS
+![1](docs/publish_model_1.png)
+2. Имя модели указывается в [config.yaml](config.yaml) через параметр `MLFLOW_ANALYSER_MODEL_NAME`
+![2](docs/publish_model_2.png)
+3. Модель должна быть в той фазе, которая указана в [config.yaml](config.yaml): 
+- `MLFLOW_ANALYSER_MODEL_STAGE` -- `Production` или `Staging`,
+![4](docs/publish_model_4.png)
 
 
 
